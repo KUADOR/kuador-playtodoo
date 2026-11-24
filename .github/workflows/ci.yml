@@ -1,0 +1,21 @@
+# CI mínimo del tablero. Las ramas protegidas exigen el job «ci»: agrega aquí los pasos del stack
+# (compilar, lint, pruebas) cuando el proyecto tenga código.
+name: ci
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+permissions:
+  contents: read
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Documentos de la metodología
+        run: |
+          for f in "AGENTS.md" "docs/architecture.md" "docs/deployment.md" "docs/glossary.md" "DESIGN.md" "PRODUCT.md"; do
+            test -f "$f" || { echo "Falta $f"; exit 1; }
+          done

@@ -1,0 +1,10 @@
+# Servidores MCP de este repositorio (Codex los lee si marcas el proyecto como de confianza).
+# Inicia sesión una vez en el tablero: codex mcp login kuador
+
+[mcp_servers.kuador]
+url = "https://go-api.kuador.com/mcp"
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+# Variables que necesita (defínelas en tu entorno): CONTEXT7_API_KEY (opcional)
