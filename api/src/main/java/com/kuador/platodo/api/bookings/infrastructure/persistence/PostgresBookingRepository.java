@@ -30,6 +30,14 @@ public class PostgresBookingRepository implements BookingRepository {
     /** SQLSTATE of an exclusion constraint violation (booking_no_overlap). */
     static final String EXCLUSION_VIOLATION = "23P01";
 
+    /**
+     * SQLSTATE of a deadlock. Concurrent inserts of overlapping periods check the exclusion constraint against
+     * each other's uncommitted rows and can wait on each other; PostgreSQL then aborts one of them with this
+     * code instead of 23P01. A single-row insert waits only on those checks, so the aborted insert lost the
+     * slot to a concurrent overlapping booking that goes on to commit.
+     */
+    static final String DEADLOCK_DETECTED = "40P01";
+
     private static final String INSERT = """
             INSERT INTO booking (id, court_id, kind, status, period, player_id, holder_name, holder_phone,
                                  block_reason, created_by, created_at, expires_at, confirmed_at,
@@ -72,7 +80,7 @@ public class PostgresBookingRepository implements BookingRepository {
         try {
             insert(booking);
         } catch (DataAccessException error) {
-            if (isExclusionViolation(error)) {
+            if (lostTheSlotToAnOverlappingBooking(error)) {
                 throw new BookingOverlapException(booking.courtId(), booking.period(), error);
             }
             throw error;
@@ -119,9 +127,10 @@ public class PostgresBookingRepository implements BookingRepository {
                 .update();
     }
 
-    private static boolean isExclusionViolation(DataAccessException error) {
+    private static boolean lostTheSlotToAnOverlappingBooking(DataAccessException error) {
         return error.getMostSpecificCause() instanceof SQLException sqlError
-                && EXCLUSION_VIOLATION.equals(sqlError.getSQLState());
+                && (EXCLUSION_VIOLATION.equals(sqlError.getSQLState())
+                        || DEADLOCK_DETECTED.equals(sqlError.getSQLState()));
     }
 
     private static Booking toBooking(ResultSet row) throws SQLException {
