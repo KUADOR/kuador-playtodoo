@@ -77,12 +77,15 @@ const SLOT_TAKEN = 'Ese horario ya no está disponible. Elige otro.'
 const INVALID_SLOT = 'Esa hora no es una franja válida de la cancha o ya pasó. Elige otra.'
 const NETWORK = 'Revisa tu conexión e inténtalo de nuevo.'
 const GENERIC = 'Ocurrió un problema. Inténtalo de nuevo en unos minutos.'
+// A resource of another complex answers 404 like a missing one (contracts/tenancy.openapi.yaml), so the text
+// never says whether it exists elsewhere (Pantallas PLATODO-26 · cambios en pantallas existentes).
+const NOT_FOUND = 'No encontramos lo que buscas.'
 
 const ERROR_TEXT: Partial<Record<BookingErrorCode, string>> = {
   SLOT_UNAVAILABLE: SLOT_TAKEN,
   INVALID_SLOT,
-  COURT_NOT_FOUND: 'La cancha ya no existe. Recarga la página y elige otra.',
-  BOOKING_NOT_FOUND: 'La reserva ya no existe. Recarga el calendario.',
+  COURT_NOT_FOUND: `${NOT_FOUND} Recarga la página y elige otra cancha.`,
+  BOOKING_NOT_FOUND: `${NOT_FOUND} Recarga el calendario.`,
   UNAUTHENTICATED: 'Tu sesión terminó. Vuelve a iniciar sesión.',
   FORBIDDEN: 'No tienes permiso para gestionar reservas de este complejo.',
   NETWORK_ERROR: NETWORK,
