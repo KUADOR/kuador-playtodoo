@@ -5,6 +5,7 @@ import '../../core/design/tokens.g.dart';
 import '../../shared/ui/app_button.dart';
 import '../../shared/ui/app_card.dart';
 import '../../shared/ui/app_field.dart';
+import '../../shared/ui/booking_calendar/booking_calendar.dart';
 
 /// Debug-only gallery of the base components in every state.
 class DesignCatalogScreen extends StatefulWidget {
@@ -21,8 +22,36 @@ class _DesignCatalogScreenState extends State<DesignCatalogScreen> {
     AppSelectOption(value: 'tenis', label: 'Tenis'),
   ];
 
+  static const String _sampleToday = '2026-12-04';
+  static const int _sampleSlotMinutes = 60;
+  static const List<CalendarDay> _sampleDays = [
+    CalendarDay(
+      date: '2026-12-03',
+      slots: [
+        CalendarSlot(start: '19:00', availability: SlotAvailability.available),
+        CalendarSlot(start: '20:00', availability: SlotAvailability.occupied),
+      ],
+    ),
+    CalendarDay(
+      date: _sampleToday,
+      slots: [
+        CalendarSlot(start: '17:00', availability: SlotAvailability.available),
+        CalendarSlot(start: '18:00', availability: SlotAvailability.occupied),
+        CalendarSlot(start: '19:00', availability: SlotAvailability.available),
+        CalendarSlot(start: '20:00', availability: SlotAvailability.available),
+        CalendarSlot(start: '21:00', availability: SlotAvailability.occupied),
+        CalendarSlot(start: '22:00', availability: SlotAvailability.available),
+      ],
+    ),
+    CalendarDay(date: '2026-12-05', slots: []),
+  ];
+
   String? _sport;
   bool _isCardSelected = true;
+  SlotSelection? _calendarSelection = const SlotSelection(
+    date: _sampleToday,
+    start: '19:00',
+  );
 
   void _noop() {}
 
@@ -120,6 +149,45 @@ class _DesignCatalogScreenState extends State<DesignCatalogScreen> {
                   ),
                 ),
                 const AppCard(isLoading: true, child: SizedBox.shrink()),
+              ],
+            ),
+            _Section(
+              title: 'Calendario',
+              children: [
+                BookingCalendar(
+                  slotDurationMinutes: _sampleSlotMinutes,
+                  days: _sampleDays,
+                  today: _sampleToday,
+                  selected: _calendarSelection,
+                  onSelectionChange: (selection) =>
+                      setState(() => _calendarSelection = selection),
+                ),
+                const BookingCalendar(
+                  slotDurationMinutes: _sampleSlotMinutes,
+                  days: _sampleDays,
+                  today: _sampleToday,
+                  initialView: CalendarView.week,
+                  mode: CalendarMode.readonly,
+                ),
+                const BookingCalendar(
+                  slotDurationMinutes: _sampleSlotMinutes,
+                  days: _sampleDays,
+                  today: _sampleToday,
+                  initialView: CalendarView.month,
+                ),
+                const BookingCalendar(
+                  slotDurationMinutes: _sampleSlotMinutes,
+                  days: [],
+                  today: _sampleToday,
+                  status: CalendarStatus.loading,
+                ),
+                BookingCalendar(
+                  slotDurationMinutes: _sampleSlotMinutes,
+                  days: const [],
+                  today: _sampleToday,
+                  status: CalendarStatus.error,
+                  onRetry: _noop,
+                ),
               ],
             ),
             _Section(

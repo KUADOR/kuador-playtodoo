@@ -8,7 +8,10 @@ enum AppIcons {
   calendar(LucideIcons.calendar),
   check(LucideIcons.check),
   chevronDown(LucideIcons.chevronDown),
+  chevronLeft(LucideIcons.chevronLeft),
+  chevronRight(LucideIcons.chevronRight),
   clock(LucideIcons.clock),
+  eye(LucideIcons.eye),
   lock(LucideIcons.lock),
   mapPin(LucideIcons.mapPin),
   search(LucideIcons.search);

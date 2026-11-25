@@ -6,6 +6,7 @@ import 'package:playtodoo/main.dart';
 import 'package:playtodoo/shared/ui/app_button.dart';
 import 'package:playtodoo/shared/ui/app_card.dart';
 import 'package:playtodoo/shared/ui/app_field.dart';
+import 'package:playtodoo/shared/ui/booking_calendar/booking_calendar.dart';
 
 void main() {
   test('the catalog route does not exist when the catalog is disabled', () {
@@ -44,19 +45,27 @@ void main() {
           matching: find.byType(Scrollable),
         )
         .first;
-    for (final section in ['Botones', 'Campos', 'Tarjetas', 'Iconos']) {
+    // The list is lazy: each component is checked while its section is
+    // built.
+    final componentsBySection = {
+      'Botones': find.byType(AppButton, skipOffstage: false),
+      'Campos': find.byWidgetPredicate(
+        (w) => w is AppField,
+        skipOffstage: false,
+      ),
+      'Tarjetas': find.byType(AppCard, skipOffstage: false),
+      'Calendario': find.byType(BookingCalendar, skipOffstage: false),
+      'Iconos': find.text('Iconos'),
+    };
+    for (final MapEntry(key: section, value: components)
+        in componentsBySection.entries) {
       await tester.scrollUntilVisible(
         find.text(section),
         200,
         scrollable: catalogScroll,
       );
       expect(find.text(section), findsOneWidget);
+      expect(components, findsWidgets, reason: section);
     }
-    expect(find.byType(AppButton, skipOffstage: false), findsWidgets);
-    expect(
-      find.byWidgetPredicate((w) => w is AppField, skipOffstage: false),
-      findsWidgets,
-    );
-    expect(find.byType(AppCard, skipOffstage: false), findsWidgets);
   });
 }
