@@ -22,8 +22,8 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.kuador.platodo.api.bookings.application.CreatePendingBooking;
-import com.kuador.platodo.api.support.FixedTenantScopeFilter;
 import com.kuador.platodo.api.support.TenantDatabase;
+import com.kuador.platodo.api.support.TenantHostRequests;
 import com.kuador.platodo.api.support.TestTenants;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 import com.kuador.platodo.api.tenancy.infrastructure.persistence.TenantMigrations;
@@ -42,11 +42,11 @@ class StaffBookingApiFailClosedIT {
     @TestConfiguration(proxyBeanMethods = false)
     static class TenantOnly {
 
-        /** Stand-in for the subdomain resolution of PLATODO-50: every request runs in this class's tenant. */
+        /** Every request goes to the host of this class's tenant and is resolved by Tenancy. */
         @Bean
         @DependsOn(FLYWAY_INITIALIZER)
-        FixedTenantScopeFilter tenantScope(TenantMigrations migrations) {
-            return new FixedTenantScopeFilter(TestTenants.provision(migrations, TENANT));
+        TenantHostRequests tenantHost(TenantMigrations migrations) {
+            return new TenantHostRequests(TestTenants.provision(migrations, TENANT));
         }
     }
 

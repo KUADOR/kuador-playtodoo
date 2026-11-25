@@ -5,9 +5,9 @@ import com.kuador.platodo.api.tenancy.infrastructure.persistence.TenantMigration
 import com.kuador.platodo.api.tenancy.infrastructure.persistence.TenantSchemaName;
 
 /**
- * Two-tenant harness (ADR-010): tenants registered in {@code global.tenant} and migrated through the production
- * {@link TenantMigrations}, until Tenancy provisioning exists. Needs a started application context, which creates
- * the global schema.
+ * Two-tenant harness (ADR-010): tenants registered in {@code global.tenant} with a current subdomain in
+ * {@code global.tenant_domain}, and migrated through the production {@link TenantMigrations}, until Tenancy
+ * provisioning exists. Needs a started application context, which creates the global schema.
  */
 public final class TestTenants {
 
@@ -17,7 +17,14 @@ public final class TestTenants {
     /** Bean that runs the startup migrations; beans that provision tenants while the context starts depend on it. */
     public static final String FLYWAY_INITIALIZER = "flywayInitializer";
 
-    private static final String TEST_DISPLAY_NAME = "Test complex";
+    /** Display name of every registered test tenant. */
+    public static final String DISPLAY_NAME = "Test complex";
+    /** Root domain of the test environment ({@code playtodoo.root-domain}). */
+    public static final String ROOT_DOMAIN = "localhost";
+    /** Host of the global context. */
+    public static final String GLOBAL_HOST = "api." + ROOT_DOMAIN;
+
+    private static final String SUBDOMAIN_PREFIX = "test-";
 
     private TestTenants() {
     }
@@ -29,7 +36,10 @@ public final class TestTenants {
         return tenant;
     }
 
-    /** Registers {@code tenant} with {@code status} unless it is already registered; no schema is created. */
+    /**
+     * Registers {@code tenant} with {@code status} and its current subdomain {@link #subdomainOf}, unless it is already
+     * registered; no schema is created.
+     */
     public static void register(TenantId tenant, String status) {
         TenantDatabase.admin().sql("""
                         INSERT INTO global.tenant (id, schema_name, display_name, status, created_at)
@@ -38,9 +48,27 @@ public final class TestTenants {
                         """)
                 .param("id", tenant.value())
                 .param("schema", schemaOf(tenant))
-                .param("name", TEST_DISPLAY_NAME)
+                .param("name", DISPLAY_NAME)
                 .param("status", status)
                 .update();
+        TenantDatabase.admin().sql("""
+                        INSERT INTO global.tenant_domain (subdomain, tenant_id, is_current, created_at)
+                        VALUES (:subdomain, :id::uuid, true, now())
+                        ON CONFLICT (subdomain) DO NOTHING
+                        """)
+                .param("subdomain", subdomainOf(tenant))
+                .param("id", tenant.value())
+                .update();
+    }
+
+    /** Current subdomain of a registered test tenant, derived from its id so that tenants never share one. */
+    public static String subdomainOf(TenantId tenant) {
+        return SUBDOMAIN_PREFIX + tenant.value().replace("-", "");
+    }
+
+    /** Host of a registered test tenant. */
+    public static String hostOf(TenantId tenant) {
+        return subdomainOf(tenant) + "." + ROOT_DOMAIN;
     }
 
     public static String schemaOf(TenantId tenant) {
