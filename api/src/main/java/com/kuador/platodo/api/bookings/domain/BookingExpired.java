@@ -4,12 +4,15 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.kuador.platodo.api.bookings.domain.event.BookingEvent;
+
 /**
  * A pending booking reached its deadline without being confirmed and released its slot.
  * Carries no personal data (see the event catalog in docs/architecture.md).
  */
 public record BookingExpired(
-        String tenantId, UUID bookingId, UUID courtId, Instant start, Instant end, BookingKind kind) {
+        String tenantId, UUID bookingId, UUID courtId, Instant start, Instant end, BookingKind kind)
+        implements BookingEvent {
 
     public BookingExpired {
         Objects.requireNonNull(tenantId, "tenantId");

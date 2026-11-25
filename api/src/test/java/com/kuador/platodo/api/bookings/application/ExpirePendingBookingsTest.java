@@ -27,7 +27,7 @@ class ExpirePendingBookingsTest {
 
     private final StubRepository repository = new StubRepository();
     private final List<BookingExpired> published = new ArrayList<>();
-    private final BookingEventPublisher events = published::add;
+    private final BookingEventPublisher events = event -> published.add((BookingExpired) event);
     private final ExpirePendingBookings expirePendingBookings =
             new ExpirePendingBookings(repository, events, Clock.fixed(NOW, ZoneOffset.UTC));
 
@@ -78,6 +78,36 @@ class ExpirePendingBookingsTest {
 
         @Override
         public Optional<Booking> findById(UUID id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void serializeWritesOfCourt(UUID courtId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int expireOverdueOverlapping(UUID courtId, TimePeriod period, Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Booking> confirmIfPending(UUID id, UUID playerId, Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Booking> cancelIfPending(UUID id, UUID playerId, Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Booking> findActiveOfPlayerOverlapping(UUID playerId, TimePeriod period, Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<TimePeriod> findOccupiedPeriods(UUID courtId, TimePeriod range, Instant now) {
             throw new UnsupportedOperationException();
         }
 

@@ -65,6 +65,46 @@ class BookingTest {
     }
 
     @Test
+    void aPendingBookingIsEffectivelyPendingBeforeItsHoldEnds_criterion6() {
+        Booking pending = Booking.pendingReservation(UUID.randomUUID(), UUID.randomUUID(), PERIOD,
+                UUID.randomUUID(), NOW);
+        Instant lastSecondOfHold = pending.expiresAt().minusSeconds(1);
+
+        assertThat(pending.isOverdueAt(lastSecondOfHold)).isFalse();
+        assertThat(pending.asSeenAt(lastSecondOfHold)).isSameAs(pending);
+    }
+
+    @Test
+    void aPendingBookingIsEffectivelyExpiredFromTheEndOfItsHold_criterion6() {
+        Booking pending = Booking.pendingReservation(UUID.randomUUID(), UUID.randomUUID(), PERIOD,
+                UUID.randomUUID(), NOW);
+
+        Booking seen = pending.asSeenAt(pending.expiresAt());
+
+        assertThat(pending.isOverdueAt(pending.expiresAt())).isTrue();
+        assertThat(seen.status()).isEqualTo(BookingStatus.EXPIRED);
+        assertThat(seen).usingRecursiveComparison().ignoringFields("status").isEqualTo(pending);
+    }
+
+    @Test
+    void aConfirmedBookingNeverExpires() {
+        Booking confirmed = Booking.staffReservation(UUID.randomUUID(), UUID.randomUUID(), PERIOD,
+                new BookingHolder("Holder", "000"), UUID.randomUUID(), NOW);
+
+        assertThat(confirmed.asSeenAt(NOW.plus(Booking.PENDING_HOLD).plusSeconds(1))).isSameAs(confirmed);
+    }
+
+    @Test
+    void aReservationIsHeldOnlyByItsPlayer() {
+        UUID playerId = UUID.randomUUID();
+        Booking pending = Booking.pendingReservation(UUID.randomUUID(), UUID.randomUUID(), PERIOD, playerId, NOW);
+
+        assertThat(pending.isHeldBy(playerId)).isTrue();
+        assertThat(pending.isHeldBy(UUID.randomUUID())).isFalse();
+        assertThat(pending.isHeldBy(null)).isFalse();
+    }
+
+    @Test
     void theHolderIsRedactedWhenPrinted() {
         assertThat(new BookingHolder("Holder Name", "000").toString()).doesNotContain("Holder Name", "000");
     }

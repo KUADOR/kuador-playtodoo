@@ -3,11 +3,12 @@ package com.kuador.platodo.api.bookings.infrastructure.events;
 import org.springframework.context.ApplicationEventPublisher;
 
 import com.kuador.platodo.api.bookings.application.port.out.BookingEventPublisher;
-import com.kuador.platodo.api.bookings.domain.BookingExpired;
+import com.kuador.platodo.api.bookings.domain.event.BookingEvent;
 
 /**
- * Publishes booking events as Spring application events (ADR-007). Listeners that must only react to
- * committed changes use {@code @TransactionalEventListener(phase = AFTER_COMMIT)}.
+ * Publishes booking events as Spring application events (ADR-007), in-process, same thread and transaction.
+ * Listeners that must only react to committed changes use
+ * {@code @TransactionalEventListener(phase = AFTER_COMMIT)}.
  */
 public class SpringBookingEventPublisher implements BookingEventPublisher {
 
@@ -18,7 +19,7 @@ public class SpringBookingEventPublisher implements BookingEventPublisher {
     }
 
     @Override
-    public void publish(BookingExpired event) {
+    public void publish(BookingEvent event) {
         publisher.publishEvent(event);
     }
 }

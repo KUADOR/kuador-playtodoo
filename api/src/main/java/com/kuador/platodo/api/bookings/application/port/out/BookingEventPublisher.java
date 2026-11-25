@@ -1,9 +1,12 @@
 package com.kuador.platodo.api.bookings.application.port.out;
 
-import com.kuador.platodo.api.bookings.domain.BookingExpired;
+import com.kuador.platodo.api.bookings.domain.event.BookingEvent;
 
-/** Announces booking lifecycle changes to other modules. */
+/**
+ * Announces booking lifecycle changes to other modules. Called inside the transaction that changed the
+ * booking, so after-commit listeners only see committed changes.
+ */
 public interface BookingEventPublisher {
 
-    void publish(BookingExpired event);
+    void publish(BookingEvent event);
 }

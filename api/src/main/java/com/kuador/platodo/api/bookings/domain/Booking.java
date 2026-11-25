@@ -57,6 +57,28 @@ public record Booking(
                 playerId, null, null, playerId, now, now.plus(PENDING_HOLD), null, null);
     }
 
+    /** Whether this booking was made by the given player. */
+    public boolean isHeldBy(UUID player) {
+        return player != null && player.equals(playerId);
+    }
+
+    /** A pending booking whose hold ended at or before {@code now}; it no longer occupies the slot. */
+    public boolean isOverdueAt(Instant now) {
+        return status == BookingStatus.PENDING && !expiresAt.isAfter(now);
+    }
+
+    /**
+     * The booking with its effective status at {@code now}: an overdue pending booking is reported as
+     * EXPIRED even if the stored row was not updated yet (ADR-006, lazy expiry).
+     */
+    public Booking asSeenAt(Instant now) {
+        if (!isOverdueAt(now)) {
+            return this;
+        }
+        return new Booking(id, courtId, kind, BookingStatus.EXPIRED, period, playerId, holder, blockReason,
+                createdBy, createdAt, expiresAt, confirmedAt, cancellation);
+    }
+
     /** A manual reservation registered by the complex staff; it is confirmed from the start. */
     public static Booking staffReservation(
             UUID id, UUID courtId, TimePeriod period, BookingHolder holder, UUID staffId, Instant now) {

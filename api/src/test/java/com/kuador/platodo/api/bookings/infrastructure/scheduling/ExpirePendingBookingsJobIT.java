@@ -197,7 +197,7 @@ class ExpirePendingBookingsJobIT {
         PostgresBookingRepository currentTenantBookings =
                 new PostgresBookingRepository(JdbcClient.create(activeTenants.dataSource()));
         ExpirePendingBookings expirePendingBookings = new ExpirePendingBookings(
-                currentTenantBookings, published::add, Clock.fixed(now, ZoneOffset.UTC));
+                currentTenantBookings, event -> published.add((BookingExpired) event), Clock.fixed(now, ZoneOffset.UTC));
         return new ExpirePendingBookingsJob(activeTenants, expirePendingBookings);
     }
 
