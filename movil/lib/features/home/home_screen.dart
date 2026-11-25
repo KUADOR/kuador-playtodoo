@@ -33,6 +33,14 @@ class HomeScreen extends StatelessWidget {
                         Navigator.of(context)
                             .pushNamed(AppRoutes.designCatalog),
                   ),
+                  const SizedBox(height: AppTokens.space3),
+                  AppButton(
+                    label: 'Probar reserva con datos de prueba',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: () =>
+                        Navigator.of(context)
+                            .pushNamed(AppRoutes.bookingPreview),
+                  ),
                 ],
               ],
             ),

@@ -7,6 +7,7 @@ enum AppIcons {
   alert(LucideIcons.circleAlert),
   calendar(LucideIcons.calendar),
   check(LucideIcons.check),
+  circleCheck(LucideIcons.circleCheck),
   chevronDown(LucideIcons.chevronDown),
   chevronLeft(LucideIcons.chevronLeft),
   chevronRight(LucideIcons.chevronRight),
@@ -14,7 +15,8 @@ enum AppIcons {
   eye(LucideIcons.eye),
   lock(LucideIcons.lock),
   mapPin(LucideIcons.mapPin),
-  search(LucideIcons.search);
+  search(LucideIcons.search),
+  warning(LucideIcons.triangleAlert);
 
   const AppIcons(this.data);
 
