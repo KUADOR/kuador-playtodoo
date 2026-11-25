@@ -25,22 +25,8 @@ abstract final class AppTokens {
   static const Color colorDisabledFg = Color(0xFF4B5563);
   static const Color colorDisabledBorder = Color(0xFF9CA3AF);
   static const Color colorOccupiedBg = Color(0xFFE5E7EB);
-  static const List<BoxShadow> shadowCard = [
-    BoxShadow(
-      color: Color.fromRGBO(11, 47, 102, 0.14),
-      offset: Offset(0.0, 1.0),
-      blurRadius: 3.0,
-      spreadRadius: 0.0,
-    ),
-  ];
-  static const List<BoxShadow> shadowOverlay = [
-    BoxShadow(
-      color: Color.fromRGBO(11, 47, 102, 0.2),
-      offset: Offset(0.0, 8.0),
-      blurRadius: 24.0,
-      spreadRadius: 0.0,
-    ),
-  ];
+  static const List<BoxShadow> shadowCard = [BoxShadow(color: Color.fromRGBO(11, 47, 102, 0.14), offset: Offset(0.0, 1.0), blurRadius: 3.0, spreadRadius: 0.0)];
+  static const List<BoxShadow> shadowOverlay = [BoxShadow(color: Color.fromRGBO(11, 47, 102, 0.2), offset: Offset(0.0, 8.0), blurRadius: 24.0, spreadRadius: 0.0)];
   static const double space1 = 4.0;
   static const double space2 = 8.0;
   static const double space3 = 12.0;
