@@ -39,6 +39,12 @@
   font-size: var(--font-size-xs);
 }
 
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1fr;
