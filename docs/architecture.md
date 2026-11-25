@@ -42,7 +42,7 @@ La `api` es un **monolito modular**: una sola aplicación desplegable, dividida 
   - **Aplicación:** casos de uso y puertos de entrada y de salida.
   - **Adaptadores de entrada:** API REST, consumida por las tres apps.
   - **Adaptadores de salida:** persistencia en PostgreSQL e integraciones externas, siempre detrás de una interfaz (puerto).
-- **Spring Events:** un módulo publica eventos de dominio y otros módulos reaccionan sin acoplarse entre sí. [POR DEFINIR: catálogo de eventos y cuáles se procesan de forma síncrona o asíncrona].
+- **Spring Events:** un módulo publica eventos de dominio y otros módulos reaccionan sin acoplarse entre sí. El catálogo de eventos está en «Catálogo de eventos». [POR DEFINIR: qué eventos de otros módulos se procesan de forma asíncrona].
 - **Multi-tenant:** la resolución del tenant y el esquema activo se manejan de forma transversal en el módulo Tenancy, no dentro de cada caso de uso.
 - **Verificación de fronteras entre módulos:** [POR DEFINIR: herramienta para hacerlas cumplir (por ejemplo, Spring Modulith o pruebas de arquitectura)].
 
@@ -74,11 +74,27 @@ El dominio no conoce Spring ni PostgreSQL. El controlador llama al puerto de ent
 
 Una jugadora cancela una reserva:
 
-1. El módulo **Reservas** cancela la reserva según la política del complejo y publica el evento `ReservaCancelada` (cancha, fecha, horario).
-2. El módulo **Disponibilidad** escucha el evento y vuelve a marcar ese horario como libre.
-3. Reservas no llama directamente a Disponibilidad ni conoce sus clases internas.
+1. El módulo **Reservas** cancela la reserva y publica el evento `BookingCancelled` después del commit.
+2. Un módulo interesado (por ejemplo, unas futuras notificaciones) escucha el evento y reacciona.
+3. Reservas no llama directamente a ese módulo ni conoce sus clases internas.
 
-Este evento es solo un ejemplo del mecanismo. El catálogo real de eventos sigue [POR DEFINIR].
+La ocupación de las canchas **no** se copia a Disponibilidad por eventos: el calendario la lee de Reservas (decisión D4 en «Catálogo de eventos» y ADR-006).
+
+### Catálogo de eventos
+
+Eventos de dominio publicados con Spring Events. El publicador los emite dentro de la transacción y los consumidores escuchan con `@TransactionalEventListener(phase = AFTER_COMMIT)`, así nunca reaccionan a un cambio que se revirtió. Ningún evento lleva datos personales (nombre o teléfono del titular).
+
+| Evento | Módulo que lo publica | Cuándo | Carga |
+|---|---|---|---|
+| `BookingCreated` | Reservas | Se crea una reserva (pendiente del jugador o confirmada del personal) | `tenantId`, `bookingId`, `courtId`, `start`, `end`, `kind` |
+| `BookingConfirmed` | Reservas | El jugador confirma su pendiente dentro del plazo | Igual que arriba |
+| `BookingCancelled` | Reservas | El jugador cancela su pendiente o el personal cancela una reserva o quita un bloqueo | Igual que arriba |
+| `BookingExpired` | Reservas | Un pendiente vence (tarea programada) | Igual que arriba |
+| `SlotBlocked` | Reservas | El personal bloquea una franja libre | Igual que arriba |
+
+En la épica PLATODO-25 no hay consumidores obligatorios; notificaciones y métricas los usarán en otras tarjetas. Contrato REST de Reservas: `contracts/bookings.openapi.yaml`.
+
+**D4 · Ocupación sin copia en Disponibilidad:** la fuente única de verdad de la ocupación es la tabla `booking` de Reservas. El calendario (jugador y personal) lee la ocupación del puerto de entrada de Reservas (`GET /courts/{courtId}/occupancy`, `GET /staff/bookings`). Disponibilidad no mantiene una copia actualizada por eventos. Se descartó la copia porque la consistencia eventual mostraría como libres franjas ya tomadas. Disponibilidad sigue siendo dueña de la configuración de la cancha (duración y franjas válidas), que Reservas consume por el puerto `CourtSlotRules`.
 
 ## Arquitectura del frontend
 
@@ -112,7 +128,8 @@ La carpeta se llama igual que el módulo `Reservas` del backend. Si cambia la fo
 
 - **Base de datos:** PostgreSQL con estrategia Schema per Tenant: cada complejo tiene su propio esquema.
 - **Esquema global** (propuesta): tenants, planes, suscripciones, pagos de suscripción, usuarios globales, parámetros de plataforma, auditoría y catálogo de complejos (ver abajo).
-- **Herramienta de migraciones:** [POR DEFINIR]. Debe cubrir tanto el esquema global como la creación y evolución del esquema de cada tenant.
+- **Herramienta de migraciones:** Flyway, con un conjunto de migraciones para el esquema global y otro que se aplica a cada esquema de tenant (propuesta en ADR-009).
+- **Reservas sin solapes:** la tabla `booking` de cada esquema de tenant tiene una restricción de exclusión (`btree_gist`) que impide dos reservas o bloqueos activos solapados en la misma cancha (ADR-006).
 
 Ejemplo de cómo se ve la base con dos complejos ficticios (los nombres de esquema son ilustrativos):
 
@@ -166,8 +183,8 @@ Propuesta inicial del backend `api`, a confirmar al diseñar. Cada módulo expon
 | Tenancy | Resolver el complejo por subdominio, crear y activar o suspender esquemas | Resolución de tenant por solicitud; ciclo de vida del tenant |
 | Identidad y acceso | Registro e inicio de sesión de jugadores, usuarios del complejo y usuarios globales; roles y permisos | [POR DEFINIR] |
 | Complejos y canchas | Información comercial, ubicación, contacto y canchas; publicar los datos públicos al catálogo global de complejos y atender la búsqueda de cercanos | [POR DEFINIR] |
-| Disponibilidad | Horarios y disponibilidad por cancha | [POR DEFINIR] |
-| Reservas | Crear, consultar y cancelar reservas según la política del complejo, sin duplicados ni conflictos | [POR DEFINIR] |
+| Disponibilidad | Horarios, duración y franjas válidas por cancha (no guarda la ocupación, ver D4) | Configuración de la cancha consumida por Reservas mediante el puerto `CourtSlotRules`; resto [POR DEFINIR] |
+| Reservas | Crear, consultar y cancelar reservas y bloqueos, pendiente de 5 minutos y ocupación de cada cancha, sin duplicados ni conflictos | `contracts/bookings.openapi.yaml`; eventos del «Catálogo de eventos» |
 | Novedades | Publicación y consulta de novedades | [POR DEFINIR] |
 | Torneos | Publicación y administración de torneos | [POR DEFINIR] |
 | Planes y suscripciones | Planes, precios, características y seguimiento de suscripciones y pagos externos | [POR DEFINIR] |
@@ -179,8 +196,8 @@ Ejemplo de qué módulos participan al crear una reserva (ilustrativo):
 1. `movil` envía la solicitud a la `api` con el subdominio del complejo.
 2. **Tenancy** resuelve el tenant y activa su esquema.
 3. **Identidad y acceso** comprueba que la jugadora está autenticada.
-4. **Reservas** valida que el horario esté libre y crea la reserva. Si ya está ocupado, responde con un conflicto (ver ADR-006).
-5. **Disponibilidad** actualiza el horario como ocupado al recibir el evento correspondiente.
+4. **Reservas** obtiene la duración de la cancha de Disponibilidad (`CourtSlotRules`) y crea la reserva pendiente. Si el horario ya está ocupado, la base rechaza la fila y la `api` responde `409 SLOT_UNAVAILABLE` (ver ADR-006).
+5. **Reservas** publica `BookingCreated` después del commit. El calendario ya ve la franja ocupada porque lee la ocupación de Reservas (D4).
 
 ## Integraciones
 
@@ -197,6 +214,7 @@ Ejemplo: si se decide enviar correos de confirmación de reserva, el módulo Res
 - **ADR-003 · Acceso de Kuador con motivo y auditoría** ({date}): el equipo de Kuador puede leer y editar datos operativos de un complejo solo con permiso y con un motivo registrado en la auditoría. Ejemplo: una persona de soporte de Kuador necesita ver las reservas de «Canchas El Sol» por un reclamo. Antes de acceder registra el motivo («reclamo por reserva duplicada») y queda en la auditoría con quién, cuándo y a qué accedió.
 - **ADR-004 · Sin pagos en la plataforma en el MVP** ({date}): el jugador paga la reserva en el complejo y el complejo paga su suscripción a Kuador por transferencia o factura. La plataforma solo registra el seguimiento. Ejemplo: la jugadora reserva en `movil` y paga en la recepción del complejo; el complejo transfiere su suscripción mensual a Kuador y el equipo de Kuador registra ese pago en `backoffice`.
 - **ADR-005 · Tres aplicaciones en paralelo sobre un backend único** ({date}): móvil, web del complejo y backoffice global se construyen a la vez contra la misma `api`.
-- **ADR-006 · Prevención de reservas duplicadas** ({date}): el sistema nunca debe permitir dos reservas en la misma cancha y horario. [POR DEFINIR: mecanismo técnico (restricción en base de datos, bloqueo, etc.)]. Ejemplo del caso a evitar: dos jugadores piden a la vez la cancha 1 del viernes a las 20:00. Solo una reserva se confirma; la otra recibe un aviso de que el horario ya no está disponible.
+- **ADR-006 · Prevención de reservas duplicadas** (2026-11-25, propuesto): el sistema nunca permite dos reservas o bloqueos activos (pendiente vigente o confirmada) solapados en la misma cancha. Mecanismo: tabla única `booking` por esquema de tenant con el horario como `tstzrange [inicio, fin)` y una restricción de exclusión de PostgreSQL (`EXCLUDE USING gist (court_id WITH =, period WITH &&) WHERE status IN ('PENDING','CONFIRMED')`, extensión `btree_gist`). La violación (SQLSTATE `23P01`) se traduce a `409` con Problem Details y `code` estable. El pendiente de 5 minutos vence de forma perezosa al reservar, con una tarea programada por tenant y como estado efectivo en las lecturas; confirmar es un `UPDATE` condicional. Ejemplo: dos jugadores piden a la vez la cancha 1 del viernes a las 20:00; solo una reserva se crea y la otra recibe `SLOT_UNAVAILABLE`. Detalle y alternativas: `docs/adr/ADR-006-prevencion-de-reservas-duplicadas.md`.
 - **ADR-007 · Monolito modular con arquitectura hexagonal y Spring Events** ({date}): el backend `api` es un monolito modular. Cada módulo sigue arquitectura hexagonal y los módulos se comunican entre sí mediante Spring Events, sin acceder a las partes internas de otros módulos.
 - **ADR-008 · Catálogo global de complejos para la búsqueda de cercanos** ({date}): propuesta a confirmar. La búsqueda por ubicación se resuelve en el esquema global con datos públicos de los complejos, sincronizados mediante eventos desde cada tenant. Los datos operativos (canchas, horarios, reservas) se consultan solo en el esquema del tenant elegido, sin consultas entre esquemas.
+- **ADR-009 · Migraciones con Flyway** (2026-11-25, propuesto): migraciones SQL versionadas con Flyway, un conjunto para el esquema global y otro aplicado a cada esquema de tenant (al crearlo y en cada despliegue), con historial propio por esquema. Detalle y alternativas: `docs/adr/ADR-009-migraciones-con-flyway.md`.

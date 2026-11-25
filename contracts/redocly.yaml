@@ -1,0 +1,12 @@
+extends:
+  - recommended
+
+rules:
+  # The API license is a business decision that has not been made yet.
+  info-license: off
+  operation-4xx-problem-details-rfc7807: error
+  no-invalid-media-type-examples: error
+  no-invalid-parameter-examples: error
+  no-invalid-schema-examples: error
+  operation-operationId-unique: error
+  security-defined: error
