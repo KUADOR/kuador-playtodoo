@@ -71,3 +71,29 @@ Además acepta los atributos de `<button>` (`type` es `button` por defecto).
 | Plataforma | Diferencia |
 |---|---|
 | `movil` | Ripple de Material al pulsar |
+
+## Angular (`backoffice`)
+
+Componente standalone `Button` en `backoffice/src/app/shared/ui/button/` (selector `app-button`), con iconos de `@lucide/angular`.
+
+| Contrato | Angular |
+|---|---|
+| `variant`, `label`, `loading`, `disabled` | Entradas con el mismo nombre (`label` es obligatoria) |
+| `press` | Salida `(press)`: solo se emite si no está `loading` ni `disabled` |
+| — | `type` (`button` por defecto · `submit` · `reset`) para usarlo en formularios |
+| — | `loadingLabel` (por defecto «Guardando…»): texto que reemplaza la etiqueta mientras carga |
+
+```html
+<app-button label="Guardar cambios" (press)="save()" />
+<app-button variant="secondary" label="Ver complejo" />
+<app-button variant="danger" label="Suspender complejo" [loading]="saving()" />
+<app-button variant="text" label="Cancelar" [disabled]="true" />
+```
+
+- **Cargando:** spinner `LucideLoaderCircle` (oculto a lectores) + `loadingLabel`; el botón sigue enfocable, con `aria-busy="true"` y `aria-disabled="true"`, y si es `submit` no envía el formulario.
+- **Deshabilitado:** atributo nativo `disabled` (sale del orden de tabulación).
+- **Foco:** `:focus-visible` con anillo `color-focus` de `border-focus-ring` y separación `border-focus-offset`.
+- **Pulsado del primario:** `color-primary-hover` + `inset var(--shadow-card)` como sombra interior.
+- **Sin estilo propio mientras sigan [POR DEFINIR]:** hover del peligro y pulsado del secundario (este usa el mismo `color-primary-tint` del hover).
+- El spinner respeta `prefers-reduced-motion`.
+- Catálogo vivo: `npm start` en `backoffice/` y abrir `/design` (solo en desarrollo). Capturas en `docs/evidence/platodo-20/`.

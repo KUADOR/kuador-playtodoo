@@ -1,0 +1,55 @@
+:host {
+  /* Narrowest column before the grid wraps: a layout choice for this dev page. */
+  --catalog-column-min: 18rem;
+
+  display: block;
+}
+
+.catalog {
+  box-sizing: border-box;
+  max-width: var(--size-content-max);
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+
+.catalog__intro,
+.catalog__card-detail {
+  color: var(--color-fg-muted);
+}
+
+.catalog__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--catalog-column-min)), 1fr));
+  gap: var(--space-5);
+}
+
+.catalog__example {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.catalog__example h3 {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.catalog__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.catalog__card-title {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.catalog__card-detail {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+section {
+  margin-top: var(--space-6);
+}

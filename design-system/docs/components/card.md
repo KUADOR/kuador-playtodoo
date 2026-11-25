@@ -62,3 +62,24 @@ Además acepta los atributos de `<div>`. El contenido va como `children`.
 | Plataforma | Diferencia |
 |---|---|
 | `movil` | Ripple de Material al tocar una tarjeta interactiva |
+
+## Angular (`backoffice`)
+
+Componente standalone `Card` en `backoffice/src/app/shared/ui/card/` (selector `app-card`). El contenido se proyecta con `<ng-content>`.
+
+| Contrato | Angular |
+|---|---|
+| `variant` | Entrada obligatoria; se expone como `data-variant` en el elemento (hoy las cinco variantes se ven igual) |
+| `selected`, `loading` | Entradas con el mismo nombre |
+
+```html
+<app-card variant="booking" [selected]="isSelected()">
+  <p>Sábado 18:00 – 19:00</p>
+  <p>Cancha 2 · confirmada</p>
+</app-card>
+<app-card variant="complex" [loading]="true" />
+```
+
+- **Seleccionada:** borde `color-primary` de `border-width-lg`, fondo `color-primary-tint` e icono `LucideCheck` con el texto oculto «Seleccionada» para lectores. La tarjeta no es interactiva por sí misma: si una pantalla la hace seleccionable, envuélvela en un botón o agrega el rol y `aria-pressed`/`aria-selected` según el uso.
+- **Cargando:** el contenido se reemplaza por un esqueleto en `color-disabled-bg` con texto oculto «Cargando…» y `aria-busy="true"`; la animación se apaga con `prefers-reduced-motion`.
+- Catálogo vivo en `/design` (solo desarrollo). Capturas en `docs/evidence/platodo-20/`.

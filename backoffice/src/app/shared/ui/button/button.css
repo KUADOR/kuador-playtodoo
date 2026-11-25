@@ -1,0 +1,113 @@
+:host {
+  /* Spinner speed: an animation choice, not an identity token. */
+  --button-spinner-duration: 1s;
+
+  display: inline-block;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--size-touch-min);
+  min-width: var(--size-touch-min);
+  padding: 0 var(--space-4);
+  border: var(--border-width-md) solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-heading);
+  cursor: pointer;
+}
+
+.button:focus-visible {
+  outline: var(--border-focus-ring) solid var(--color-focus);
+  outline-offset: var(--border-focus-offset);
+}
+
+.button[aria-busy='true'] {
+  cursor: progress;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+}
+
+/* Primary */
+.button--primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.button--primary:hover:not(:disabled, [aria-busy='true']) {
+  background: var(--color-primary-hover);
+}
+
+.button--primary:active:not(:disabled, [aria-busy='true']) {
+  background: var(--color-primary-hover);
+  box-shadow: inset var(--shadow-card);
+}
+
+/* Secondary */
+.button--secondary {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.button--secondary:hover:not(:disabled, [aria-busy='true']) {
+  background: var(--color-primary-tint);
+}
+
+/* Danger */
+.button--danger {
+  background: var(--color-danger);
+  color: var(--color-on-primary);
+}
+
+/* Text */
+.button--text {
+  background: transparent;
+  color: var(--color-primary);
+}
+
+.button--text:hover:not(:disabled, [aria-busy='true']) {
+  text-decoration: underline;
+}
+
+/* Disabled */
+.button--primary:disabled,
+.button--danger:disabled {
+  background: var(--color-disabled-bg);
+  color: var(--color-disabled-fg);
+  box-shadow: none;
+}
+
+.button--secondary:disabled {
+  background: var(--color-surface);
+  border-color: var(--color-disabled-border);
+  color: var(--color-disabled-border);
+}
+
+.button--text:disabled {
+  color: var(--color-disabled-fg);
+}
+
+.button__spinner {
+  flex-shrink: 0;
+  animation: button-spin var(--button-spinner-duration) linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button__spinner {
+    animation: none;
+  }
+}
