@@ -1,0 +1,1205 @@
+openapi: 3.1.0
+info:
+  title: Playtodoo Tenancy API
+  version: 1.0.0
+  summary: Tenant resolution, account login, subdomains, tenant lifecycle and audited Kuador access.
+  description: |
+    Contract of the **Tenancy**, **Identity and access** and **Audit** modules of the `api`
+    (epic PLATODO-26; ADR-002, ADR-003, ADR-009 to ADR-013).
+
+    **Two host contexts.** Every operation declares the host it is served on:
+
+    | Host | Context | Callers |
+    |---|---|---|
+    | `{subdomain}.playtodoo.com/api/v1` | **Tenant**: the complex is resolved from the subdomain and every read and write happens only in its schema | `app`, `movil` (complex data), `backoffice` (with an access session) |
+    | `api.playtodoo.com/api/v1` | **Global**: no tenant is resolved | `movil` (player account), `backoffice` (platform) |
+
+    The root domain is configurable per environment (`playtodoo.root-domain`); locally the tenant
+    host is `{subdomain}.localhost`. A tenant-context operation requested on the global host, or a
+    global-context operation requested on a tenant host, answers `404`.
+
+    **Tenant resolution (every tenant-host request).** Before any handler runs:
+    - Malformed, unknown or retired subdomain, or a purged complex: `404 TENANT_NOT_FOUND`.
+      No tenant schema is touched.
+    - Suspended or archived complex: `403 TENANT_UNAVAILABLE`. The response never says which of
+      the two applies, nor the archive deadline.
+    - Active complex: the request runs inside that tenant's schema only.
+
+    These two answers apply to **every** tenant-host operation, including the ones of other
+    contracts (for example `bookings.openapi.yaml`).
+
+    **Resources of another complex.** A resource of complex B requested by id from the host of
+    complex A answers `404` exactly like a non-existent id (`RESOURCE_NOT_FOUND`, or the
+    module-specific code such as `BOOKING_NOT_FOUND`). It is never `403`.
+
+    **Access tokens.** JWT bearer tokens signed by the `api`. Claims: `sub` (account id),
+    `typ` (`STAFF`, `PLAYER` or `PLATFORM`), `tid` (tenant id, only `STAFF`) and `role`.
+    On a tenant host:
+    - `STAFF` is accepted only when `tid` is the resolved tenant; otherwise `401 UNAUTHENTICATED`.
+    - `PLAYER` is always accepted (players have a global account).
+    - `PLATFORM` is accepted only together with a valid access session (below).
+
+    **Kuador access to a complex (ADR-003, ADR-011).** Only a platform user with role
+    `PLATFORM_OWNER` may open an access session for a complex, with a mandatory reason. The
+    `backoffice` then calls the tenant host with its bearer token plus the header
+    `X-Platform-Access-Session: <sessionId>`. Each such request is audited (method and route
+    template, never the concrete path or query string) **before** it runs; if the audit cannot be
+    written, access is denied. An expired, closed or foreign session answers
+    `403 ACCESS_SESSION_INVALID`. CORS on tenant hosts allows only the `backoffice` origin besides
+    the host itself.
+
+    **Errors.** Every error uses Problem Details (RFC 9457) with a stable machine-readable `code`.
+    Clients map `code` to the user-facing text; `title` and `detail` are for developers and logs
+    and never contain personal data.
+  contact:
+    name: Kuador
+servers:
+  - url: https://api.playtodoo.com/api/v1
+    description: Global context (no tenant).
+tags:
+  - name: Tenant
+    description: Public state of the complex and its subdomain. Served on the tenant host.
+  - name: Authentication
+    description: Login per account type. Staff on the tenant host; players and Kuador on the global host.
+  - name: Subdomains
+    description: Subdomain suggestion and availability used while registering a complex. Global host.
+  - name: Platform tenants
+    description: Tenant registration and lifecycle, used by `backoffice`. Global host, platform token.
+  - name: Platform access
+    description: Audited access sessions of the Kuador owner to a complex. Global host, platform token.
+security:
+  - bearerAuth: []
+paths:
+  /tenant:
+    servers:
+      - url: https://{subdomain}.playtodoo.com/api/v1
+        description: Tenant context. The complex is resolved from the subdomain.
+        variables:
+          subdomain:
+            default: example
+            description: Subdomain of the sports complex.
+    get:
+      tags: [Tenant]
+      operationId: getTenantState
+      summary: Get the public state of the complex resolved from the subdomain.
+      description: |
+        Used by `app` and `movil` when entering a complex to decide whether to show the complex
+        or the "not available" / "not found" screens. Public: no token required.
+      security: []
+      responses:
+        '200':
+          description: The complex is active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantState'
+              examples:
+                active:
+                  value:
+                    status: ACTIVE
+                    displayName: Canchas El Sol
+        '403':
+          $ref: '#/components/responses/TenantUnavailable'
+        '404':
+          $ref: '#/components/responses/TenantNotFound'
+  /tenant/subdomain:
+    servers:
+      - url: https://{subdomain}.playtodoo.com/api/v1
+        description: Tenant context. The complex is resolved from the subdomain.
+        variables:
+          subdomain:
+            default: example
+            description: Subdomain of the sports complex.
+    put:
+      tags: [Tenant]
+      operationId: changeTenantSubdomain
+      summary: Change the subdomain of the resolved complex.
+      description: |
+        Only staff with role `OWNER` of the resolved tenant. The value is normalized to lower case
+        and validated with the subdomain rules (ADR-012). On success the new subdomain resolves to
+        the same tenant and the previous one stops resolving immediately (`404 TENANT_NOT_FOUND`);
+        the previous one stays blocked for every other complex. Setting the current subdomain
+        again is a no-op that answers `200`. Two concurrent requests for the same subdomain: one
+        succeeds, the other receives `409 SUBDOMAIN_TAKEN`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeSubdomainRequest'
+            examples:
+              change:
+                value:
+                  subdomain: elsol-norte
+      responses:
+        '200':
+          description: Subdomain changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubdomainChanged'
+              examples:
+                changed:
+                  value:
+                    subdomain: elsol-norte
+                    url: https://elsol-norte.playtodoo.com
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: |
+            `FORBIDDEN`: the caller is not the owner of the resolved complex.
+            `TENANT_UNAVAILABLE`: the complex is suspended or archived.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                forbidden:
+                  $ref: '#/components/examples/ForbiddenProblem'
+                tenantUnavailable:
+                  $ref: '#/components/examples/TenantUnavailableProblem'
+        '404':
+          $ref: '#/components/responses/TenantNotFound'
+        '409':
+          $ref: '#/components/responses/SubdomainTaken'
+        '422':
+          $ref: '#/components/responses/SubdomainRejected'
+  /auth/staff/login:
+    servers:
+      - url: https://{subdomain}.playtodoo.com/api/v1
+        description: Tenant context. The complex is resolved from the subdomain.
+        variables:
+          subdomain:
+            default: example
+            description: Subdomain of the sports complex.
+    post:
+      tags: [Authentication]
+      operationId: loginStaff
+      summary: Log in a staff member of the resolved complex.
+      description: |
+        Staff accounts live in the schema of their complex. Credentials of complex A used on the
+        host of complex B do not find the account and answer the generic
+        `401 INVALID_CREDENTIALS`, never revealing that the account exists elsewhere. The issued
+        token carries `typ = STAFF` and `tid` = the resolved tenant.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              staff:
+                value:
+                  email: admin@example.com
+                  password: example-password
+      responses:
+        '200':
+          $ref: '#/components/responses/LoggedIn'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '403':
+          $ref: '#/components/responses/TenantUnavailable'
+        '404':
+          $ref: '#/components/responses/TenantNotFound'
+  /auth/players/login:
+    post:
+      tags: [Authentication]
+      operationId: loginPlayer
+      summary: Log in a player with their global account.
+      description: |
+        Player accounts are global: the same token is accepted on the host of every active
+        complex. The issued token carries `typ = PLAYER` and no `tid`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              player:
+                value:
+                  email: player@example.com
+                  password: example-password
+      responses:
+        '200':
+          $ref: '#/components/responses/LoggedIn'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+  /auth/platform/login:
+    post:
+      tags: [Authentication]
+      operationId: loginPlatformUser
+      summary: Log in a Kuador platform user.
+      description: |
+        The issued token carries `typ = PLATFORM` and the platform `role`. It gives no access to
+        complex data by itself: that requires an access session.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              platform:
+                value:
+                  email: owner@example.com
+                  password: example-password
+      responses:
+        '200':
+          $ref: '#/components/responses/LoggedIn'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+  /subdomains/suggestion:
+    get:
+      tags: [Subdomains]
+      operationId: suggestSubdomain
+      summary: Suggest a free subdomain from the complex name.
+      description: |
+        Lower case, accents removed, every non-alphanumeric run replaced by a single hyphen and
+        trimmed to the subdomain rules (ADR-012). If the result is taken or reserved, `-2`, `-3`,
+        and so on are tried. The suggestion is not reserved: availability is checked again when
+        the complex is registered. Public: no token required.
+      security: []
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: Commercial name of the complex.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 120
+          example: Canchas El Sol
+      responses:
+        '200':
+          description: Suggested subdomain.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubdomainSuggestion'
+              examples:
+                suggestion:
+                  value:
+                    subdomain: canchas-el-sol
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+  /subdomains/{subdomain}/availability:
+    get:
+      tags: [Subdomains]
+      operationId: getSubdomainAvailability
+      summary: Check whether a subdomain can be used.
+      description: |
+        Validates format, the reserved list and current or retired use, in that order. A malformed
+        value is not an error here: it answers `200` with `available: false` and
+        `reason: INVALID`; only a value longer than 255 characters answers
+        `400 INVALID_REQUEST`. Public: no token required.
+      security: []
+      parameters:
+        - name: subdomain
+          in: path
+          required: true
+          description: Candidate subdomain. Compared in lower case.
+          schema:
+            type: string
+            maxLength: 255
+          example: canchas-el-sol
+      responses:
+        '200':
+          description: Availability of the subdomain.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubdomainAvailability'
+              examples:
+                available:
+                  value:
+                    subdomain: canchas-el-sol
+                    available: true
+                    reason: null
+                taken:
+                  value:
+                    subdomain: canchas-el-sol
+                    available: false
+                    reason: TAKEN
+                reserved:
+                  value:
+                    subdomain: admin
+                    available: false
+                    reason: RESERVED
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+  /platform/tenants:
+    post:
+      tags: [Platform tenants]
+      operationId: registerTenant
+      summary: Register a complex and provision its schema.
+      description: |
+        Creates the tenant, reserves its subdomain, creates its schema `t_<uuid>`, runs the tenant
+        migrations and creates the owner staff account with `ownerEmail`. On success the tenant is
+        `ACTIVE` and `TenantActivated` is published.
+
+        If provisioning fails after the tenant was recorded, the `api` answers `500` and the tenant
+        stays `PROVISIONING`; `POST /platform/tenants/{tenantId}/activate` retries provisioning.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterTenantRequest'
+            examples:
+              register:
+                value:
+                  displayName: Canchas El Sol
+                  subdomain: canchas-el-sol
+                  ownerEmail: owner@example.com
+      responses:
+        '201':
+          description: Tenant registered and active.
+          headers:
+            Location:
+              description: URL of the tenant resource.
+              schema:
+                type: string
+                format: uri-reference
+              example: /api/v1/platform/tenants/5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+              examples:
+                active:
+                  $ref: '#/components/examples/ActiveTenant'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/SubdomainTaken'
+        '422':
+          $ref: '#/components/responses/SubdomainRejected'
+  /platform/tenants/{tenantId}/suspend:
+    post:
+      tags: [Platform tenants]
+      operationId: suspendTenant
+      summary: Suspend an active complex.
+      description: |
+        `ACTIVE → SUSPENDED`. From then on its host answers `403 TENANT_UNAVAILABLE` to everyone.
+        Publishes `TenantSuspended`.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          $ref: '#/components/responses/TenantChanged'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlatformTenantNotFound'
+        '409':
+          $ref: '#/components/responses/InvalidTransition'
+  /platform/tenants/{tenantId}/activate:
+    post:
+      tags: [Platform tenants]
+      operationId: activateTenant
+      summary: Activate a suspended complex, or retry a failed provisioning.
+      description: |
+        `SUSPENDED → ACTIVE`, or `PROVISIONING → ACTIVE` re-running the idempotent provisioning.
+        Publishes `TenantActivated`.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          $ref: '#/components/responses/TenantChanged'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlatformTenantNotFound'
+        '409':
+          $ref: '#/components/responses/InvalidTransition'
+  /platform/tenants/{tenantId}/archive:
+    post:
+      tags: [Platform tenants]
+      operationId: archiveTenant
+      summary: Archive a complex (cancellation with a retention period).
+      description: |
+        `ACTIVE | SUSPENDED → ARCHIVED`. Sets `retentionDays` from the configured default
+        (`tenancy.archive.default-retention-days`) and `purgeDueAt = archivedAt + retentionDays`.
+        When `purgeDueAt` is reached without reactivation the daily purge job deletes the schema
+        (ADR-013). Publishes `TenantArchived`.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: Tenant archived.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+              examples:
+                archived:
+                  $ref: '#/components/examples/ArchivedTenant'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlatformTenantNotFound'
+        '409':
+          $ref: '#/components/responses/InvalidTransition'
+  /platform/tenants/{tenantId}/reactivate:
+    post:
+      tags: [Platform tenants]
+      operationId: reactivateTenant
+      summary: Reactivate an archived complex before its purge date.
+      description: |
+        `ARCHIVED → ACTIVE` while `now < purgeDueAt`; the complex recovers all its data. Clears the
+        archive fields and publishes `TenantActivated`.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          $ref: '#/components/responses/TenantChanged'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlatformTenantNotFound'
+        '409':
+          description: |
+            `INVALID_TRANSITION`: the tenant is not `ARCHIVED`.
+            `RETENTION_EXPIRED`: `purgeDueAt` has already passed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                invalidTransition:
+                  $ref: '#/components/examples/InvalidTransitionProblem'
+                retentionExpired:
+                  $ref: '#/components/examples/RetentionExpiredProblem'
+  /platform/tenants/{tenantId}/retention:
+    put:
+      tags: [Platform tenants]
+      operationId: changeTenantRetention
+      summary: Change the retention period of an archived complex.
+      description: |
+        Only while `ARCHIVED`. Recomputes `purgeDueAt = archivedAt + days`. The resulting
+        `purgeDueAt` must be in the future, so an archived complex is never purged by mistake as a
+        side effect of this call. Upper bound: [POR DEFINIR: maximum retention days, if any].
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeRetentionRequest'
+            examples:
+              extend:
+                value:
+                  days: 60
+      responses:
+        '200':
+          $ref: '#/components/responses/TenantChanged'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlatformTenantNotFound'
+        '409':
+          $ref: '#/components/responses/InvalidTransition'
+        '422':
+          description: '`RETENTION_INVALID`: the resulting `purgeDueAt` would not be in the future.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                retentionInvalid:
+                  value:
+                    type: https://playtodoo.com/problems/retention-invalid
+                    title: Invalid retention
+                    status: 422
+                    detail: The resulting purge date must be in the future.
+                    code: RETENTION_INVALID
+  /platform/tenants/{tenantId}/access-sessions:
+    post:
+      tags: [Platform access]
+      operationId: openAccessSession
+      summary: Open an audited access session to a complex.
+      description: |
+        Only role `PLATFORM_OWNER`. The reason is mandatory (non-blank) and is stored in the audit.
+        It must not contain personal data; it is anonymized when the complex is purged. The session
+        lasts 30 minutes by default (security setting) and only grants access on `tenantHost`.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenAccessSessionRequest'
+            examples:
+              complaint:
+                value:
+                  reason: Complaint about a duplicated booking, ticket 1234
+      responses:
+        '201':
+          description: Access session opened.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessSession'
+              examples:
+                opened:
+                  value:
+                    sessionId: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
+                    expiresAt: '2026-12-01T15:30:00Z'
+                    tenantHost: canchas-el-sol.playtodoo.com
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlatformTenantNotFound'
+        '422':
+          description: '`REASON_REQUIRED`: the reason is missing or blank.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                reasonRequired:
+                  value:
+                    type: https://playtodoo.com/problems/reason-required
+                    title: Reason required
+                    status: 422
+                    detail: An access session needs a non-blank reason.
+                    code: REASON_REQUIRED
+  /platform/access-sessions/{sessionId}:
+    delete:
+      tags: [Platform access]
+      operationId: closeAccessSession
+      summary: Close an access session before it expires.
+      description: Only the platform user who opened it. Closing an already closed or expired session is a no-op.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
+      responses:
+        '204':
+          description: Session closed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: '`ACCESS_SESSION_NOT_FOUND`: no session with this id for the caller.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                notFound:
+                  value:
+                    type: https://playtodoo.com/problems/access-session-not-found
+                    title: Access session not found
+                    status: 404
+                    code: ACCESS_SESSION_NOT_FOUND
+  /platform/tenants/{tenantId}/access-audit:
+    get:
+      tags: [Platform access]
+      operationId: listAccessAudit
+      summary: List the audited Kuador accesses to a complex.
+      description: |
+        Only role `PLATFORM_OWNER`. Newest first. Also available for purged complexes: their
+        reasons are anonymized and `reasonRedacted` is `true`.
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: page
+          in: query
+          description: Zero-based page index.
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          description: Page size.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: One page of audit events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessAuditPage'
+              examples:
+                page:
+                  value:
+                    items:
+                      - id: 7d8e9f0a-1b2c-4d3e-8f4a-5b6c7d8e9f0a
+                        sessionId: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
+                        platformUserId: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+                        reason: Complaint about a duplicated booking, ticket 1234
+                        reasonRedacted: false
+                        httpMethod: GET
+                        routeTemplate: /api/v1/staff/bookings/{bookingId}
+                        outcome: ALLOWED
+                        occurredAt: '2026-12-01T15:02:10Z'
+                    page: 0
+                    size: 20
+                    totalItems: 1
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlatformTenantNotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token issued by one of the login operations.
+  parameters:
+    TenantId:
+      name: tenantId
+      in: path
+      required: true
+      description: Tenant id (not the subdomain).
+      schema:
+        type: string
+        format: uuid
+      example: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+  schemas:
+    TenantStatus:
+      type: string
+      description: |
+        Lifecycle state. `PROVISIONING` until the schema is created and migrated; `PURGING` while
+        the purge job deletes the schema; `PURGED` is final (the tenant row is kept as a tombstone).
+      enum: [PROVISIONING, ACTIVE, SUSPENDED, ARCHIVED, PURGING, PURGED]
+    TenantState:
+      type: object
+      additionalProperties: false
+      required: [status, displayName]
+      properties:
+        status:
+          type: string
+          const: ACTIVE
+          description: Always `ACTIVE`; any other state answers `403` or `404`.
+        displayName:
+          type: string
+          description: Commercial name of the complex.
+    Tenant:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, subdomain, status, createdAt, activatedAt, suspendedAt, archivedAt, retentionDays, purgeDueAt, purgedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        subdomain:
+          type: [string, 'null']
+          description: Current subdomain. Null once purged (its subdomains stay retired).
+        status:
+          $ref: '#/components/schemas/TenantStatus'
+        createdAt:
+          type: string
+          format: date-time
+        activatedAt:
+          type: [string, 'null']
+          format: date-time
+        suspendedAt:
+          type: [string, 'null']
+          format: date-time
+        archivedAt:
+          type: [string, 'null']
+          format: date-time
+        retentionDays:
+          type: [integer, 'null']
+          format: int32
+          description: Retention period of the current archive. Null unless `ARCHIVED`.
+        purgeDueAt:
+          type: [string, 'null']
+          format: date-time
+          description: Instant from which the purge job may delete the schema. Null unless `ARCHIVED`.
+        purgedAt:
+          type: [string, 'null']
+          format: date-time
+    RegisterTenantRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName, subdomain, ownerEmail]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Commercial name of the complex.
+        subdomain:
+          $ref: '#/components/schemas/Subdomain'
+        ownerEmail:
+          type: string
+          format: email
+          maxLength: 254
+          description: Email of the owner. Stored only in the tenant schema, never in `global`.
+    ChangeSubdomainRequest:
+      type: object
+      additionalProperties: false
+      required: [subdomain]
+      properties:
+        subdomain:
+          $ref: '#/components/schemas/Subdomain'
+    Subdomain:
+      type: string
+      description: |
+        Subdomain rules (ADR-012): `a-z`, `0-9` and hyphen; 3 to 63 characters; no leading or
+        trailing hyphen; no double hyphen; never starts with `xn--`; not in the reserved list.
+        Upper case input is normalized to lower case. Rule violations answer
+        `422 SUBDOMAIN_INVALID` or `422 SUBDOMAIN_RESERVED`, not `400`.
+      minLength: 1
+      maxLength: 255
+      examples: [canchas-el-sol]
+    SubdomainChanged:
+      type: object
+      additionalProperties: false
+      required: [subdomain, url]
+      properties:
+        subdomain:
+          type: string
+        url:
+          type: string
+          format: uri
+          description: Base URL of the complex web on the new subdomain.
+    SubdomainSuggestion:
+      type: object
+      additionalProperties: false
+      required: [subdomain]
+      properties:
+        subdomain:
+          type: string
+    SubdomainAvailability:
+      type: object
+      additionalProperties: false
+      required: [subdomain, available, reason]
+      properties:
+        subdomain:
+          type: string
+          description: The normalized (lower case) candidate.
+        available:
+          type: boolean
+        reason:
+          type: [string, 'null']
+          enum: [INVALID, RESERVED, TAKEN, null]
+          description: Why it is not available. `TAKEN` also covers retired subdomains. Null when available.
+    ChangeRetentionRequest:
+      type: object
+      additionalProperties: false
+      required: [days]
+      properties:
+        days:
+          type: integer
+          format: int32
+          minimum: 1
+          description: 'New retention period in days, counted from `archivedAt`. Upper bound: [POR DEFINIR].'
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 128
+    AccessToken:
+      type: object
+      additionalProperties: false
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          description: Signed JWT. See the token claims in the API description.
+        tokenType:
+          type: string
+          const: Bearer
+        expiresIn:
+          type: integer
+          format: int32
+          minimum: 1
+          description: Lifetime of the token in seconds.
+    OpenAccessSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          description: Why Kuador needs to access the complex. Must not contain personal data.
+    AccessSession:
+      type: object
+      additionalProperties: false
+      required: [sessionId, expiresAt, tenantHost]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: Value of the `X-Platform-Access-Session` header on the tenant host.
+        expiresAt:
+          type: string
+          format: date-time
+        tenantHost:
+          type: string
+          description: Host of the complex where the session is valid.
+    AccessAuditEvent:
+      type: object
+      additionalProperties: false
+      required: [id, sessionId, platformUserId, reason, reasonRedacted, httpMethod, routeTemplate, outcome, occurredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sessionId:
+          type: [string, 'null']
+          format: uuid
+          description: Null when the request was denied before a valid session was found.
+        platformUserId:
+          type: string
+          format: uuid
+        reason:
+          type: [string, 'null']
+          description: Reason of the session. After a purge it is replaced by a fixed anonymized text.
+        reasonRedacted:
+          type: boolean
+        httpMethod:
+          type: string
+          examples: [GET]
+        routeTemplate:
+          type: string
+          description: Route template, never the concrete path or query string.
+        outcome:
+          type: string
+          enum: [ALLOWED, DENIED]
+        occurredAt:
+          type: string
+          format: date-time
+    AccessAuditPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessAuditEvent'
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+        totalItems:
+          type: integer
+          format: int64
+          minimum: 0
+    ProblemCode:
+      type: string
+      description: |
+        Stable machine-readable error code. Clients map it to the user-facing text.
+        `RESOURCE_NOT_FOUND` and `ACCESS_SESSION_INVALID` are answered by tenant-host operations of
+        every contract.
+      enum:
+        - TENANT_NOT_FOUND
+        - TENANT_UNAVAILABLE
+        - RESOURCE_NOT_FOUND
+        - INVALID_CREDENTIALS
+        - UNAUTHENTICATED
+        - FORBIDDEN
+        - ACCESS_SESSION_INVALID
+        - ACCESS_SESSION_NOT_FOUND
+        - INVALID_REQUEST
+        - SUBDOMAIN_TAKEN
+        - SUBDOMAIN_INVALID
+        - SUBDOMAIN_RESERVED
+        - INVALID_TRANSITION
+        - RETENTION_EXPIRED
+        - RETENTION_INVALID
+        - REASON_REQUIRED
+    Problem:
+      type: object
+      description: Problem Details (RFC 9457) with a stable `code` extension.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: URI identifying the problem type.
+        title:
+          type: string
+          description: Short developer-facing summary. Not shown to end users.
+        status:
+          type: integer
+          format: int32
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+          description: Developer-facing explanation of this occurrence. Never contains personal data.
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+  responses:
+    LoggedIn:
+      description: Credentials accepted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AccessToken'
+          examples:
+            token:
+              value:
+                accessToken: example.jwt.token
+                tokenType: Bearer
+                expiresIn: 3600
+    TenantChanged:
+      description: Tenant after the change.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Tenant'
+          examples:
+            active:
+              $ref: '#/components/examples/ActiveTenant'
+    InvalidRequest:
+      description: '`INVALID_REQUEST`: malformed body or parameters.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            invalidRequest:
+              value:
+                type: https://playtodoo.com/problems/invalid-request
+                title: Invalid request
+                status: 400
+                detail: '`email` is required.'
+                code: INVALID_REQUEST
+    Unauthenticated:
+      description: '`UNAUTHENTICATED`: missing or invalid access token, or a staff token of another complex.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unauthenticated:
+              value:
+                type: https://playtodoo.com/problems/unauthenticated
+                title: Authentication required
+                status: 401
+                code: UNAUTHENTICATED
+    InvalidCredentials:
+      description: '`INVALID_CREDENTIALS`: unknown account or wrong password. Never says which.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            invalidCredentials:
+              value:
+                type: https://playtodoo.com/problems/invalid-credentials
+                title: Invalid credentials
+                status: 401
+                code: INVALID_CREDENTIALS
+    Forbidden:
+      description: '`FORBIDDEN`: the token is valid but its type or role does not allow this operation.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            forbidden:
+              $ref: '#/components/examples/ForbiddenProblem'
+    TenantUnavailable:
+      description: '`TENANT_UNAVAILABLE`: the complex is suspended or archived. The reason is not disclosed.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            tenantUnavailable:
+              $ref: '#/components/examples/TenantUnavailableProblem'
+    TenantNotFound:
+      description: '`TENANT_NOT_FOUND`: malformed, unknown or retired subdomain, or a purged complex.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            tenantNotFound:
+              $ref: '#/components/examples/TenantNotFoundProblem'
+    PlatformTenantNotFound:
+      description: '`TENANT_NOT_FOUND`: no tenant with this id.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            tenantNotFound:
+              $ref: '#/components/examples/TenantNotFoundProblem'
+    SubdomainTaken:
+      description: '`SUBDOMAIN_TAKEN`: the subdomain is used, or was used, by a complex.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            subdomainTaken:
+              value:
+                type: https://playtodoo.com/problems/subdomain-taken
+                title: Subdomain taken
+                status: 409
+                code: SUBDOMAIN_TAKEN
+    SubdomainRejected:
+      description: |
+        `SUBDOMAIN_INVALID`: the value breaks the format rules.
+        `SUBDOMAIN_RESERVED`: the value is in the reserved list.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            subdomainInvalid:
+              value:
+                type: https://playtodoo.com/problems/subdomain-invalid
+                title: Invalid subdomain
+                status: 422
+                detail: Use 3 to 63 lower-case letters, digits or single hyphens, not at the ends.
+                code: SUBDOMAIN_INVALID
+            subdomainReserved:
+              value:
+                type: https://playtodoo.com/problems/subdomain-reserved
+                title: Reserved subdomain
+                status: 422
+                code: SUBDOMAIN_RESERVED
+    InvalidTransition:
+      description: '`INVALID_TRANSITION`: the lifecycle state does not allow this operation.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            invalidTransition:
+              $ref: '#/components/examples/InvalidTransitionProblem'
+  examples:
+    ActiveTenant:
+      summary: Active complex
+      value:
+        id: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+        displayName: Canchas El Sol
+        subdomain: canchas-el-sol
+        status: ACTIVE
+        createdAt: '2026-12-01T14:00:00Z'
+        activatedAt: '2026-12-01T14:00:02Z'
+        suspendedAt: null
+        archivedAt: null
+        retentionDays: null
+        purgeDueAt: null
+        purgedAt: null
+    ArchivedTenant:
+      summary: Archived complex with the default retention
+      value:
+        id: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+        displayName: Canchas El Sol
+        subdomain: canchas-el-sol
+        status: ARCHIVED
+        createdAt: '2026-12-01T14:00:00Z'
+        activatedAt: '2026-12-01T14:00:02Z'
+        suspendedAt: null
+        archivedAt: '2027-01-10T12:00:00Z'
+        retentionDays: 45
+        purgeDueAt: '2027-02-24T12:00:00Z'
+        purgedAt: null
+    ForbiddenProblem:
+      summary: Token type or role not allowed
+      value:
+        type: https://playtodoo.com/problems/forbidden
+        title: Not allowed
+        status: 403
+        code: FORBIDDEN
+    TenantUnavailableProblem:
+      summary: Suspended or archived complex
+      value:
+        type: https://playtodoo.com/problems/tenant-unavailable
+        title: Complex unavailable
+        status: 403
+        code: TENANT_UNAVAILABLE
+    TenantNotFoundProblem:
+      summary: Unknown complex
+      value:
+        type: https://playtodoo.com/problems/tenant-not-found
+        title: Complex not found
+        status: 404
+        code: TENANT_NOT_FOUND
+    InvalidTransitionProblem:
+      summary: Lifecycle state does not allow the operation
+      value:
+        type: https://playtodoo.com/problems/invalid-transition
+        title: Invalid lifecycle transition
+        status: 409
+        detail: The tenant is not in a state that allows this operation.
+        code: INVALID_TRANSITION
+    RetentionExpiredProblem:
+      summary: Archive retention already ended
+      value:
+        type: https://playtodoo.com/problems/retention-expired
+        title: Retention expired
+        status: 409
+        detail: The purge date has passed; the complex can no longer be reactivated.
+        code: RETENTION_EXPIRED

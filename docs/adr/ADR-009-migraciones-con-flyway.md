@@ -35,6 +35,14 @@ Usar **Flyway** (integración nativa de Spring Boot) con dos conjuntos de migrac
 | `spring.jpa.hibernate.ddl-auto=update` | No versiona, no revierte y no sirve para evolucionar cientos de esquemas con datos reales |
 | Scripts manuales | No son repetibles ni verificables en CI |
 
+## Actualización · PLATODO-26 (2026-11-25)
+
+Decisión D5 del diseño de la épica de aislamiento, que confirma Flyway y precisa:
+
+- **Global:** el conjunto global crea las tablas de `global` (`tenant`, `tenant_domain`, cuentas, auditoría, `notification_outbox`) y el esquema vacío `no_tenant` (ADR-010).
+- **Tenant:** se aplica al provisionar un complejo y, al arrancar, a cada tenant en `ACTIVE`, `SUSPENDED` o `ARCHIVED` (no a `PROVISIONING`, `PURGING` ni `PURGED`), de a uno y cada uno en su propio esquema, abriendo su ámbito de tenant. Si un tenant falla, el arranque se detiene.
+- La primera migración de tenant de la épica crea `staff_user` (personal del complejo).
+
 ## Consecuencias
 
 - Nueva dependencia de la `api` (`flyway-core` y `flyway-database-postgresql`); la agrega la primera tarea que cree tablas (PLATODO-30).

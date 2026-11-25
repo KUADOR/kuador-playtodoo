@@ -91,8 +91,15 @@ Eventos de dominio publicados con Spring Events. El publicador los emite dentro 
 | `BookingCancelled` | Reservas | El jugador cancela su pendiente o el personal cancela una reserva o quita un bloqueo | Igual que arriba |
 | `BookingExpired` | Reservas | Un pendiente vence (tarea programada) | Igual que arriba |
 | `SlotBlocked` | Reservas | El personal bloquea una franja libre | Igual que arriba |
+| `TenantActivated` | Tenancy | El complejo queda `ACTIVE`: al terminar la provisión, al activarlo tras una suspensión o al reactivarlo desde el archivado | `tenantId`, `subdomain`, `occurredAt` |
+| `TenantSuspended` | Tenancy | Kuador suspende un complejo activo | `tenantId`, `occurredAt` |
+| `TenantArchived` | Tenancy | Baja: el complejo pasa a `ARCHIVED` con su plazo de retención | `tenantId`, `purgeDueAt`, `occurredAt` |
+| `TenantSubdomainChanged` | Tenancy | El propietario cambia el subdominio; el anterior queda retirado | `tenantId`, `previousSubdomain`, `subdomain`, `occurredAt` |
+| `TenantPurged` | Tenancy | Baja definitiva: el esquema del complejo se eliminó | `tenantId`, `purgedAt` |
 
 En la épica PLATODO-25 no hay consumidores obligatorios; notificaciones y métricas los usarán en otras tarjetas. Contrato REST de Reservas: `contracts/bookings.openapi.yaml`.
+
+Eventos `Tenant*` (épica PLATODO-26, ADR-013): llevan el `tenantId` para que un consumidor que toque datos del complejo abra su propio ámbito de tenant (ADR-010); el ámbito no se hereda entre hilos. **Excepción a `AFTER_COMMIT`:** `TenantPurged` se escucha de forma **síncrona dentro de la transacción de purga**. Sus consumidores obligatorios son Auditoría (anonimiza los motivos de acceso) y Planes y suscripciones (quita los datos personales y conserva suscripción y pagos); si uno falla, el complejo no queda `PURGED`. Contrato REST de Tenancy: `contracts/tenancy.openapi.yaml`.
 
 **D4 · Ocupación sin copia en Disponibilidad:** la fuente única de verdad de la ocupación es la tabla `booking` de Reservas. El calendario (jugador y personal) lee la ocupación del puerto de entrada de Reservas (`GET /courts/{courtId}/occupancy`, `GET /staff/bookings`). Disponibilidad no mantiene una copia actualizada por eventos. Se descartó la copia porque la consistencia eventual mostraría como libres franjas ya tomadas. Disponibilidad sigue siendo dueña de la configuración de la cancha (duración y franjas válidas), que Reservas consume por el puerto `CourtSlotRules`.
 
@@ -127,8 +134,11 @@ La carpeta se llama igual que el módulo `Reservas` del backend. Si cambia la fo
 ## Datos
 
 - **Base de datos:** PostgreSQL con estrategia Schema per Tenant: cada complejo tiene su propio esquema.
-- **Esquema global** (propuesta): tenants, planes, suscripciones, pagos de suscripción, usuarios globales, parámetros de plataforma, auditoría y catálogo de complejos (ver abajo).
-- **Herramienta de migraciones:** Flyway, con un conjunto de migraciones para el esquema global y otro que se aplica a cada esquema de tenant (propuesta en ADR-009).
+- **Esquema global** (propuesta): tenants, planes, suscripciones, pagos de suscripción, usuarios globales, parámetros de plataforma, auditoría y catálogo de complejos (ver abajo). Tablas de la épica PLATODO-26 y su módulo dueño: `tenant` y `tenant_domain` (Tenancy), `player_account` y `platform_user` (Identidad y acceso), `access_session` y `access_audit_event` (Auditoría), `notification_outbox` (Notificaciones).
+- **Esquema de cada complejo:** `t_<uuid sin guiones>`, inmutable y separado del subdominio (ADR-010). Contiene `staff_user` (el personal vive en su complejo) y las tablas operativas (reservas, canchas, etc.).
+- **Esquema `no_tenant`:** vacío. Es el `search_path` de toda conexión devuelta al pool, para que una conexión reutilizada sin tenant no vea datos de ningún complejo (ADR-010).
+- **Selección del esquema:** dos unidades de persistencia, global y de tenant. La de tenant usa el `TenantScope` (`ScopedValue`) y falla si no hay tenant activo; nunca usa un esquema por defecto (ADR-010).
+- **Herramienta de migraciones:** Flyway (ADR-009). Migraciones globales en `api/src/main/resources/db/migration/global`, aplicadas al arrancar. Migraciones de tenant en `api/src/main/resources/db/migration/tenant`; `TenantSchemaMigrator` (Tenancy) las aplica a un esquema con su propio `flyway_schema_history`, al provisionar un complejo y, al arrancar, a cada tenant `ACTIVE`, `SUSPENDED` o `ARCHIVED`, de a uno.
 - **Reservas sin solapes:** la tabla `booking` de cada esquema de tenant tiene una restricción de exclusión (`btree_gist`) que impide dos reservas o bloqueos activos solapados en la misma cancha (ADR-006).
 
 Ejemplo de cómo se ve la base con dos complejos ficticios (los nombres de esquema son ilustrativos):
@@ -180,15 +190,15 @@ Propuesta inicial del backend `api`, a confirmar al diseñar. Cada módulo expon
 
 | Módulo | Responsabilidad | API pública |
 |---|---|---|
-| Tenancy | Resolver el complejo por subdominio, crear y activar o suspender esquemas | Resolución de tenant por solicitud; ciclo de vida del tenant |
-| Identidad y acceso | Registro e inicio de sesión de jugadores, usuarios del complejo y usuarios globales; roles y permisos | [POR DEFINIR] |
+| Tenancy | Resolver el complejo por subdominio, `TenantScope`, `PlatformAccessGuard`, ciclo de vida (alta, suspensión, archivado, reactivación y purga) y subdominios | `contracts/tenancy.openapi.yaml`; `TenantScope`, `TenantDirectory`; eventos `Tenant*` |
+| Identidad y acceso | Registro e inicio de sesión de jugadores, usuarios del complejo y usuarios globales; roles y permisos | Login por tipo de cuenta en `contracts/tenancy.openapi.yaml`; `AuthenticatedPrincipal`; resto [POR DEFINIR] |
 | Complejos y canchas | Información comercial, ubicación, contacto y canchas; publicar los datos públicos al catálogo global de complejos y atender la búsqueda de cercanos | [POR DEFINIR] |
 | Disponibilidad | Horarios, duración y franjas válidas por cancha (no guarda la ocupación, ver D4) | Configuración de la cancha consumida por Reservas mediante el puerto `CourtSlotRules`; resto [POR DEFINIR] |
 | Reservas | Crear, consultar y cancelar reservas y bloqueos, pendiente de 5 minutos y ocupación de cada cancha, sin duplicados ni conflictos | `contracts/bookings.openapi.yaml`; eventos del «Catálogo de eventos» |
 | Novedades | Publicación y consulta de novedades | [POR DEFINIR] |
 | Torneos | Publicación y administración de torneos | [POR DEFINIR] |
 | Planes y suscripciones | Planes, precios, características y seguimiento de suscripciones y pagos externos | [POR DEFINIR] |
-| Auditoría | Registrar accesos de Kuador a datos de complejos, con motivo | [POR DEFINIR] |
+| Auditoría | Registrar accesos de Kuador a datos de complejos, con motivo | `OpenAccessSession`, `RecordAccess` (síncrono) y consulta de auditoría (`contracts/tenancy.openapi.yaml`); listener de `TenantPurged` (ADR-011) |
 | Métricas | Indicadores globales para Kuador | [POR DEFINIR] |
 
 Ejemplo de qué módulos participan al crear una reserva (ilustrativo):
@@ -210,11 +220,24 @@ Ejemplo: si se decide enviar correos de confirmación de reserva, el módulo Res
 ## Decisiones (ADR)
 
 - **ADR-001 · Schema per Tenant en PostgreSQL** ({date}): cada complejo es un tenant con su propio esquema, para garantizar que gestione solo sus datos.
-- **ADR-002 · Tenant identificado por subdominio** ({date}): el complejo se resuelve por subdominio (complejo.playtodoo.com), tanto en la web del complejo como cuando el jugador consulta sus canchas. Ejemplo: `canchaselsol.playtodoo.com` resuelve al tenant «Canchas El Sol».
-- **ADR-003 · Acceso de Kuador con motivo y auditoría** ({date}): el equipo de Kuador puede leer y editar datos operativos de un complejo solo con permiso y con un motivo registrado en la auditoría. Ejemplo: una persona de soporte de Kuador necesita ver las reservas de «Canchas El Sol» por un reclamo. Antes de acceder registra el motivo («reclamo por reserva duplicada») y queda en la auditoría con quién, cuándo y a qué accedió.
+- **ADR-002 · Tenant identificado por subdominio** ({date}): el complejo se resuelve por subdominio (complejo.playtodoo.com), tanto en la web del complejo como cuando el jugador consulta sus canchas. Ejemplo: `canchaselsol.playtodoo.com` resuelve al tenant «Canchas El Sol». Hosts (actualizado en PLATODO-26):
+
+  | Host | Contexto | Quién lo usa |
+  |---|---|---|
+  | `{subdominio}.playtodoo.com` | Web `app`; `/api/**` va a la `api` en **contexto de tenant** | `app`, `movil` (datos del complejo), `backoffice` (con sesión de acceso, ADR-011) |
+  | `api.playtodoo.com` | `api` en **contexto global** (sin tenant) | `movil` (cuenta de jugador), `backoffice` (plataforma) |
+  | `admin.playtodoo.com` | Web `backoffice` | Equipo Kuador |
+  | `playtodoo.com`, `www` | Sitio raíz; destino de «Ir a Playtodoo» en `app` (en `movil` vuelve al inicio de la propia app) | Público |
+
+  El dominio raíz es configurable por entorno (`playtodoo.root-domain`); en local, `{subdominio}.localhost`. Un endpoint de tenant pedido en el host global, o uno global pedido en un host de tenant, responde `404`. El host solo se toma de `X-Forwarded-Host` cuando viene de un proxy de confianza. Reglas del subdominio en ADR-012.
+- **ADR-003 · Acceso de Kuador con motivo y auditoría** ({date}): el equipo de Kuador puede leer y editar datos operativos de un complejo solo con permiso y con un motivo registrado en la auditoría. Ejemplo: una persona de soporte de Kuador necesita ver las reservas de «Canchas El Sol» por un reclamo. Antes de acceder registra el motivo («reclamo por reserva duplicada») y queda en la auditoría con quién, cuándo y a qué accedió. Mecanismo (sesión de acceso solo para el dueño de Kuador y auditoría síncrona): ADR-011.
 - **ADR-004 · Sin pagos en la plataforma en el MVP** ({date}): el jugador paga la reserva en el complejo y el complejo paga su suscripción a Kuador por transferencia o factura. La plataforma solo registra el seguimiento. Ejemplo: la jugadora reserva en `movil` y paga en la recepción del complejo; el complejo transfiere su suscripción mensual a Kuador y el equipo de Kuador registra ese pago en `backoffice`.
 - **ADR-005 · Tres aplicaciones en paralelo sobre un backend único** ({date}): móvil, web del complejo y backoffice global se construyen a la vez contra la misma `api`.
 - **ADR-006 · Prevención de reservas duplicadas** (2026-11-25, propuesto): el sistema nunca permite dos reservas o bloqueos activos (pendiente vigente o confirmada) solapados en la misma cancha. Mecanismo: tabla única `booking` por esquema de tenant con el horario como `tstzrange [inicio, fin)` y una restricción de exclusión de PostgreSQL (`EXCLUDE USING gist (court_id WITH =, period WITH &&) WHERE status IN ('PENDING','CONFIRMED')`, extensión `btree_gist`). La violación (SQLSTATE `23P01`) se traduce a `409` con Problem Details y `code` estable. El pendiente de 5 minutos vence de forma perezosa al reservar, con una tarea programada por tenant y como estado efectivo en las lecturas; confirmar es un `UPDATE` condicional. Ejemplo: dos jugadores piden a la vez la cancha 1 del viernes a las 20:00; solo una reserva se crea y la otra recibe `SLOT_UNAVAILABLE`. Detalle y alternativas: `docs/adr/ADR-006-prevencion-de-reservas-duplicadas.md`.
 - **ADR-007 · Monolito modular con arquitectura hexagonal y Spring Events** ({date}): el backend `api` es un monolito modular. Cada módulo sigue arquitectura hexagonal y los módulos se comunican entre sí mediante Spring Events, sin acceder a las partes internas de otros módulos.
 - **ADR-008 · Catálogo global de complejos para la búsqueda de cercanos** ({date}): propuesta a confirmar. La búsqueda por ubicación se resuelve en el esquema global con datos públicos de los complejos, sincronizados mediante eventos desde cada tenant. Los datos operativos (canchas, horarios, reservas) se consultan solo en el esquema del tenant elegido, sin consultas entre esquemas.
 - **ADR-009 · Migraciones con Flyway** (2026-11-25, propuesto): migraciones SQL versionadas con Flyway, un conjunto para el esquema global y otro aplicado a cada esquema de tenant (al crearlo y en cada despliegue), con historial propio por esquema. Detalle y alternativas: `docs/adr/ADR-009-migraciones-con-flyway.md`.
+- **ADR-010 · Persistencia multi-tenant por esquema con falla cerrada** (2026-11-25, propuesto): dos unidades de persistencia (global y de tenant), ámbito de tenant con `ScopedValue` que falla si no hay tenant, `search_path` por conexión desde un pool único con reinicio a `no_tenant` al liberarla, y esquemas `t_<uuid>` separados del subdominio. Ejemplo: un job que olvida abrir el ámbito de «Canchas El Sol» falla en vez de leer otro complejo. Detalle: `docs/adr/ADR-010-persistencia-multi-tenant.md`.
+- **ADR-011 · Sesiones de acceso de Kuador y auditoría síncrona** (2026-11-25, propuesto): solo el dueño de Kuador abre una sesión con motivo, limitada a un complejo y a 30 minutos; accede por el host del complejo con `X-Platform-Access-Session` y cada solicitud se audita antes de ejecutarse (si la auditoría falla, se deniega). Detalle: `docs/adr/ADR-011-sesiones-de-acceso-de-kuador-y-auditoria.md`.
+- **ADR-012 · Reglas de subdominio** (2026-11-25, propuesto): formato, reservados, sugerencia desde el nombre, cambio por el propietario y subdominios anteriores retirados para siempre. Detalle: `docs/adr/ADR-012-reglas-de-subdominio.md`.
+- **ADR-013 · Ciclo de vida del complejo y baja definitiva** (2026-11-25, propuesto): suspensión, archivado de 45 días modificable, reactivación y purga diaria que elimina el esquema y conserva sin datos personales el tenant, la auditoría, la suscripción y sus pagos. Detalle: `docs/adr/ADR-013-ciclo-de-vida-y-baja-definitiva.md`.
