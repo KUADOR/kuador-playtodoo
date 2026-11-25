@@ -1,0 +1,25 @@
+# Local PostgreSQL for the api piece, with the shared "extensions" schema and btree_gist.
+# Development only: it listens on localhost and uses trust authentication, so no password is stored.
+# The init scripts run only when the data volume is empty (see api/README.md to recreate it).
+name: platodo-api
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: platodo
+      POSTGRES_USER: platodo
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platodo -d platodo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
