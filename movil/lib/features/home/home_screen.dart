@@ -41,6 +41,14 @@ class HomeScreen extends StatelessWidget {
                         Navigator.of(context)
                             .pushNamed(AppRoutes.bookingPreview),
                   ),
+                  const SizedBox(height: AppTokens.space3),
+                  AppButton(
+                    label: 'Probar estados del complejo',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: () =>
+                        Navigator.of(context)
+                            .pushNamed(AppRoutes.tenantPreview),
+                  ),
                 ],
               ],
             ),
