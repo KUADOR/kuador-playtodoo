@@ -44,3 +44,33 @@ El mensaje de error y la ayuda se asocian al campo (`aria-describedby` en web, `
 | Plataforma | Diferencia |
 |---|---|
 | `movil` | Teclado en pantalla y selectores nativos |
+
+## Angular (`backoffice`)
+
+Componente standalone `Field` en `backoffice/src/app/shared/ui/field/` (selector `app-field`).
+
+| Contrato | Angular |
+|---|---|
+| `kind`, `label`, `help`, `error`, `disabled`, `options` | Entradas con el mismo nombre (`label` es obligatoria); `options` es `{ value, label }[]` |
+| `change` | `value` es un `model()`: enlace doble `[(value)]` o salida `(valueChange)` al escribir o elegir |
+| — | `placeholder`: texto de ejemplo en `text`; en `select` es una primera opción deshabilitada, elegida mientras no hay valor |
+
+```html
+<app-field label="Nombre del complejo" [(value)]="name" help="Como aparece para los jugadores." />
+<app-field
+  kind="select"
+  label="Plan"
+  placeholder="Elige un plan"
+  [options]="plans"
+  [(value)]="plan"
+  [error]="planError()"
+/>
+```
+
+- **Etiqueta:** `<label for>` visible, enlazada a un id único por campo.
+- **Error:** borde `color-danger` de `border-width-lg`, icono `LucideCircleAlert` y mensaje en `color-danger`; el control lleva `aria-invalid="true"` y `aria-describedby` con los ids de la ayuda y del error.
+- **Foco:** borde `color-primary` de `border-width-lg` + anillo `color-focus`. Con error, el borde sigue en `color-danger`.
+- El grosor del borde de foco y error se compensa en el relleno para que el texto no se mueva.
+- **Selección:** `<select>` nativo del navegador (flecha y lista del sistema).
+- Validar es responsabilidad de la pantalla: el campo solo muestra el `error` que recibe.
+- Catálogo vivo en `/design` (solo desarrollo). Capturas en `docs/evidence/platodo-20/`.

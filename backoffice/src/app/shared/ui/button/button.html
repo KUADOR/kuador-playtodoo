@@ -1,0 +1,14 @@
+<button
+  class="button"
+  [class]="'button--' + variant()"
+  [type]="type()"
+  [disabled]="disabled()"
+  [attr.aria-disabled]="loading() || null"
+  [attr.aria-busy]="loading() || null"
+  (click)="handleClick($event)"
+>
+  @if (loading()) {
+    <svg lucideLoaderCircle class="button__spinner" [size]="spinnerSize"></svg>
+  }
+  <span>{{ visibleLabel() }}</span>
+</button>
