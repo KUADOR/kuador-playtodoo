@@ -1,0 +1,30 @@
+# Local environment: PostgreSQL (from api/compose.yaml) and the subdomain proxy on http://{sub}.localhost:8000.
+# The api, app and backoffice run on the host with their own dev commands; the proxy reaches them
+# through host.docker.internal. Development only: no TLS and no secrets. See infra/local/README.md.
+name: platodo-local
+
+include:
+  - ../../api/compose.yaml
+
+services:
+  proxy:
+    image: caddy:2.11.9-alpine
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.local", "--adapter", "caddyfile"]
+    environment:
+      PLATODO_ROOT_DOMAIN: localhost
+      PLATODO_TRUSTED_PROXIES: ""
+      PLATODO_API_UPSTREAM: host.docker.internal:${API_PORT:-8080}
+      PLATODO_APP_UPSTREAM: host.docker.internal:${APP_PORT:-5173}
+      PLATODO_BACKOFFICE_UPSTREAM: host.docker.internal:${BACKOFFICE_PORT:-4200}
+    ports:
+      - "127.0.0.1:${PROXY_PORT:-8000}:8000"
+    extra_hosts:
+      # Docker Desktop defines host.docker.internal; Linux Docker Engine needs this mapping.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../proxy:/etc/caddy:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
