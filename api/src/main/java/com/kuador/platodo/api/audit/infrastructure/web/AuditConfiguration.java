@@ -16,11 +16,14 @@ import com.kuador.platodo.api.audit.application.AuthorizePlatformAccess;
 import com.kuador.platodo.api.audit.application.CloseAccessSession;
 import com.kuador.platodo.api.audit.application.ListAccessAudit;
 import com.kuador.platodo.api.audit.application.OpenAccessSession;
+import com.kuador.platodo.api.audit.application.RedactAccessReasonsOfPurgedTenant;
 import com.kuador.platodo.api.audit.application.port.out.AccessAuditLog;
 import com.kuador.platodo.api.audit.application.port.out.AccessSessions;
 import com.kuador.platodo.api.audit.application.port.out.CurrentPlatformOwner;
+import com.kuador.platodo.api.audit.infrastructure.events.TenantPurgedAuditListener;
 import com.kuador.platodo.api.audit.infrastructure.identity.PrincipalCurrentPlatformOwner;
 import com.kuador.platodo.api.audit.infrastructure.persistence.global.JpaAccessAuditLog;
+import com.kuador.platodo.api.audit.infrastructure.persistence.global.JpaAccessReasonRedaction;
 import com.kuador.platodo.api.audit.infrastructure.persistence.global.JpaAccessSessions;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantDirectory;
 import com.kuador.platodo.api.tenancy.application.port.out.PlatformAccessAuthorization;
@@ -29,7 +32,8 @@ import jakarta.persistence.EntityManagerFactory;
 
 /**
  * Audit module (PLATODO-26 design, ADR-011): access sessions and audit trail of the Kuador owner in the global schema,
- * the platform access operations and the {@link PlatformAccessAuthorization} that Tenancy's guard asks.
+ * the platform access operations, the {@link PlatformAccessAuthorization} that Tenancy's guard asks and the
+ * anonymization of the reasons when a complex is purged (ADR-013).
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(AccessSessionProperties.class)
@@ -85,5 +89,12 @@ class AuditConfiguration {
         TransactionTemplate ownTransaction = new TransactionTemplate(global);
         ownTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         return new AuthorizePlatformAccess(sessions, auditLog, ownTransaction, clock);
+    }
+
+    @Bean
+    TenantPurgedAuditListener tenantPurgedAuditListener(
+            @Qualifier(GLOBAL_ENTITY_MANAGER_FACTORY) EntityManagerFactory global) {
+        return new TenantPurgedAuditListener(new RedactAccessReasonsOfPurgedTenant(
+                new JpaAccessReasonRedaction(SharedEntityManagerCreator.createSharedEntityManager(global))));
     }
 }

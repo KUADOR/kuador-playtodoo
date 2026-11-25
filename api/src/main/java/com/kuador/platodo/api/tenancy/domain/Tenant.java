@@ -9,8 +9,8 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 
 /**
  * A sports complex as Tenancy keeps it in {@code global.tenant}, with its lifecycle (ADR-013):
- * {@code PROVISIONING → ACTIVE ⇄ SUSPENDED}, {@code ACTIVE | SUSPENDED → ARCHIVED} and {@code ARCHIVED → ACTIVE}
- * before {@code purgeDueAt}. The purge states belong to the purge job. Every transition returns a new value; a
+ * {@code PROVISIONING → ACTIVE ⇄ SUSPENDED}, {@code ACTIVE | SUSPENDED → ARCHIVED}, {@code ARCHIVED → ACTIVE}
+ * before {@code purgeDueAt} and, for the purge job, {@code ARCHIVED → PURGING → PURGED} from {@code purgeDueAt} on. Every transition returns a new value; a
  * transition the current state does not allow throws {@link InvalidTransitionException}.
  *
  * <p>Entering {@code ACTIVE} clears the suspension and the archive, so the timestamps always describe the current
@@ -18,7 +18,8 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
  * archived.
  *
  * @param retentionDays retention of the current archive; null unless {@code ARCHIVED}
- * @param purgeDueAt    instant from which the purge job may delete the schema; null unless {@code ARCHIVED}
+ * @param purgeDueAt    instant from which the purge job may delete the schema; null unless {@code ARCHIVED} or purged
+ * @param purgedAt      instant the schema was deleted; null unless {@code PURGED}
  */
 public record Tenant(
         TenantId id,
@@ -101,12 +102,40 @@ public record Tenant(
         return changed;
     }
 
+    /**
+     * {@code ARCHIVED → PURGING} once {@code purgeDueAt} is reached: the complex can no longer be reactivated and its
+     * host answers "not found" while the purge job deletes its schema. The archive fields are kept.
+     *
+     * @throws InvalidTransitionException if the complex is not archived or its purge date is still ahead
+     */
+    public Tenant startPurge(Instant now) {
+        requireStatusIn(Set.of(TenantStatus.ARCHIVED));
+        if (now.isBefore(purgeDueAt)) {
+            throw new InvalidTransitionException();
+        }
+        return withStatus(TenantStatus.PURGING, purgedAt);
+    }
+
+    /**
+     * {@code PURGING → PURGED}: the schema was deleted. What is left is the tombstone of the complex (ADR-013): its
+     * id, commercial name, state and dates.
+     */
+    public Tenant markPurged(Instant now) {
+        requireStatusIn(Set.of(TenantStatus.PURGING));
+        return withStatus(TenantStatus.PURGED, now);
+    }
+
     public boolean is(TenantStatus expected) {
         return status == expected;
     }
 
     private Tenant activeSince(Instant now) {
         return new Tenant(id, displayName, TenantStatus.ACTIVE, createdAt, now, null, null, null, null, purgedAt);
+    }
+
+    private Tenant withStatus(TenantStatus next, Instant purged) {
+        return new Tenant(id, displayName, next, createdAt, activatedAt, suspendedAt, archivedAt, retentionDays,
+                purgeDueAt, purged);
     }
 
     private Tenant archivedFor(Instant archivedSince, int days) {

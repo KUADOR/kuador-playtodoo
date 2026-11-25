@@ -9,6 +9,9 @@ public record AccessReason(String value) {
 
     public static final int MAX_LENGTH = 500;
 
+    /** What is left of every reason of a complex after its permanent deletion (ADR-013). */
+    public static final AccessReason REDACTED = new AccessReason("[anonimizado por baja definitiva]");
+
     /**
      * @throws ReasonRequiredException if {@code value} is missing or blank
      * @throws ReasonTooLongException  if it is longer than {@value #MAX_LENGTH} characters once trimmed

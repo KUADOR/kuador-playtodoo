@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.Base64;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -13,7 +14,8 @@ import com.kuador.platodo.api.identity.domain.EmailAddress;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantOwnerAccounts;
 
 /**
- * The owner staff account Tenancy provisions in the schema of a new complex. The account is active but its password
+ * The owner staff account Tenancy provisions in the schema of a new complex and whose e-mail it reads to announce
+ * the permanent deletion. The account is active but its password
  * is a random secret nobody knows, so nobody can log in with it until the owner sets one (invitation epic).
  */
 public final class JdbcTenantOwnerAccounts implements TenantOwnerAccounts {
@@ -56,6 +58,15 @@ public final class JdbcTenantOwnerAccounts implements TenantOwnerAccounts {
                 .param("role", OWNER)
                 .query(Boolean.class)
                 .single();
+    }
+
+    /** The oldest owner, should a complex ever have more than one. */
+    @Override
+    public Optional<String> ownerEmail() {
+        return tenantData.sql("SELECT email FROM staff_user WHERE role = :role ORDER BY created_at, id LIMIT 1")
+                .param("role", OWNER)
+                .query(String.class)
+                .optional();
     }
 
     private String unknownSecret() {

@@ -10,18 +10,20 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.kuador.platodo.api.tenancy.application.PurgeDueTenants;
 import com.kuador.platodo.api.tenancy.application.RequestHosts;
 import com.kuador.platodo.api.tenancy.application.TenancyUseCases;
 import com.kuador.platodo.api.tenancy.application.port.out.GlobalTransaction;
 import com.kuador.platodo.api.tenancy.application.port.out.SubdomainUsage;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantOwnerAccounts;
+import com.kuador.platodo.api.tenancy.application.port.out.TenantOwnerNotifier;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantRegistry;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantSchemas;
 import com.kuador.platodo.api.tenancy.domain.SubdomainRules;
 import com.kuador.platodo.api.tenancy.infrastructure.events.SpringTenantEventPublisher;
 import com.kuador.platodo.api.tenancy.infrastructure.identity.PrincipalCallers;
 
-/** Tenant lifecycle and subdomain use cases (ADR-012, ADR-013). */
+/** Tenant lifecycle, purge and subdomain use cases (ADR-012, ADR-013). */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(TenancyProperties.class)
 class TenancyLifecycleConfiguration {
@@ -45,5 +47,14 @@ class TenancyLifecycleConfiguration {
                 schemas, owners, new SpringTenantEventPublisher(publisher), transaction);
         return TenancyUseCases.create(ports, rules, clock.getIfAvailable(Clock::systemUTC),
                 properties.archive().defaultRetentionDays());
+    }
+
+    @Bean
+    PurgeDueTenants purgeDueTenants(TenantRegistry registry, TenantSchemas schemas, TenantOwnerAccounts owners,
+            TenantOwnerNotifier notifier, GlobalTransaction transaction, ApplicationEventPublisher publisher,
+            ObjectProvider<Clock> clock) {
+        PurgeDueTenants.Ports ports = new PurgeDueTenants.Ports(registry, schemas, owners, notifier,
+                new SpringTenantEventPublisher(publisher), transaction);
+        return new PurgeDueTenants(ports, clock.getIfAvailable(Clock::systemUTC));
     }
 }

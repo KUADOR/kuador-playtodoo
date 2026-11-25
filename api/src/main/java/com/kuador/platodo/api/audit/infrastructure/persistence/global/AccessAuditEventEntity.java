@@ -15,7 +15,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Row of {@code global.access_audit_event} (migration V4). Inserted once; never updated here. */
+/**
+ * Row of {@code global.access_audit_event} (migration V4). Inserted once; only {@link JpaAccessReasonRedaction}
+ * changes it, when the complex is purged.
+ */
 @Entity
 @Table(name = "access_audit_event")
 class AccessAuditEventEntity {
