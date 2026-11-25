@@ -105,6 +105,11 @@ class BookingTest {
     }
 
     @Test
+    void theHolderPhoneIsOptional() {
+        assertThat(new BookingHolder("Holder", null).phone()).isNull();
+    }
+
+    @Test
     void theHolderIsRedactedWhenPrinted() {
         assertThat(new BookingHolder("Holder Name", "000").toString()).doesNotContain("Holder Name", "000");
     }

@@ -102,6 +102,26 @@ class ExpirePendingBookingsTest {
         }
 
         @Override
+        public Optional<Booking> cancelIfActive(UUID id, UUID cancelledBy, Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Booking> findActiveReservationOverlapping(UUID courtId, TimePeriod period, Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Booking> findActiveOverlapping(TimePeriod range, Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Booking> findActiveOfCourtOverlapping(UUID courtId, TimePeriod range, Instant now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<Booking> findActiveOfPlayerOverlapping(UUID playerId, TimePeriod period, Instant now) {
             throw new UnsupportedOperationException();
         }
