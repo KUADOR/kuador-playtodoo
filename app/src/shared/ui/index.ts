@@ -17,3 +17,9 @@ export type {
   LocalTime,
   SlotSelection,
 } from './booking-calendar/calendarTypes'
+export { formatLongDate, formatSlotLabel } from './booking-calendar/calendarText'
+export { addDays } from './booking-calendar/calendarDates'
+export { Dialog } from './dialog/Dialog'
+export type { DialogProps } from './dialog/Dialog'
+export { Alert } from './alert/Alert'
+export type { AlertProps, AlertVariant } from './alert/Alert'

@@ -1,0 +1,224 @@
+/* Staff calendar (Pantallas · Pantalla 6): values come only from design tokens. Mobile first. */
+
+.page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: var(--size-content-max);
+  margin-inline: auto;
+  padding: var(--space-4);
+  font-family: var(--font-family-body);
+  color: var(--color-fg);
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: var(--font-size-xl);
+}
+
+.filters {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.dayNavigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dayTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.message {
+  margin: 0;
+  color: var(--color-fg-muted);
+}
+
+.loadError {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.icon {
+  flex-shrink: 0;
+  width: var(--font-size-md);
+  height: var(--font-size-md);
+}
+
+/* Rows of the day */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width-sm) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.row[data-state='free'] {
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-tint);
+}
+
+/* Block: diagonal hatch over the occupied background, plus lock icon and text. */
+.row[data-state='block'] {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-occupied-bg) 0 var(--space-2),
+    var(--color-surface-alt) var(--space-2) var(--space-4)
+  );
+}
+
+.rowInfo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.rowTime {
+  min-width: calc(var(--space-7) * 2);
+  color: var(--color-brand-navy);
+  font-weight: var(--font-weight-semibold);
+}
+
+.rowDetail {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Status tag: icon plus text in the state color, on white for AA contrast. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width-sm) solid currentColor;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.tag[data-state='free'] {
+  color: var(--color-accent-strong);
+}
+
+.tag[data-state='pending'] {
+  color: var(--color-warning);
+}
+
+.tag[data-state='confirmed'] {
+  color: var(--color-success);
+}
+
+.tag[data-state='block'] {
+  color: var(--color-fg-muted);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonRow {
+  height: calc(var(--size-touch-min) + 2 * var(--space-3));
+  border-radius: var(--radius-md);
+  background: var(--color-disabled-bg);
+  /* Same pulse as the BookingCalendar skeleton (motion tokens are [POR DEFINIR], PLATODO-24). */
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonRow {
+    animation: none;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Forms inside dialogs */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.formActions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-2);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.details dt {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+.details dd {
+  margin: 0;
+}
+
+/* 768px: same breakpoint as the BookingCalendar toolbar. */
+@media (min-width: 768px) {
+  .page {
+    padding: var(--space-6) var(--space-5);
+  }
+
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+    align-items: end;
+  }
+
+  .row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .formActions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
