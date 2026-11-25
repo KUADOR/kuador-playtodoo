@@ -1,0 +1,19 @@
+# Deployed proxy (pruebas and producción): HTTPS with a wildcard certificate for *.<root domain>
+# obtained through the ACME DNS-01 challenge (the only challenge that issues wildcard certificates).
+# Needs the image built from infra/proxy/Dockerfile, which adds the DNS provider module.
+# Variables (names only, values live in the deployment platform): see infra/proxy/README.md.
+{
+	email {$ACME_EMAIL}
+	servers {
+		trusted_proxies static {$PLATODO_TRUSTED_PROXIES}
+	}
+}
+
+import routes.caddy
+
+*.{$PLATODO_ROOT_DOMAIN}, {$PLATODO_ROOT_DOMAIN} {
+	tls {
+		dns {$ACME_DNS_PROVIDER} {$ACME_DNS_API_TOKEN}
+	}
+	import platodo_routes
+}

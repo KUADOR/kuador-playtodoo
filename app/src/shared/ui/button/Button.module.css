@@ -15,6 +15,12 @@
   cursor: pointer;
 }
 
+/* ButtonLink: an anchor with the look of a button. */
+.link {
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
 .button:disabled,
 .button[data-loading] {
   cursor: not-allowed;
