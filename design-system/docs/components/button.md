@@ -1,7 +1,5 @@
 # Button · botón
 
-> Esqueleto del contrato. Las tareas de cada pieza (PLATODO-18, PLATODO-20 y PLATODO-22) completan ejemplos y capturas; PLATODO-24 cierra la documentación final.
-
 Contrato común de `Button` (`app`, `backoffice`) y `AppButton` (`movil`). Solo usa tokens de `design-system/tokens`.
 
 ## Uso
@@ -85,18 +83,12 @@ const AppButton(label: 'Guardar cambios', onPressed: null); // deshabilitado
 | `disabled` | `onPressed: null` (Semantics `enabled: false`, fuera del recorrido de foco) |
 | `press` | `onPressed` |
 
-- **Cargando:** `onPressed` pasa a null, se muestra un `CircularProgressIndicator` con `loadingLabel` y el cambio se anuncia como región viva de Semantics.
+- **Cargando:** el botón de Material queda deshabilitado (ignora toques y sale del recorrido de foco), pero conserva los colores de su variante, como en web; se muestra un `CircularProgressIndicator` con `loadingLabel` y el cambio se anuncia como región viva de Semantics. Con movimiento reducido (`MediaQuery.disableAnimations`) el indicador queda quieto como un arco de tres cuartos (`AppButton.reducedMotionSpinnerValue`), igual que el icono `LoaderCircle` de web.
 - **Foco:** `AppFocusRing` (anillo `color-focus` de `border-focus-ring`, separado `border-focus-offset`, con halo `color-focus-halo`), solo con foco de teclado (`FocusHighlightMode.traditional`, equivalente a `:focus-visible`).
 - **Tamaño táctil:** `minimumSize` de `size-touch-min` (44 × 44) y `MaterialTapTargetSize.padded`.
 - **Pendientes ([POR DEFINIR]):** el pulsado del secundario usa `color-primary-tint` y el de peligro mantiene `color-danger` (más el ripple), hasta que la identidad defina esos tonos.
 - **Pruebas:** `movil/test/shared/ui/app_button_test.dart` (cada variante: 44 × 44, `androidTapTargetGuideline`, `iOSTapTargetGuideline`, `labeledTapTargetGuideline`, `textContrastGuideline`; deshabilitado; cargando; anillo de foco).
-- **Catálogo:** `flutter run` en `movil/` y «Ver catálogo de diseño» en la pantalla de inicio, o `flutter run --route /design-catalog` (solo en depuración).
-
-## Diferencias aceptadas por plataforma
-
-| Plataforma | Diferencia |
-|---|---|
-| `movil` | Ripple de Material al pulsar, en Android y en iOS (no se usa el resaltado de Cupertino). Sin hover: el estado hover solo aplica con puntero |
+- **Catálogo:** `flutter run` en `movil/` y «Ver catálogo de diseño» en la pantalla de inicio, o `flutter run --route /design-catalog` (solo en depuración). Muestra cada variante en normal, cargando y deshabilitado, como los catálogos web.
 
 ## Angular (`backoffice`)
 
@@ -123,3 +115,17 @@ Componente standalone `Button` en `backoffice/src/app/shared/ui/button/` (select
 - **Sin estilo propio mientras sigan [POR DEFINIR]:** hover del peligro y pulsado del secundario (este usa el mismo `color-primary-tint` del hover).
 - El spinner respeta `prefers-reduced-motion`.
 - Catálogo vivo: `npm start` en `backoffice/` y abrir `/design` (solo en desarrollo). Capturas en `docs/evidence/platodo-20/`.
+
+## Diferencias aceptadas por plataforma
+
+Lo que no está en esta tabla debe verse y comportarse igual en las tres piezas (mismos tokens, estados y textos). Comparación lado a lado: `docs/evidence/platodo-24/parity-button.png`.
+
+| Plataforma | Diferencia | Motivo |
+|---|---|---|
+| `movil` | Ripple de Material al pulsar, en Android y en iOS (no se usa el resaltado de Cupertino) | Retroalimentación táctil nativa |
+| `movil` | Sin hover: el estado hover solo aplica con puntero | Pantallas táctiles |
+| `movil` | Cargando: el botón sale del recorrido de foco (en web sigue enfocable con `aria-busy` y `aria-disabled`) | Un botón de Material sin acción no recibe foco; el estado se anuncia como región viva |
+| `movil` | Ancho completo dentro de su contenedor en el catálogo; en web el ancho se ajusta a la etiqueta | Convención de formularios móviles; el ancho lo decide la pantalla, no el componente |
+| `app` · `backoffice` | Pulsado del primario: `app` usa sombra interior de `border-width-md` en `color-brand-navy` y `backoffice` usa `inset var(--shadow-card)` | Provisional mientras siga [POR DEFINIR: sombra exacta del pulsado]; al definirla se unifica con un token |
+
+Pendientes comunes ([POR DEFINIR]): tono del pulsado del secundario y del hover de peligro.

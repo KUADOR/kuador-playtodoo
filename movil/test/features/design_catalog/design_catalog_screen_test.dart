@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:playtodoo/app/app_routes.dart';
+import 'package:playtodoo/core/design/app_theme.dart';
 import 'package:playtodoo/features/design_catalog/design_catalog_screen.dart';
 import 'package:playtodoo/main.dart';
 import 'package:playtodoo/shared/ui/app_button.dart';
@@ -27,6 +28,49 @@ void main() {
 
     expect(find.text('Ver catálogo de diseño'), findsNothing);
   });
+
+  testWidgets(
+    'shows every button variant in normal, loading and disabled states, '
+    'and every card variant plus selected and loading, like the web catalogs',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 6000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(theme: AppTheme.light(), home: const DesignCatalogScreen()),
+      );
+
+      for (final variant in AppButtonVariant.values) {
+        final buttons = tester
+            .widgetList<AppButton>(find.byType(AppButton, skipOffstage: false))
+            .where((button) => button.variant == variant)
+            // The calendar error state adds its own «Reintentar» button.
+            .where((button) => button.label != 'Reintentar');
+        expect(
+          buttons.where((b) => !b.isLoading && b.onPressed != null),
+          hasLength(1),
+          reason: '$variant normal',
+        );
+        expect(
+          buttons.where((b) => b.isLoading),
+          hasLength(1),
+          reason: '$variant loading',
+        );
+        expect(
+          buttons.where((b) => b.onPressed == null),
+          hasLength(1),
+          reason: '$variant disabled',
+        );
+      }
+
+      final cards = tester.widgetList<AppCard>(
+        find.byType(AppCard, skipOffstage: false),
+      );
+      expect(cards.where((c) => !c.selected && !c.isLoading), hasLength(5));
+      expect(cards.where((c) => c.selected), hasLength(1));
+      expect(cards.where((c) => c.isLoading), hasLength(1));
+    },
+  );
 
   testWidgets('debug build: opens the catalog with every component', (
     tester,

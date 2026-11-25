@@ -10,8 +10,9 @@ enum AppButtonVariant { primary, secondary, danger, text }
 /// Brand button built on Material buttons, which keep the native ripple,
 /// keyboard activation and semantics.
 ///
-/// A null [onPressed] disables it. While [isLoading] it ignores taps, shows a
-/// spinner with [loadingLabel] and announces it.
+/// A null [onPressed] disables it. While [isLoading] it ignores taps, keeps
+/// the colors of its variant, shows a spinner with [loadingLabel] and
+/// announces it.
 class AppButton extends StatelessWidget {
   const AppButton({
     super.key,
@@ -24,6 +25,10 @@ class AppButton extends StatelessWidget {
   });
 
   static const String defaultLoadingLabel = 'Guardando…';
+
+  /// With reduced motion the spinner stops as a three-quarter arc, like the
+  /// web `LoaderCircle` icon.
+  static const double reducedMotionSpinnerValue = 0.75;
 
   final String label;
   final VoidCallback? onPressed;
@@ -41,21 +46,27 @@ class AppButton extends StatelessWidget {
       leadingIcon: leadingIcon,
     );
 
+    final style = _variantStyle(context);
+    final effectiveStyle = isLoading && onPressed != null
+        ? _keepEnabledLook(style)
+        : style;
+
     final Widget button = switch (variant) {
-      AppButtonVariant.primary => FilledButton(
+      AppButtonVariant.primary || AppButtonVariant.danger => FilledButton(
         onPressed: action,
+        style: effectiveStyle,
         child: content,
       ),
       AppButtonVariant.secondary => OutlinedButton(
         onPressed: action,
+        style: effectiveStyle,
         child: content,
       ),
-      AppButtonVariant.danger => FilledButton(
+      AppButtonVariant.text => TextButton(
         onPressed: action,
-        style: _dangerStyle(context.appColors),
+        style: effectiveStyle,
         child: content,
       ),
-      AppButtonVariant.text => TextButton(onPressed: action, child: content),
     };
 
     return Semantics(
@@ -65,6 +76,38 @@ class AppButton extends StatelessWidget {
         child: button,
       ),
     );
+  }
+
+  /// The variant style resolved against the app theme, so loading can reuse
+  /// its enabled colors.
+  ButtonStyle? _variantStyle(BuildContext context) {
+    final theme = Theme.of(context);
+    return switch (variant) {
+      AppButtonVariant.primary => theme.filledButtonTheme.style,
+      AppButtonVariant.danger => _dangerStyle(
+        context.appColors,
+      ).merge(theme.filledButtonTheme.style),
+      AppButtonVariant.secondary => theme.outlinedButtonTheme.style,
+      AppButtonVariant.text => theme.textButtonTheme.style,
+    };
+  }
+
+  /// While loading, the Material button is disabled to ignore taps, but it
+  /// keeps the colors of its variant as on the web (only `disabled` greys out).
+  static ButtonStyle? _keepEnabledLook(ButtonStyle? style) {
+    if (style == null) return null;
+    return ButtonStyle(
+      backgroundColor: _enabledValue(style.backgroundColor),
+      foregroundColor: _enabledValue(style.foregroundColor),
+      side: _enabledValue(style.side),
+    ).merge(style);
+  }
+
+  static WidgetStateProperty<T>? _enabledValue<T>(
+    WidgetStateProperty<T>? property,
+  ) {
+    if (property == null) return null;
+    return WidgetStatePropertyAll(property.resolve(const <WidgetState>{}));
   }
 
   static ButtonStyle _dangerStyle(AppColors colors) {
@@ -98,6 +141,9 @@ class _ButtonContent extends StatelessWidget {
         ? SizedBox.square(
             dimension: _indicatorSize,
             child: CircularProgressIndicator(
+              value: MediaQuery.disableAnimationsOf(context)
+                  ? AppButton.reducedMotionSpinnerValue
+                  : null,
               strokeWidth: AppTokens.borderWidthLg,
               color: foreground,
             ),

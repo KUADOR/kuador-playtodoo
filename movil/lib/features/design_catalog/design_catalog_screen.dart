@@ -46,6 +46,41 @@ class _DesignCatalogScreenState extends State<DesignCatalogScreen> {
     CalendarDay(date: '2026-12-05', slots: []),
   ];
 
+  static const List<_ButtonSample> _buttonSamples = [
+    _ButtonSample(
+      name: 'Primario',
+      label: 'Reservar cancha',
+      variant: AppButtonVariant.primary,
+    ),
+    _ButtonSample(
+      name: 'Secundario',
+      label: 'Ver horarios',
+      variant: AppButtonVariant.secondary,
+      leadingIcon: AppIcons.clock,
+    ),
+    _ButtonSample(
+      name: 'Peligro',
+      label: 'Cancelar reserva',
+      variant: AppButtonVariant.danger,
+    ),
+    _ButtonSample(
+      name: 'Texto',
+      label: 'Ver detalle',
+      variant: AppButtonVariant.text,
+    ),
+  ];
+
+  static const List<_CardSample> _cardSamples = [
+    _CardSample(title: 'Canchas El Sol', detail: 'Complejo · 4 canchas'),
+    _CardSample(title: 'Cancha 1', detail: 'Fútbol 5 · césped sintético'),
+    _CardSample(title: 'Viernes 20:00', detail: 'Reserva · Cancha 1'),
+    _CardSample(title: 'Torneo de verano', detail: 'Torneo · 8 equipos'),
+    _CardSample(
+      title: 'Nuevos horarios',
+      detail: 'Novedad · abrimos a las 7:00',
+    ),
+  ];
+
   String? _sport;
   bool _isCardSelected = true;
   SlotSelection? _calendarSelection = const SlotSelection(
@@ -57,7 +92,6 @@ class _DesignCatalogScreenState extends State<DesignCatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Catálogo de diseño')),
       body: SafeArea(
@@ -67,34 +101,26 @@ class _DesignCatalogScreenState extends State<DesignCatalogScreen> {
             _Section(
               title: 'Botones',
               children: [
-                AppButton(label: 'Reservar cancha', onPressed: _noop),
-                AppButton(
-                  label: 'Ver horarios',
-                  variant: AppButtonVariant.secondary,
-                  leadingIcon: AppIcons.clock,
-                  onPressed: _noop,
-                ),
-                AppButton(
-                  label: 'Cancelar reserva',
-                  variant: AppButtonVariant.danger,
-                  onPressed: _noop,
-                ),
-                AppButton(
-                  label: 'Ver más',
-                  variant: AppButtonVariant.text,
-                  onPressed: _noop,
-                ),
-                const AppButton(label: 'Reservar cancha', onPressed: null),
-                const AppButton(
-                  label: 'Ver horarios',
-                  variant: AppButtonVariant.secondary,
-                  onPressed: null,
-                ),
-                AppButton(
-                  label: 'Guardar cambios',
-                  isLoading: true,
-                  onPressed: _noop,
-                ),
+                for (final sample in _buttonSamples) ...[
+                  _StateLabel(sample.name),
+                  AppButton(
+                    label: sample.label,
+                    variant: sample.variant,
+                    leadingIcon: sample.leadingIcon,
+                    onPressed: _noop,
+                  ),
+                  AppButton(
+                    label: sample.label,
+                    variant: sample.variant,
+                    isLoading: true,
+                    onPressed: _noop,
+                  ),
+                  AppButton(
+                    label: sample.label,
+                    variant: sample.variant,
+                    onPressed: null,
+                  ),
+                ],
               ],
             ),
             _Section(
@@ -132,20 +158,21 @@ class _DesignCatalogScreenState extends State<DesignCatalogScreen> {
             _Section(
               title: 'Tarjetas',
               children: [
+                for (final sample in _cardSamples)
+                  AppCard(
+                    child: _CardContent(
+                      title: sample.title,
+                      detail: sample.detail,
+                    ),
+                  ),
                 AppCard(
-                  semanticLabel: 'Cancha 1, fútbol 5',
+                  semanticLabel: 'Viernes 20:00, reserva en Cancha 1',
                   selected: _isCardSelected,
                   onTap: () =>
                       setState(() => _isCardSelected = !_isCardSelected),
-                  child: Text(
-                    'Cancha 1 · Fútbol 5',
-                    style: textTheme.titleMedium,
-                  ),
-                ),
-                AppCard(
-                  child: Text(
-                    'Complejo Los Andes',
-                    style: textTheme.titleMedium,
+                  child: const _CardContent(
+                    title: 'Viernes 20:00',
+                    detail: 'Seleccionada',
                   ),
                 ),
                 const AppCard(isLoading: true, child: SizedBox.shrink()),
@@ -231,6 +258,63 @@ class _Section extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _ButtonSample {
+  const _ButtonSample({
+    required this.name,
+    required this.label,
+    required this.variant,
+    this.leadingIcon,
+  });
+
+  final String name;
+  final String label;
+  final AppButtonVariant variant;
+  final AppIcons? leadingIcon;
+}
+
+/// One card per domain variant (complex, court, booking, tournament, news).
+class _CardSample {
+  const _CardSample({required this.title, required this.detail});
+
+  final String title;
+  final String detail;
+}
+
+class _StateLabel extends StatelessWidget {
+  const _StateLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(text, style: Theme.of(context).textTheme.titleSmall);
+  }
+}
+
+class _CardContent extends StatelessWidget {
+  const _CardContent({required this.title, required this.detail});
+
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: textTheme.titleMedium),
+        Text(
+          detail,
+          style: textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }
