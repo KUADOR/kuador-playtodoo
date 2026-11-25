@@ -1,7 +1,5 @@
 # Field · campo de formulario
 
-> Esqueleto del contrato. Las tareas de cada pieza (PLATODO-18, PLATODO-20 y PLATODO-22) completan ejemplos y capturas; PLATODO-24 cierra la documentación final.
-
 Contrato común de `Field` (`app`, `backoffice`) y `AppField` (`movil`). Solo usa tokens de `design-system/tokens`.
 
 ## Uso
@@ -97,12 +95,6 @@ AppField<String>.select(
 - **Selección:** se usa `DropdownButtonFormField` en lugar de `DropdownMenu` porque acepta el mismo `InputDecoration` (con el error como widget, con su icono), y el campo de texto y el de selección quedan iguales.
 - **Pruebas:** `movil/test/shared/ui/app_field_test.dart` (etiqueta encima; error con borde, icono, mensaje y Semantics; selección que emite el valor; deshabilitado; 44 de alto).
 
-## Diferencias aceptadas por plataforma
-
-| Plataforma | Diferencia |
-|---|---|
-| `movil` | Teclado en pantalla del sistema según `keyboardType` (correo, número, teléfono). La selección abre el menú de Material en las dos plataformas. Fecha y hora (fuera de esta tarea) usarán los selectores nativos de cada plataforma |
-
 ## Angular (`backoffice`)
 
 Componente standalone `Field` en `backoffice/src/app/shared/ui/field/` (selector `app-field`).
@@ -132,3 +124,15 @@ Componente standalone `Field` en `backoffice/src/app/shared/ui/field/` (selector
 - **Selección:** `<select>` nativo del navegador (flecha y lista del sistema).
 - Validar es responsabilidad de la pantalla: el campo solo muestra el `error` que recibe.
 - Catálogo vivo en `/design` (solo desarrollo). Capturas en `docs/evidence/platodo-20/`.
+
+## Diferencias aceptadas por plataforma
+
+Lo que no está en esta tabla debe verse y comportarse igual en las tres piezas. Comparación lado a lado: `docs/evidence/platodo-24/parity-field.png`.
+
+| Plataforma | Diferencia | Motivo |
+|---|---|---|
+| `movil` | Teclado en pantalla del sistema según `keyboardType` (correo, número, teléfono) | Teclado nativo |
+| `movil` | La selección abre el menú de Material en Android y en iOS | Selector nativo de Flutter con la misma decoración que el campo de texto |
+| `movil` | Fecha y hora (fuera de esta épica) usarán los selectores nativos de cada plataforma | Selectores nativos |
+| `backoffice` | Selección con `<select>` nativo del navegador (flecha y lista del sistema); `app` dibuja su propia flecha (Lucide `ChevronDown`) sobre el `<select>` nativo | La lista desplegable es del sistema en las dos; cambia solo la flecha |
+| `backoffice` | Texto del control en `font-size-sm`; `app` usa `font-size-md` | `app` se usa en el celular (16 px evitan el zoom del navegador al enfocar); `backoffice` es una herramienta de escritorio. Las dos cumplen el mínimo del contrato |

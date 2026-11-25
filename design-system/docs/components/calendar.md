@@ -77,14 +77,6 @@ Estas reglas producen la salida esperada (`expected`) de cada fixture; las tres 
 - Área mínima de cada franja: `size-touch-min` × `size-touch-min` (44 × 44).
 - Contraste: los pares usados están en `design-system/contrast-pairs.json` y se validan con `npm test`.
 
-## Diferencias aceptadas por plataforma
-
-| Plataforma | Diferencia |
-|---|---|
-| `movil` | Vista diaria por defecto; franjas en rejilla de 3 columnas; vista semanal con desplazamiento horizontal; ripple de Material |
-| `app` | Vista semanal por defecto |
-| `backoffice` | Siempre `readonly` (decisión D6): no tiene `mode`, `selected` ni `selectionChange`; las franjas no son interactivas (sin hover, foco ni acción) y se muestra el aviso fijo «Solo lectura». Semana y mes se desplazan en horizontal en pantallas angostas |
-
 ## Fixtures compartidos
 
 En `design-system/fixtures/calendar/` y copiados por `npm run build` a:
@@ -218,3 +210,19 @@ BookingCalendar(
 - **Navegación:** botones de icono con `tooltip` «Día/Semana/Mes anterior/siguiente» y `SegmentedButton` para la vista; deshabilitados con `status: loading`.
 - **Movimiento:** el esqueleto (`AppSkeleton`) queda quieto con `MediaQuery.disableAnimations`.
 - **Área táctil:** 44 × 44 (`size-touch-min`), validado con `iOSTapTargetGuideline`.
+
+## Diferencias aceptadas por plataforma
+
+Lo que no está en esta tabla debe verse y comportarse igual en las tres piezas. Comparación lado a lado: `docs/evidence/platodo-24/parity-calendar.png`.
+
+| Plataforma | Diferencia | Motivo |
+|---|---|---|
+| `movil` | Vista diaria por defecto; franjas en rejilla de 3 columnas; vista semanal con desplazamiento horizontal | Pantalla angosta; el jugador reserva un día a la vez |
+| `movil` | Ripple de Material; selector de vista con `SegmentedButton` de Material (con check en la vista activa) | Controles nativos |
+| `movil` | Navegación con Tab por las franjas seleccionables (sin roving tabindex); las no seleccionables no reciben foco, pero los lectores sí las leen | Recorrido de foco de Flutter (`FocusTraversalGroup`) |
+| `app` | Vista semanal por defecto | El personal del complejo consulta la semana |
+| `backoffice` | Siempre `readonly` (decisión D6): no tiene `mode`, `selected` ni `selectionChange`; las franjas no son interactivas (sin hover, foco ni acción) y se muestra el aviso fijo «Solo lectura». Semana y mes se desplazan en horizontal en pantallas angostas | Kuador consulta otros complejos y no edita |
+
+### Por resolver (no es diferencia de plataforma)
+
+- **Celda del mes con franjas libres:** `movil` la pinta con fondo `color-accent-tint` y borde `color-primary` en el día de hoy; `app` y `backoffice` la dejan en `color-surface` y marcan hoy con punto y «Hoy». El contrato no fija el aspecto de la celda del mes (solo el resumen). [POR DEFINIR: aspecto de la celda del mes, lo decide Diseño UI/UX]; mientras tanto se acepta como está.
