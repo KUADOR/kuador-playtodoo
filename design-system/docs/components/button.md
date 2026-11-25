@@ -36,6 +36,36 @@ Medidas: alto mínimo `size-touch-min`; radio `radius-md`; etiqueta en `font-fam
 
 Foco visible con anillo de `border-focus-ring` y separación `border-focus-offset`; activable con Enter y Espacio; nombre accesible = `label`.
 
+## React (`app`)
+
+Ubicación: `app/src/shared/ui/button/Button.tsx` (exportado desde `app/src/shared/ui`). Estilos en `Button.module.css`, solo con `var(--…)`.
+
+```tsx
+import { Button } from '../shared/ui'
+
+<Button label="Reservar cancha" onClick={reserve} />
+<Button variant="secondary" label="Ver horarios" />
+<Button variant="danger" label="Cancelar reserva" loading loadingLabel="Cancelando…" />
+<Button label="Guardar cambios" disabled />
+```
+
+| Contrato | React |
+|---|---|
+| `variant` | `variant` (`primary` por defecto) |
+| `label` | `label` (texto visible y nombre accesible) |
+| `loading` | `loading`; texto `loadingLabel` (por defecto «Guardando…») |
+| `disabled` | `disabled` (atributo nativo: fuera del orden de tabulación) |
+| `press` | `onClick` |
+
+Además acepta los atributos de `<button>` (`type` es `button` por defecto).
+
+- **Cargando:** `aria-busy="true"` y `aria-disabled="true"`; sigue enfocable para no perder el foco del teclado, pero `onClick` no se llama. El spinner (Lucide `LoaderCircle`) no gira con `prefers-reduced-motion`.
+- **Foco:** anillo `color-focus` de `border-focus-ring` separado `border-focus-offset`, con halo `color-focus-halo`, solo con `:focus-visible` (`app/src/shared/ui/a11y.module.css`).
+- **Pulsado del primario:** `color-primary-hover` + sombra interior de `border-width-md` en `color-brand-navy`, provisional hasta definir la sombra exacta.
+- **Pendientes ([POR DEFINIR]):** el pulsado del secundario usa el mismo `color-primary-tint` del hover y el hover de peligro mantiene `color-danger`, hasta que la identidad defina esos tonos.
+- **Pruebas:** `Button.test.tsx` (activación con mouse, Enter y Espacio; deshabilitado; cargando; axe en cada variante × normal, cargando y deshabilitado).
+- **Catálogo:** `pnpm dev` y abrir `/dev/design` (solo en desarrollo).
+
 ## Diferencias aceptadas por plataforma
 
 | Plataforma | Diferencia |

@@ -1,0 +1,17 @@
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-body);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-family-heading);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-heading);
+  color: var(--color-brand-navy);
+}

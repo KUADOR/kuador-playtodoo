@@ -1,0 +1,101 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-family: var(--font-family-body);
+}
+
+.label {
+  color: var(--color-fg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-body);
+}
+
+/* 16px text on mobile-first layouts also prevents the browser zoom on focus. */
+.control {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--size-touch-min);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-sm) solid var(--color-fg-muted);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-body);
+}
+
+/* Focus and error use a 2px border: the padding shrinks by the extra width so the text does not move. */
+.control:focus-visible,
+.control[aria-invalid='true'] {
+  border-width: var(--border-width-lg);
+  padding: calc(var(--space-2) - var(--border-width-lg) + var(--border-width-sm))
+    calc(var(--space-3) - var(--border-width-lg) + var(--border-width-sm));
+}
+
+.control:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.control[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.control::placeholder {
+  color: var(--color-fg-muted);
+}
+
+.control:disabled {
+  background: var(--color-surface-alt);
+  color: var(--color-disabled-fg);
+  cursor: not-allowed;
+}
+
+.selectWrapper {
+  position: relative;
+}
+
+.select {
+  appearance: none;
+  padding-inline-end: calc(var(--space-3) + var(--font-size-lg) + var(--space-2));
+}
+
+.select:focus-visible,
+.select[aria-invalid='true'] {
+  padding-inline-end: calc(var(--space-3) + var(--font-size-lg) + var(--space-2) - var(--border-width-lg) + var(--border-width-sm));
+}
+
+.selectIcon {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--space-3);
+  margin-block: auto;
+  color: var(--color-fg-muted);
+  pointer-events: none;
+}
+
+.help,
+.error {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.help {
+  color: var(--color-fg-muted);
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  color: var(--color-danger);
+}
+
+.icon {
+  flex-shrink: 0;
+  width: var(--font-size-lg);
+  height: var(--font-size-lg);
+}
