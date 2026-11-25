@@ -1,4 +1,10 @@
 import { Component } from '@angular/core';
+import { BookingCalendar } from '../../shared/ui/booking-calendar/booking-calendar';
+import { CalendarStatus } from '../../shared/ui/booking-calendar/booking-calendar.types';
+import {
+  CalendarFixture,
+  CALENDAR_FIXTURES,
+} from '../../shared/ui/booking-calendar/calendar-fixtures';
 import { Button, ButtonVariant } from '../../shared/ui/button/button';
 import { Card, CardVariant } from '../../shared/ui/card/card';
 import { Field, FieldOption } from '../../shared/ui/field/field';
@@ -7,6 +13,12 @@ interface ButtonExample {
   readonly variant: ButtonVariant;
   readonly name: string;
   readonly label: string;
+}
+
+interface CalendarExample {
+  readonly name: string;
+  readonly source: CalendarFixture;
+  readonly status: CalendarStatus;
 }
 
 interface CardExample {
@@ -22,7 +34,7 @@ interface CardExample {
  */
 @Component({
   selector: 'app-design-catalog',
-  imports: [Button, Field, Card],
+  imports: [Button, Field, Card, BookingCalendar],
   templateUrl: './design-catalog.html',
   styleUrl: './design-catalog.css',
 })
@@ -65,5 +77,16 @@ export class DesignCatalog {
       title: 'Nuevas luces LED',
       detail: 'Publicada hace 2 días',
     },
+  ];
+
+  protected readonly calendars: readonly CalendarExample[] = [
+    { name: 'Semana', source: CALENDAR_FIXTURES.weekReadonly, status: 'ready' },
+    { name: 'Día · franjas de 30 min', source: CALENDAR_FIXTURES.day30, status: 'ready' },
+    { name: 'Día · franjas de 60 min', source: CALENDAR_FIXTURES.day60, status: 'ready' },
+    { name: 'Día · franjas de 90 min', source: CALENDAR_FIXTURES.day90, status: 'ready' },
+    { name: 'Mes', source: CALENDAR_FIXTURES.monthMixed, status: 'ready' },
+    { name: 'Día sin horarios', source: CALENDAR_FIXTURES.dayEmpty, status: 'ready' },
+    { name: 'Cargando', source: CALENDAR_FIXTURES.weekReadonly, status: 'loading' },
+    { name: 'Error', source: CALENDAR_FIXTURES.weekReadonly, status: 'error' },
   ];
 }

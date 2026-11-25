@@ -83,7 +83,7 @@ Estas reglas producen la salida esperada (`expected`) de cada fixture; las tres 
 |---|---|
 | `movil` | Vista diaria por defecto; franjas en rejilla de 3 columnas; vista semanal con desplazamiento horizontal; ripple de Material |
 | `app` | Vista semanal por defecto |
-| `backoffice` | Siempre `readonly`: no emite `selectionChange` |
+| `backoffice` | Siempre `readonly` (decisión D6): no tiene `mode`, `selected` ni `selectionChange`; las franjas no son interactivas (sin hover, foco ni acción) y se muestra el aviso fijo «Solo lectura». Semana y mes se desplazan en horizontal en pantallas angostas |
 
 ## Fixtures compartidos
 
@@ -125,3 +125,35 @@ Forma de `expected`:
 ```
 
 En `week` la clave `day` se reemplaza por `week: { columns, rows, cells }` y en `month` por `month: { weekdayHeaders, weeks }`. Los tres casos de 30, 60 y 90 min muestran el mismo día de complejos distintos: es la prueba a nivel de componente de que la duración de franja de cada complejo se respeta.
+
+## Angular (`backoffice`)
+
+Componente standalone `BookingCalendar` en `backoffice/src/app/shared/ui/booking-calendar/` (selector `app-booking-calendar`), con iconos de `@lucide/angular` (ojo, candado, alerta y chevrons). **Diferencia aceptada:** el backoffice siempre es de solo lectura (decisión D6 de PLATODO-15: Kuador consulta otros complejos y no edita), así que no existe el modo editable.
+
+| Contrato | Angular |
+|---|---|
+| `slotDurationMinutes`, `today` | Entradas obligatorias |
+| `days`, `status` | Entradas (`[]` y `ready` por defecto) |
+| `initialView` | Entrada, `week` por defecto |
+| `mode`, `selected` | No existen: siempre `readonly`, sin selección. Si los datos traen una franja «seleccionada», se muestra con su estado recibido |
+| `selectionChange` | No existe |
+| `rangeChange` | Salida `(rangeChange)`: al cambiar de vista, de período o al abrir un día desde la semana o el mes. No se emite al montar ni si el período no cambia |
+| `retry` | Salida `(retry)` desde «Reintentar» |
+
+```html
+<app-booking-calendar
+  [slotDurationMinutes]="complex.slotDurationMinutes"
+  [today]="today"
+  [days]="days()"
+  [status]="status()"
+  (rangeChange)="loadSlots($event)"
+  (retry)="reload()"
+/>
+```
+
+- **Franjas:** mismos colores y textos que en las otras piezas (disponible y ocupado con candado y «Ocupado»), sin cursor, hover ni foco. El lector de pantalla lee la etiqueta accesible del contrato (`18:00 a 19:00, Libre`).
+- **Navegación con teclado:** todos los controles son botones nativos (Tab, Enter, Espacio). Botones «Día/Semana/Mes anterior» y «… siguiente», selector de vista con `aria-pressed`, cabeceras de la semana que abren el día y cuadrícula del mes con roving tabindex: una sola fecha en el orden de tabulación (hoy o el día 1) y flechas para moverse dentro del mes. El título del período se anuncia (`aria-live`).
+- **Estados:** cargando (esqueleto, `aria-busy`, navegación y vistas deshabilitadas, respeta `prefers-reduced-motion`), error («No pudimos cargar los horarios.» con `role="alert"` + «Reintentar») y vacío del día.
+- **Móvil:** semana y mes dentro de una región desplazable en horizontal y enfocable; vista diaria en rejilla que se adapta al ancho.
+- **Pruebas:** `booking-calendar.spec.ts` y `calendar-model.spec.ts` comprueban los fixtures (30, 60 y 90 min en paralelo, semana, mes, vacío, todo ocupado), que ninguna franja sea interactiva ni seleccionada, teclado, `rangeChange`, estados y axe.
+- Catálogo vivo: `npm start` en `backoffice/` y abrir `/design`, sección «Calendario de reservas (solo lectura)». Capturas en `docs/evidence/platodo-21/`.
