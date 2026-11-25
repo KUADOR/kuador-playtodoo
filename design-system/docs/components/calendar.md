@@ -157,6 +157,7 @@ Componente standalone `BookingCalendar` en `backoffice/src/app/shared/ui/booking
 - **Móvil:** semana y mes dentro de una región desplazable en horizontal y enfocable; vista diaria en rejilla que se adapta al ancho.
 - **Pruebas:** `booking-calendar.spec.ts` y `calendar-model.spec.ts` comprueban los fixtures (30, 60 y 90 min en paralelo, semana, mes, vacío, todo ocupado), que ninguna franja sea interactiva ni seleccionada, teclado, `rangeChange`, estados y axe.
 - Catálogo vivo: `npm start` en `backoffice/` y abrir `/design`, sección «Calendario de reservas (solo lectura)». Capturas en `docs/evidence/platodo-21/`.
+
 ## React (`app`)
 
 Ubicación: `app/src/shared/ui/booking-calendar/` (exportado desde `app/src/shared/ui`). Estilos en `BookingCalendar.module.css`, solo con `var(--…)`. Las reglas de presentación viven en funciones puras (`calendarModel.ts`, `calendarText.ts`, `calendarDates.ts`) que producen la forma de `expected`; el componente solo las pinta.
