@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.kuador.platodo.api.bookings.domain.Booking;
@@ -195,7 +196,9 @@ class PostgresBookingRepositoryIT {
                 try {
                     repositoryA.add(pending(EIGHT_TO_NINE));
                     return true;
-                } catch (BookingOverlapException rejected) {
+                } catch (BookingOverlapException | PessimisticLockingFailureException rejected) {
+                    // PostgreSQL may resolve conflicting concurrent inserts with a deadlock (40P01)
+                    // instead of 23P01; either way the row is not stored. CreatePendingBooking retries it.
                     return false;
                 }
             });

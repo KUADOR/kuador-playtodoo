@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,13 +39,55 @@ public class PostgresBookingRepository implements BookingRepository {
                     :cancelledAt, :cancelledBy)
             """;
 
-    private static final String SELECT_BY_ID = """
-            SELECT id, court_id, kind, status, lower(period) AS period_start, upper(period) AS period_end,
-                   player_id, holder_name, holder_phone, block_reason, created_by, created_at, expires_at,
-                   confirmed_at, cancelled_at, cancelled_by
-            FROM booking
-            WHERE id = :id
+    private static final String BOOKING_COLUMNS = """
+            id, court_id, kind, status, lower(period) AS period_start, upper(period) AS period_end,
+            player_id, holder_name, holder_phone, block_reason, created_by, created_at, expires_at,
+            confirmed_at, cancelled_at, cancelled_by""";
+
+    /** Rows that occupy their slot at :now: confirmed, or pending with a hold that has not ended (ADR-006). */
+    private static final String STILL_OCCUPYING =
+            "status IN ('PENDING', 'CONFIRMED') AND (status = 'CONFIRMED' OR expires_at > :now)";
+
+    private static final String OVERLAPPING = "period && tstzrange(:periodStart, :periodEnd, '[)')";
+
+    private static final String SELECT_BY_ID = "SELECT %s FROM booking WHERE id = :id".formatted(BOOKING_COLUMNS);
+
+    /** Transaction-scoped advisory lock per tenant schema and court, so tenants never wait for each other. */
+    private static final String LOCK_COURT_WRITES = """
+            SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':' || :courtId, 0)))
+                AS court_lock
             """;
+
+    private static final String EXPIRE_OVERDUE_OVERLAPPING = """
+            UPDATE booking SET status = 'EXPIRED', version = version + 1
+            WHERE court_id = :courtId AND status = 'PENDING' AND expires_at <= :now AND %s
+            """.formatted(OVERLAPPING);
+
+    private static final String CONFIRM_IF_PENDING = """
+            UPDATE booking SET status = 'CONFIRMED', confirmed_at = :now, version = version + 1
+            WHERE id = :id AND player_id = :playerId AND status = 'PENDING' AND expires_at > :now
+            RETURNING %s
+            """.formatted(BOOKING_COLUMNS);
+
+    private static final String CANCEL_IF_PENDING = """
+            UPDATE booking SET status = 'CANCELLED', cancelled_at = :now, cancelled_by = :playerId,
+                               version = version + 1
+            WHERE id = :id AND player_id = :playerId AND status = 'PENDING' AND expires_at > :now
+            RETURNING %s
+            """.formatted(BOOKING_COLUMNS);
+
+    private static final String SELECT_ACTIVE_OF_PLAYER_OVERLAPPING = """
+            SELECT %s FROM booking
+            WHERE player_id = :playerId AND %s AND %s
+            ORDER BY lower(period)
+            LIMIT 1
+            """.formatted(BOOKING_COLUMNS, OVERLAPPING, STILL_OCCUPYING);
+
+    private static final String SELECT_OCCUPIED_PERIODS = """
+            SELECT lower(period) AS period_start, upper(period) AS period_end FROM booking
+            WHERE court_id = :courtId AND %s AND %s
+            ORDER BY lower(period)
+            """.formatted(OVERLAPPING, STILL_OCCUPYING);
 
     private final JdbcClient jdbcClient;
 
@@ -68,6 +111,65 @@ public class PostgresBookingRepository implements BookingRepository {
     public Optional<Booking> findById(UUID id) {
         return jdbcClient.sql(SELECT_BY_ID)
                 .param("id", id)
+                .query((row, rowNumber) -> toBooking(row))
+                .optional();
+    }
+
+    @Override
+    public void serializeWritesOfCourt(UUID courtId) {
+        jdbcClient.sql(LOCK_COURT_WRITES)
+                .param("courtId", courtId.toString())
+                .query(Integer.class)
+                .single();
+    }
+
+    @Override
+    public int expireOverdueOverlapping(UUID courtId, TimePeriod period, Instant now) {
+        return jdbcClient.sql(EXPIRE_OVERDUE_OVERLAPPING)
+                .param("courtId", courtId)
+                .param("now", toTimestamp(now))
+                .param("periodStart", toTimestamp(period.start()))
+                .param("periodEnd", toTimestamp(period.end()))
+                .update();
+    }
+
+    @Override
+    public Optional<Booking> confirmIfPending(UUID id, UUID playerId, Instant now) {
+        return updateReturning(CONFIRM_IF_PENDING, id, playerId, now);
+    }
+
+    @Override
+    public Optional<Booking> cancelIfPending(UUID id, UUID playerId, Instant now) {
+        return updateReturning(CANCEL_IF_PENDING, id, playerId, now);
+    }
+
+    @Override
+    public Optional<Booking> findActiveOfPlayerOverlapping(UUID playerId, TimePeriod period, Instant now) {
+        return jdbcClient.sql(SELECT_ACTIVE_OF_PLAYER_OVERLAPPING)
+                .param("playerId", playerId)
+                .param("now", toTimestamp(now))
+                .param("periodStart", toTimestamp(period.start()))
+                .param("periodEnd", toTimestamp(period.end()))
+                .query((row, rowNumber) -> toBooking(row))
+                .optional();
+    }
+
+    @Override
+    public List<TimePeriod> findOccupiedPeriods(UUID courtId, TimePeriod range, Instant now) {
+        return jdbcClient.sql(SELECT_OCCUPIED_PERIODS)
+                .param("courtId", courtId)
+                .param("now", toTimestamp(now))
+                .param("periodStart", toTimestamp(range.start()))
+                .param("periodEnd", toTimestamp(range.end()))
+                .query((row, rowNumber) -> toPeriod(row))
+                .list();
+    }
+
+    private Optional<Booking> updateReturning(String sql, UUID id, UUID playerId, Instant now) {
+        return jdbcClient.sql(sql)
+                .param("id", id)
+                .param("playerId", playerId)
+                .param("now", toTimestamp(now))
                 .query((row, rowNumber) -> toBooking(row))
                 .optional();
     }
@@ -108,7 +210,7 @@ public class PostgresBookingRepository implements BookingRepository {
                 row.getObject("court_id", UUID.class),
                 BookingKind.valueOf(row.getString("kind")),
                 BookingStatus.valueOf(row.getString("status")),
-                new TimePeriod(toInstant(row, "period_start"), toInstant(row, "period_end")),
+                toPeriod(row),
                 row.getObject("player_id", UUID.class),
                 holderName == null ? null : new BookingHolder(holderName, row.getString("holder_phone")),
                 row.getString("block_reason"),
@@ -118,6 +220,10 @@ public class PostgresBookingRepository implements BookingRepository {
                 toInstant(row, "confirmed_at"),
                 cancelledAt == null ? null
                         : new BookingCancellation(cancelledAt, row.getObject("cancelled_by", UUID.class)));
+    }
+
+    private static TimePeriod toPeriod(ResultSet row) throws SQLException {
+        return new TimePeriod(toInstant(row, "period_start"), toInstant(row, "period_end"));
     }
 
     /** PgJDBC binds {@link OffsetDateTime} as timestamptz; {@link Instant} is not a supported JDBC type. */
