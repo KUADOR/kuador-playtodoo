@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +30,14 @@ public class PostgresBookingRepository implements BookingRepository {
     /** SQLSTATE of an exclusion constraint violation (booking_no_overlap). */
     static final String EXCLUSION_VIOLATION = "23P01";
 
+    /**
+     * SQLSTATE of a deadlock. Concurrent inserts of overlapping periods check the exclusion constraint against
+     * each other's uncommitted rows and can wait on each other; PostgreSQL then aborts one of them with this
+     * code instead of 23P01. A single-row insert waits only on those checks, so the aborted insert lost the
+     * slot to a concurrent overlapping booking that goes on to commit.
+     */
+    static final String DEADLOCK_DETECTED = "40P01";
+
     private static final String INSERT = """
             INSERT INTO booking (id, court_id, kind, status, period, player_id, holder_name, holder_phone,
                                  block_reason, created_by, created_at, expires_at, confirmed_at,
@@ -38,13 +47,27 @@ public class PostgresBookingRepository implements BookingRepository {
                     :cancelledAt, :cancelledBy)
             """;
 
-    private static final String SELECT_BY_ID = """
-            SELECT id, court_id, kind, status, lower(period) AS period_start, upper(period) AS period_end,
-                   player_id, holder_name, holder_phone, block_reason, created_by, created_at, expires_at,
-                   confirmed_at, cancelled_at, cancelled_by
-            FROM booking
-            WHERE id = :id
+    private static final String BOOKING_COLUMNS = """
+            id, court_id, kind, status, lower(period) AS period_start, upper(period) AS period_end,
+            player_id, holder_name, holder_phone, block_reason, created_by, created_at, expires_at,
+            confirmed_at, cancelled_at, cancelled_by
             """;
+
+    private static final String SELECT_BY_ID = "SELECT " + BOOKING_COLUMNS + " FROM booking WHERE id = :id";
+
+    /**
+     * SKIP LOCKED leaves rows that a concurrent expiry or confirmation is changing to that transaction, and
+     * the outer status check makes the update a no-op on rows that stopped being pending meanwhile.
+     */
+    private static final String EXPIRE_DUE_PENDING = """
+            UPDATE booking SET status = 'EXPIRED'
+            WHERE status = 'PENDING'
+              AND id IN (SELECT id FROM booking
+                         WHERE status = 'PENDING' AND expires_at <= :now
+                         ORDER BY expires_at
+                         LIMIT :limit
+                         FOR UPDATE SKIP LOCKED)
+            RETURNING\s""" + BOOKING_COLUMNS;
 
     private final JdbcClient jdbcClient;
 
@@ -57,7 +80,7 @@ public class PostgresBookingRepository implements BookingRepository {
         try {
             insert(booking);
         } catch (DataAccessException error) {
-            if (isExclusionViolation(error)) {
+            if (lostTheSlotToAnOverlappingBooking(error)) {
                 throw new BookingOverlapException(booking.courtId(), booking.period(), error);
             }
             throw error;
@@ -70,6 +93,15 @@ public class PostgresBookingRepository implements BookingRepository {
                 .param("id", id)
                 .query((row, rowNumber) -> toBooking(row))
                 .optional();
+    }
+
+    @Override
+    public List<Booking> expirePendingDueBy(Instant now, int limit) {
+        return jdbcClient.sql(EXPIRE_DUE_PENDING)
+                .param("now", toTimestamp(now))
+                .param("limit", limit)
+                .query((row, rowNumber) -> toBooking(row))
+                .list();
     }
 
     private void insert(Booking booking) {
@@ -95,9 +127,10 @@ public class PostgresBookingRepository implements BookingRepository {
                 .update();
     }
 
-    private static boolean isExclusionViolation(DataAccessException error) {
+    private static boolean lostTheSlotToAnOverlappingBooking(DataAccessException error) {
         return error.getMostSpecificCause() instanceof SQLException sqlError
-                && EXCLUSION_VIOLATION.equals(sqlError.getSQLState());
+                && (EXCLUSION_VIOLATION.equals(sqlError.getSQLState())
+                        || DEADLOCK_DETECTED.equals(sqlError.getSQLState()));
     }
 
     private static Booking toBooking(ResultSet row) throws SQLException {
