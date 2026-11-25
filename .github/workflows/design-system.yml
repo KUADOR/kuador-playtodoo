@@ -1,0 +1,63 @@
+# Design tokens: tests, WCAG contrast and drift check of the generated files.
+# The generated paths mirror design-system/build/targets.js: keep both in sync.
+name: design-system
+
+on:
+  pull_request:
+    paths: &design-system-paths
+      - design-system/**
+      - app/src/shared/design/**
+      - app/src/shared/ui/booking-calendar/fixtures/**
+      - backoffice/src/styles/tokens.css
+      - backoffice/src/styles/fonts.css
+      - backoffice/src/styles/fonts/**
+      - backoffice/src/app/shared/ui/booking-calendar/fixtures/**
+      - movil/lib/core/design/tokens.g.dart
+      - movil/assets/fonts/**
+      - movil/test/shared/ui/booking_calendar/fixtures/**
+      - .github/workflows/design-system.yml
+  push:
+    branches: [main, develop]
+    paths: *design-system-paths
+
+permissions:
+  contents: read
+
+concurrency:
+  group: design-system-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  design-system:
+    name: design-system
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: design-system
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: design-system/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check generated files match the tokens
+        run: npm run tokens:check
+
+      - name: Test tokens, fixtures and contrast
+        run: npm test
+
+      - name: Build and verify the output is already committed
+        run: |
+          npm run build
+          if [ -n "$(git status --porcelain -- ..)" ]; then
+            echo "::error::npm run build changed the repository. Run it in design-system/ and commit the result."
+            git status --porcelain -- ..
+            exit 1
+          fi
