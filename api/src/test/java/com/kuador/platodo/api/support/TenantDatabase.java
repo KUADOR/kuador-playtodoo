@@ -5,6 +5,10 @@ import java.nio.file.Path;
 import javax.sql.DataSource;
 
 import org.postgresql.ds.PGSimpleDataSource;
+import org.springframework.boot.test.util.TestPropertyValues;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.MountableFile;
 
@@ -45,6 +49,34 @@ public final class TenantDatabase {
         DataSource dataSource = tenantDataSource(tenantSchema);
         new TenantSchemaMigrator(dataSource).migrate(tenantSchema);
         return dataSource;
+    }
+
+    /** Plain connections with the server default search_path, for test setup that names schemas explicitly. */
+    public static JdbcClient admin() {
+        startOnce();
+        PGSimpleDataSource dataSource = new PGSimpleDataSource();
+        dataSource.setUrl(POSTGRES.getJdbcUrl());
+        dataSource.setUser(POSTGRES.getUsername());
+        dataSource.setPassword(POSTGRES.getPassword());
+        return JdbcClient.create(dataSource);
+    }
+
+    /**
+     * Points the application's connection pool ({@code spring.datasource.*}) at this container. Use it with
+     * {@code @ContextConfiguration(initializers = TenantDatabase.SpringConnection.class)}.
+     */
+    public static final class SpringConnection
+            implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+
+        @Override
+        public void initialize(ConfigurableApplicationContext context) {
+            startOnce();
+            TestPropertyValues.of(
+                            "spring.datasource.url=" + POSTGRES.getJdbcUrl(),
+                            "spring.datasource.username=" + POSTGRES.getUsername(),
+                            "spring.datasource.password=" + POSTGRES.getPassword())
+                    .applyTo(context);
+        }
     }
 
     private static synchronized void startOnce() {

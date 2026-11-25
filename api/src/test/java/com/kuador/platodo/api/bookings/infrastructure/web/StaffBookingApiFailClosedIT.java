@@ -1,5 +1,6 @@
 package com.kuador.platodo.api.bookings.infrastructure.web;
 
+import static com.kuador.platodo.api.support.TestTenants.FLYWAY_INITIALIZER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,8 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.UUID;
 
-import javax.sql.DataSource;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,11 +16,17 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.kuador.platodo.api.bookings.application.CreatePendingBooking;
+import com.kuador.platodo.api.support.FixedTenantScopeFilter;
 import com.kuador.platodo.api.support.TenantDatabase;
+import com.kuador.platodo.api.support.TestTenants;
+import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
+import com.kuador.platodo.api.tenancy.infrastructure.persistence.TenantMigrations;
 
 /**
  * With only the staff API enabled and no Identity or Courts adapters registered, the default adapters reject
@@ -29,14 +34,19 @@ import com.kuador.platodo.api.support.TenantDatabase;
  */
 @SpringBootTest(properties = ConditionalOnStaffApiEnabled.PROPERTY + "=true")
 @AutoConfigureMockMvc
+@ContextConfiguration(initializers = TenantDatabase.SpringConnection.class)
 class StaffBookingApiFailClosedIT {
+
+    private static final TenantId TENANT = new TenantId("0c000000-0000-4000-8000-000000000004");
 
     @TestConfiguration(proxyBeanMethods = false)
     static class TenantOnly {
 
+        /** Stand-in for the subdomain resolution of PLATODO-50: every request runs in this class's tenant. */
         @Bean
-        DataSource tenantDataSource() {
-            return TenantDatabase.migratedTenant("tenant_staff_api_fail_closed");
+        @DependsOn(FLYWAY_INITIALIZER)
+        FixedTenantScopeFilter tenantScope(TenantMigrations migrations) {
+            return new FixedTenantScopeFilter(TestTenants.provision(migrations, TENANT));
         }
     }
 
