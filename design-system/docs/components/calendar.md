@@ -188,3 +188,33 @@ import { BookingCalendar } from '../shared/ui'
 - **Navegación:** botones «Día/Semana/Mes anterior» y «… siguiente» y el selector de vista (`aria-pressed`); se deshabilitan con `status: loading`. En `readonly` se puede navegar (emite `rangeChange` para cargar datos), pero activar franjas no emite nada.
 - **Contenedor:** `role="group"` con el título como nombre (no es un landmark, para que una pantalla pueda mostrar varios calendarios).
 - **Pantallas angostas:** las vistas semanal y mensual se desplazan horizontalmente cuando no caben.
+
+## Flutter (`movil`)
+
+Ubicación: `movil/lib/shared/ui/booking_calendar/`. Las reglas de presentación viven en funciones puras (`calendar_model.dart`, `calendar_text.dart`, `calendar_dates.dart`) que producen la forma de `expected`; los widgets solo las pintan. Solo tokens vía `AppTokens`, `ColorScheme` y `context.appColors`.
+
+```dart
+BookingCalendar(
+  slotDurationMinutes: 60,
+  days: days,
+  today: '2026-12-02',
+  selected: selected,
+  status: status,
+  onSelectionChange: (value) => setState(() => selected = value),
+  onRangeChange: loadDays,
+  onRetry: reload,
+)
+```
+
+| Contrato | Flutter |
+|---|---|
+| `slotDurationMinutes`, `days`, `today`, `selected`, `mode`, `status` | Mismo nombre (`days`: `List<CalendarDay>`; estado de entrada `SlotAvailability`) |
+| `view` / `initialView` | `initialView` (por defecto `CalendarView.day`) |
+| `selectionChange` · `rangeChange` · `retry` | `onSelectionChange` · `onRangeChange` · `onRetry` |
+
+- **Vistas:** `day` en rejilla de 3 columnas; `week` en tabla con desplazamiento horizontal (cada franja lleva el día como `hint` para lectores); `month` en cuadrícula que se desplaza si siete columnas no caben.
+- **Franjas:** `Semantics` con la etiqueta accesible, `selected`, `enabled` y `button` solo si es seleccionable. Ocupada: candado + «Ocupado»; seleccionada: hora + check.
+- **Teclado:** `Shortcuts` (flechas → `DirectionalFocusIntent`, Enter/Espacio → `ActivateIntent`) + `FocusTraversalGroup`. Las franjas no seleccionables no reciben foco (los lectores sí las leen). No hay roving tabindex: Tab recorre las franjas seleccionables.
+- **Navegación:** botones de icono con `tooltip` «Día/Semana/Mes anterior/siguiente» y `SegmentedButton` para la vista; deshabilitados con `status: loading`.
+- **Movimiento:** el esqueleto (`AppSkeleton`) queda quieto con `MediaQuery.disableAnimations`.
+- **Área táctil:** 44 × 44 (`size-touch-min`), validado con `iOSTapTargetGuideline`.
