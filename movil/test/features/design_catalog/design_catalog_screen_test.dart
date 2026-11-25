@@ -10,14 +10,22 @@ import 'package:playtodoo/shared/ui/app_field.dart';
 import 'package:playtodoo/shared/ui/booking_calendar/booking_calendar.dart';
 
 void main() {
-  test('the catalog route does not exist when the catalog is disabled', () {
+  test('the catalog and booking preview routes do not exist when the catalog '
+      'is disabled', () {
     expect(
       buildAppRoutes(enableDesignCatalog: false),
       isNot(contains(AppRoutes.designCatalog)),
     );
     expect(
+      buildAppRoutes(enableDesignCatalog: false),
+      isNot(contains(AppRoutes.bookingPreview)),
+    );
+    expect(
       buildAppRoutes(enableDesignCatalog: true),
-      contains(AppRoutes.designCatalog),
+      allOf(
+        contains(AppRoutes.designCatalog),
+        contains(AppRoutes.bookingPreview),
+      ),
     );
   });
 
@@ -27,6 +35,7 @@ void main() {
     await tester.pumpWidget(const PlaytodooApp(enableDesignCatalog: false));
 
     expect(find.text('Ver catálogo de diseño'), findsNothing);
+    expect(find.text('Probar reserva con datos de prueba'), findsNothing);
   });
 
   testWidgets(
