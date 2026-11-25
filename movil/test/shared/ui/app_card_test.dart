@@ -79,7 +79,12 @@ void main() {
     );
 
     final opacity = tester
-        .widget<FadeTransition>(find.byKey(skeletonKey))
+        .widget<FadeTransition>(
+          find.descendant(
+            of: find.byKey(skeletonKey),
+            matching: find.byType(FadeTransition),
+          ),
+        )
         .opacity;
     final start = opacity.value;
     await tester.pump(const Duration(milliseconds: 300));
@@ -96,7 +101,12 @@ void main() {
     );
 
     final opacity = tester
-        .widget<FadeTransition>(find.byKey(skeletonKey))
+        .widget<FadeTransition>(
+          find.descendant(
+            of: find.byKey(skeletonKey),
+            matching: find.byType(FadeTransition),
+          ),
+        )
         .opacity;
     final start = opacity.value;
     await tester.pump(const Duration(milliseconds: 300));

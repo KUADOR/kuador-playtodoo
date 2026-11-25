@@ -25,6 +25,7 @@ class AppFocusRing extends StatefulWidget {
 class _AppFocusRingState extends State<AppFocusRing> {
   static const double _outset =
       AppTokens.borderFocusOffset + AppTokens.borderFocusRing;
+  static const double _haloOutset = _outset + AppTokens.borderFocusRing;
 
   bool _hasFocus = false;
 
@@ -62,26 +63,37 @@ class _AppFocusRingState extends State<AppFocusRing> {
           widget.child,
           if (_isRingVisible)
             Positioned.fill(
-              left: -_outset,
-              top: -_outset,
-              right: -_outset,
-              bottom: -_outset,
+              left: -_haloOutset,
+              top: -_haloOutset,
+              right: -_haloOutset,
+              bottom: -_haloOutset,
+              // Halo and ring are borders only: a shadow would fill the whole
+              // shape and cover the child.
               child: IgnorePointer(
                 child: DecoratedBox(
                   key: const ValueKey('app-focus-ring'),
                   decoration: BoxDecoration(
                     borderRadius:
-                        widget.borderRadius + BorderRadius.circular(_outset),
+                        widget.borderRadius +
+                        BorderRadius.circular(_haloOutset),
                     border: Border.all(
-                      color: colors.focus,
+                      color: colors.focusHalo,
                       width: AppTokens.borderFocusRing,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colors.focusHalo,
-                        spreadRadius: AppTokens.borderFocusRing,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppTokens.borderFocusRing),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            widget.borderRadius +
+                            BorderRadius.circular(_outset),
+                        border: Border.all(
+                          color: colors.focus,
+                          width: AppTokens.borderFocusRing,
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

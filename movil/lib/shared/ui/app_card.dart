@@ -4,6 +4,7 @@ import '../../core/design/app_colors.dart';
 import '../../core/design/app_icon.dart';
 import '../../core/design/tokens.g.dart';
 import 'app_focus_ring.dart';
+import 'app_skeleton.dart';
 
 /// Base card the domain cards (complex, court, booking…) build on.
 ///
@@ -27,6 +28,10 @@ class AppCard extends StatelessWidget {
   final VoidCallback? onTap;
   final String? semanticLabel;
 
+  static const Key _skeletonKey = ValueKey('app-card-skeleton');
+  static const String _loadingLabel = 'Cargando';
+  static const List<double> _skeletonLineWidthFactors = [0.6, 0.9, 0.4];
+
   static final BorderRadius _radius = BorderRadius.circular(AppTokens.radiusLg);
 
   @override
@@ -47,7 +52,11 @@ class AppCard extends StatelessWidget {
         children: [
           Expanded(
             child: isLoading
-                ? const _CardSkeleton()
+                ? const AppSkeleton(
+                    key: _skeletonKey,
+                    label: _loadingLabel,
+                    lineWidthFactors: _skeletonLineWidthFactors,
+                  )
                 : ExcludeSemantics(
                     excluding: semanticLabel != null,
                     child: child,
@@ -93,76 +102,6 @@ class AppCard extends StatelessWidget {
       selected: selected,
       button: onTap != null,
       child: card,
-    );
-  }
-}
-
-class _CardSkeleton extends StatefulWidget {
-  const _CardSkeleton();
-
-  @override
-  State<_CardSkeleton> createState() => _CardSkeletonState();
-}
-
-class _CardSkeletonState extends State<_CardSkeleton>
-    with SingleTickerProviderStateMixin {
-  static const Duration _pulseDuration = Duration(milliseconds: 900);
-  static const double _minOpacity = 0.4;
-  static const List<double> _lineWidthFactors = [0.6, 0.9, 0.4];
-  static const String _loadingLabel = 'Cargando';
-
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: _pulseDuration,
-    lowerBound: _minOpacity,
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _controller
-        ..stop()
-        ..value = _controller.upperBound;
-    } else if (!_controller.isAnimating) {
-      _controller.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final lineColor = context.appColors.disabledBackground;
-    return Semantics(
-      label: _loadingLabel,
-      child: FadeTransition(
-        key: const ValueKey('app-card-skeleton'),
-        opacity: _controller,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final factor in _lineWidthFactors)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppTokens.space2),
-                child: FractionallySizedBox(
-                  widthFactor: factor,
-                  child: Container(
-                    height: AppTokens.space3,
-                    decoration: BoxDecoration(
-                      color: lineColor,
-                      borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }
