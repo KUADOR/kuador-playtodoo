@@ -1,0 +1,36 @@
+# Smoke test stack: the local proxy config in front of echo servers that report which upstream
+# answered and the headers it received. Used by smoke.sh locally and in .github/workflows/proxy.yml.
+name: platodo-proxy-smoke
+
+services:
+  proxy:
+    image: caddy:2.11.9-alpine
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.local", "--adapter", "caddyfile"]
+    environment:
+      PLATODO_ROOT_DOMAIN: localhost
+      PLATODO_TRUSTED_PROXIES: ""
+      PLATODO_API_UPSTREAM: api:80
+      PLATODO_APP_UPSTREAM: app:80
+      PLATODO_BACKOFFICE_UPSTREAM: backoffice:80
+    ports:
+      - "127.0.0.1:${SMOKE_PROXY_PORT:-18000}:8000"
+    volumes:
+      - ..:/etc/caddy:ro
+    depends_on: [api, app, backoffice]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    image: traefik/whoami:v1.11
+    command: ["--name", "api"]
+
+  app:
+    image: traefik/whoami:v1.11
+    command: ["--name", "app"]
+
+  backoffice:
+    image: traefik/whoami:v1.11
+    command: ["--name", "backoffice"]

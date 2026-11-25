@@ -1,0 +1,48 @@
+# CI of the subdomain proxy (infra/proxy, infra/local). Runs only when they or this workflow change.
+# Checks Caddyfile formatting and runs the routing smoke test against echo upstreams.
+name: proxy
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/proxy.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/proxy.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proxy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CADDY_IMAGE: caddy:2.11.9-alpine
+
+jobs:
+  proxy:
+    name: proxy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check Caddyfile formatting
+        working-directory: infra/proxy
+        run: |
+          for file in Caddyfile Caddyfile.local routes.caddy; do
+            docker run --rm -v "$PWD:/config:ro" "$CADDY_IMAGE" caddy fmt "/config/$file" | diff -u "$file" -
+          done
+
+      - name: Validate local compose files
+        run: |
+          docker compose -f infra/local/compose.yaml config --quiet
+          docker compose -f infra/proxy/test/compose.yaml config --quiet
+
+      - name: Routing smoke test
+        run: infra/proxy/test/smoke.sh

@@ -1,0 +1,21 @@
+# Local development proxy: http://{sub}.localhost:8000, no TLS.
+# Browsers and curl resolve *.localhost to the loopback address, so no hosts file is needed.
+# Started by infra/local/compose.yaml, which sets the PLATODO_* variables.
+{
+	auto_https off
+	servers {
+		trusted_proxies static {$PLATODO_TRUSTED_PROXIES}
+	}
+}
+
+import routes.caddy
+
+http://*.{$PLATODO_ROOT_DOMAIN}:8000, http://{$PLATODO_ROOT_DOMAIN}:8000 {
+	import platodo_routes
+}
+
+# Hosts outside the sites above (e.g. nested labels such as a.b.localhost) would otherwise get an
+# empty 200 from Caddy.
+http://:8000 {
+	respond 404
+}

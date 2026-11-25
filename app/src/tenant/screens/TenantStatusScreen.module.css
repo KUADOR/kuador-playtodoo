@@ -1,0 +1,70 @@
+/* Pantallas PLATODO-26 · pantallas 1 y 2. Mobile first: full width with a 16px margin, capped on wide screens. */
+.page {
+  /* Card width from Pantallas (máx. 480 px); there is no size token for it yet. */
+  --status-card-max-width: 480px;
+
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: var(--space-6) var(--space-4);
+  background: var(--color-surface-alt);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: var(--status-card-max-width);
+}
+
+.brand {
+  margin: 0;
+  font-family: var(--font-family-heading);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-heading);
+  color: var(--color-brand-navy);
+  text-align: center;
+}
+
+.card {
+  width: 100%;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.icon {
+  width: var(--font-size-2xl);
+  height: var(--font-size-2xl);
+  color: var(--color-fg-muted);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+}
+
+/* The title receives focus only by script (tabindex -1) so screen readers start there; it is not interactive,
+   so it shows no focus ring. */
+.title:focus {
+  outline: none;
+}
+
+.text {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-fg-muted);
+}
+
+.action {
+  width: 100%;
+  margin-block-start: var(--space-2);
+}
