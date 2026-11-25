@@ -13,8 +13,6 @@ public sealed interface RequestAuthentication {
 
     enum Reason {
         /** Invalid or expired token, inactive account, or a staff token outside its own complex. */
-        UNAUTHENTICATED,
-        /** A Kuador token on the host of a complex without a valid access session. */
-        ACCESS_SESSION_INVALID
+        UNAUTHENTICATED
     }
 }

@@ -6,7 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 
 /**
- * Problem Details answered by tenant resolution ({@code contracts/tenancy.openapi.yaml}). Title and detail are
+ * Problem Details answered by tenant resolution and the platform access guard ({@code contracts/tenancy.openapi.yaml}). Title and detail are
  * developer-facing; clients map {@code code} to the text shown to people. Details never name the host or the state.
  */
 enum TenancyProblem {
@@ -16,7 +16,9 @@ enum TenancyProblem {
     TENANT_UNAVAILABLE(HttpStatus.FORBIDDEN, "tenant-unavailable", "Complex unavailable",
             "The complex of this host is not available."),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "resource-not-found", "Resource not found",
-            "This operation is not served on this host.");
+            "This operation is not served on this host."),
+    ACCESS_SESSION_INVALID(HttpStatus.FORBIDDEN, "access-session-invalid", "Access session invalid",
+            "A valid access session for this complex is required.");
 
     private static final String TYPE_BASE = "https://playtodoo.com/problems/";
     private static final String CODE = "code";

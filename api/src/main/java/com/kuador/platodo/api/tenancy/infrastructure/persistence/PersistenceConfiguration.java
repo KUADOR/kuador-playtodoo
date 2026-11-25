@@ -23,6 +23,8 @@ import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 
+import com.kuador.platodo.api.tenancy.application.RequestHosts;
+import com.kuador.platodo.api.tenancy.application.port.in.TenantDirectory;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantDomains;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -124,6 +126,11 @@ class PersistenceConfiguration {
     @Bean
     TenantDomains tenantDomains(@Qualifier(CONNECTION_POOL) DataSource pool) {
         return new JdbcTenantDomains(JdbcClient.create(pool));
+    }
+
+    @Bean
+    TenantDirectory tenantDirectory(@Qualifier(CONNECTION_POOL) DataSource pool, RequestHosts hosts) {
+        return new JdbcTenantDirectory(JdbcClient.create(pool), hosts);
     }
 
     @Bean

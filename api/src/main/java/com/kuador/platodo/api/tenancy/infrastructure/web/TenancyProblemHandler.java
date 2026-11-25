@@ -5,8 +5,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Renders the rejections of {@link TenantResolutionFilter} as Problem Details. It applies to every handler because
- * the filter rejects before a handler is chosen.
+ * Renders the rejections of {@link TenantResolutionFilter} and {@link PlatformAccessGuard} as Problem Details. It
+ * applies to every handler because both reject before the handler runs.
  */
 @RestControllerAdvice
 class TenancyProblemHandler {
