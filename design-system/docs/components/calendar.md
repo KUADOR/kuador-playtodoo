@@ -48,7 +48,7 @@ Estas reglas producen la salida esperada (`expected`) de cada fixture; las tres 
 - **Períodos (`range`):** `day` = el día; `week` = de lunes a domingo; `month` = del día 1 al último del mes.
 - **Títulos:** `day` → `viernes 4 de diciembre de 2026`; `week` → `30 nov – 6 dic 2026`; `month` → `diciembre 2026`. Días y meses en español, sin depender del idioma del dispositivo.
 - **Vista semanal:** columnas de lunes a domingo con cabecera `lun 30`; filas = todas las horas de inicio de la semana, ordenadas; celda vacía (`null`) si ese día no tiene esa franja.
-- **Vista mensual:** cuadrícula de semanas de lunes a domingo; los días fuera del mes son `null`; cada día muestra su resumen. Al elegir un día se pasa a la vista diaria de ese día.
+- **Vista mensual:** cuadrícula de semanas de lunes a domingo; los días fuera del mes son `null`; cada día muestra su resumen (`N libres` o `Sin horarios`), **no sus franjas**. Al elegir un día se pasa a la vista diaria de ese día. Los estados de franja (disponible, ocupado, seleccionado) con el mismo aspecto se exigen en las vistas diaria y semanal; en la mensual basta el resumen (decisión del Equipo Kuador en PLATODO-21, opción A, sobre el criterio 7 de PLATODO-15).
 
 ## Estados
 

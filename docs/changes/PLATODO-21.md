@@ -15,3 +15,7 @@ Sin cambios.
 ## README.md
 
 Sin cambios.
+
+## odd/tasks/platodo-15-identidad-visual.md (Seguimiento de PLATODO-15)
+
+Decisión del Equipo Kuador (opción A, en PLATODO-21): ajustar el criterio 7 a «Dado el calendario de reservas, cuando se cambia entre vista diaria y semanal, entonces cada vista muestra los estados disponible, ocupado y seleccionado con el mismo aspecto; la vista mensual muestra por día un resumen de disponibilidad (`N libres` o `Sin horarios`) y lleva a la vista diaria». El contrato ya lo recoge en `design-system/docs/components/calendar.md` («Vista mensual»). Lo actualiza el Product Owner en el documento de la épica.
