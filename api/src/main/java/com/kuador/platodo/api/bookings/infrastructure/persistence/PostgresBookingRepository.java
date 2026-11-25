@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,13 +39,27 @@ public class PostgresBookingRepository implements BookingRepository {
                     :cancelledAt, :cancelledBy)
             """;
 
-    private static final String SELECT_BY_ID = """
-            SELECT id, court_id, kind, status, lower(period) AS period_start, upper(period) AS period_end,
-                   player_id, holder_name, holder_phone, block_reason, created_by, created_at, expires_at,
-                   confirmed_at, cancelled_at, cancelled_by
-            FROM booking
-            WHERE id = :id
+    private static final String BOOKING_COLUMNS = """
+            id, court_id, kind, status, lower(period) AS period_start, upper(period) AS period_end,
+            player_id, holder_name, holder_phone, block_reason, created_by, created_at, expires_at,
+            confirmed_at, cancelled_at, cancelled_by
             """;
+
+    private static final String SELECT_BY_ID = "SELECT " + BOOKING_COLUMNS + " FROM booking WHERE id = :id";
+
+    /**
+     * SKIP LOCKED leaves rows that a concurrent expiry or confirmation is changing to that transaction, and
+     * the outer status check makes the update a no-op on rows that stopped being pending meanwhile.
+     */
+    private static final String EXPIRE_DUE_PENDING = """
+            UPDATE booking SET status = 'EXPIRED'
+            WHERE status = 'PENDING'
+              AND id IN (SELECT id FROM booking
+                         WHERE status = 'PENDING' AND expires_at <= :now
+                         ORDER BY expires_at
+                         LIMIT :limit
+                         FOR UPDATE SKIP LOCKED)
+            RETURNING\s""" + BOOKING_COLUMNS;
 
     private final JdbcClient jdbcClient;
 
@@ -70,6 +85,15 @@ public class PostgresBookingRepository implements BookingRepository {
                 .param("id", id)
                 .query((row, rowNumber) -> toBooking(row))
                 .optional();
+    }
+
+    @Override
+    public List<Booking> expirePendingDueBy(Instant now, int limit) {
+        return jdbcClient.sql(EXPIRE_DUE_PENDING)
+                .param("now", toTimestamp(now))
+                .param("limit", limit)
+                .query((row, rowNumber) -> toBooking(row))
+                .list();
     }
 
     private void insert(Booking booking) {
