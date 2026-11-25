@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { TenantApi } from '../api/tenantApi'
+import { ActiveTenantContext } from './activeTenant'
 import { TenantBlockedScreen, TenantCheckFailedScreen, TenantCheckingScreen } from './TenantStatusScreen'
 import { useTenantAccess } from './useTenantAccess'
 
@@ -7,7 +8,7 @@ export interface TenantGateProps {
   api: TenantApi
   /** Destination of «Ir a Playtodoo». */
   platformUrl: string
-  /** The complex app, rendered only once the complex is active. */
+  /** The complex app, rendered only once the complex is active. It reads the complex with `useActiveTenant`. */
   children: ReactNode
 }
 
@@ -17,6 +18,8 @@ export function TenantGate({ api, platformUrl, children }: TenantGateProps) {
 
   if (check.phase === 'loading') return <TenantCheckingScreen />
   if (check.phase === 'failed') return <TenantCheckFailedScreen onRetry={retry} />
-  if (check.access.kind === 'active') return children
+  if (check.access.kind === 'active') {
+    return <ActiveTenantContext value={{ displayName: check.access.displayName }}>{children}</ActiveTenantContext>
+  }
   return <TenantBlockedScreen kind={check.access.kind} platformUrl={platformUrl} />
 }

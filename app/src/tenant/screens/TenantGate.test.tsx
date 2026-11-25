@@ -5,6 +5,7 @@ import { expectNoA11yViolations } from '../../test/axe'
 import { TenantCheckError } from '../api/tenantApi'
 import type { TenantAccess, TenantApi } from '../api/tenantApi'
 import { TENANT_TEXT } from '../model/tenantText'
+import { useActiveTenant } from './activeTenant'
 import { TenantGate } from './TenantGate'
 
 const PLATFORM_URL = 'https://playtodoo.example/'
@@ -45,6 +46,19 @@ describe('TenantGate', () => {
     renderGate(apiOf({ kind: 'active', displayName: COMPLEX_NAME }))
 
     expect(await screen.findByText(COMPLEX_CONTENT)).toBeInTheDocument()
+  })
+
+  it('gives the complex app the name the api answered', async () => {
+    function ComplexName() {
+      return <p>{useActiveTenant().displayName}</p>
+    }
+    render(
+      <TenantGate api={apiOf({ kind: 'active', displayName: COMPLEX_NAME })} platformUrl={PLATFORM_URL}>
+        <ComplexName />
+      </TenantGate>,
+    )
+
+    expect(await screen.findByText(COMPLEX_NAME)).toBeInTheDocument()
   })
 
   it('shows «Complejo no disponible» with the focus on its title and a way back to Playtodoo', async () => {
