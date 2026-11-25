@@ -1,0 +1,356 @@
+{
+  "name": "month-mixed",
+  "description": "December 2026 starting on a Tuesday; grid weeks start on Monday. Mixes days with free slots, fully occupied days and days without data.",
+  "input": {
+    "slotDurationMinutes": 60,
+    "view": "month",
+    "mode": "editable",
+    "today": "2026-12-02",
+    "selected": null,
+    "days": [
+      {
+        "date": "2026-12-01",
+        "slots": [
+          {
+            "start": "18:00",
+            "status": "available"
+          },
+          {
+            "start": "19:00",
+            "status": "available"
+          }
+        ]
+      },
+      {
+        "date": "2026-12-02",
+        "slots": [
+          {
+            "start": "18:00",
+            "status": "occupied"
+          },
+          {
+            "start": "19:00",
+            "status": "available"
+          }
+        ]
+      },
+      {
+        "date": "2026-12-05",
+        "slots": [
+          {
+            "start": "09:00",
+            "status": "occupied"
+          },
+          {
+            "start": "10:00",
+            "status": "occupied"
+          }
+        ]
+      },
+      {
+        "date": "2026-12-24",
+        "slots": []
+      },
+      {
+        "date": "2026-12-31",
+        "slots": [
+          {
+            "start": "10:00",
+            "status": "available"
+          },
+          {
+            "start": "11:00",
+            "status": "available"
+          },
+          {
+            "start": "12:00",
+            "status": "available"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "range": {
+      "from": "2026-12-01",
+      "to": "2026-12-31"
+    },
+    "selected": null,
+    "title": "diciembre 2026",
+    "month": {
+      "weekdayHeaders": [
+        "lun",
+        "mar",
+        "mié",
+        "jue",
+        "vie",
+        "sáb",
+        "dom"
+      ],
+      "weeks": [
+        [
+          null,
+          {
+            "date": "2026-12-01",
+            "dayOfMonth": 1,
+            "isToday": false,
+            "availableCount": 2,
+            "occupiedCount": 0,
+            "summary": "2 libres"
+          },
+          {
+            "date": "2026-12-02",
+            "dayOfMonth": 2,
+            "isToday": true,
+            "availableCount": 1,
+            "occupiedCount": 1,
+            "summary": "1 libre"
+          },
+          {
+            "date": "2026-12-03",
+            "dayOfMonth": 3,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-04",
+            "dayOfMonth": 4,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-05",
+            "dayOfMonth": 5,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 2,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-06",
+            "dayOfMonth": 6,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          }
+        ],
+        [
+          {
+            "date": "2026-12-07",
+            "dayOfMonth": 7,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-08",
+            "dayOfMonth": 8,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-09",
+            "dayOfMonth": 9,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-10",
+            "dayOfMonth": 10,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-11",
+            "dayOfMonth": 11,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-12",
+            "dayOfMonth": 12,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-13",
+            "dayOfMonth": 13,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          }
+        ],
+        [
+          {
+            "date": "2026-12-14",
+            "dayOfMonth": 14,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-15",
+            "dayOfMonth": 15,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-16",
+            "dayOfMonth": 16,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-17",
+            "dayOfMonth": 17,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-18",
+            "dayOfMonth": 18,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-19",
+            "dayOfMonth": 19,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-20",
+            "dayOfMonth": 20,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          }
+        ],
+        [
+          {
+            "date": "2026-12-21",
+            "dayOfMonth": 21,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-22",
+            "dayOfMonth": 22,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-23",
+            "dayOfMonth": 23,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-24",
+            "dayOfMonth": 24,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-25",
+            "dayOfMonth": 25,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-26",
+            "dayOfMonth": 26,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-27",
+            "dayOfMonth": 27,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          }
+        ],
+        [
+          {
+            "date": "2026-12-28",
+            "dayOfMonth": 28,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-29",
+            "dayOfMonth": 29,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-30",
+            "dayOfMonth": 30,
+            "isToday": false,
+            "availableCount": 0,
+            "occupiedCount": 0,
+            "summary": "Sin horarios"
+          },
+          {
+            "date": "2026-12-31",
+            "dayOfMonth": 31,
+            "isToday": false,
+            "availableCount": 3,
+            "occupiedCount": 0,
+            "summary": "3 libres"
+          },
+          null,
+          null,
+          null
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "minimumRatio": {
+    "text": 4.5,
+    "component": 3
+  },
+  "pairs": [
+    { "foreground": "color.fg", "background": "color.surface", "kind": "text", "usage": "Main text" },
+    { "foreground": "color.fg", "background": "color.surface-alt", "kind": "text", "usage": "Text on secondary backgrounds" },
+    { "foreground": "color.fg-muted", "background": "color.surface", "kind": "text", "usage": "Secondary text" },
+    { "foreground": "color.fg-muted", "background": "color.surface-alt", "kind": "text", "usage": "Secondary text on secondary backgrounds" },
+    { "foreground": "color.brand-navy", "background": "color.surface", "kind": "text", "usage": "Titles and brand text" },
+    { "foreground": "color.on-primary", "background": "color.primary", "kind": "text", "usage": "Primary button label, selected slot time" },
+    { "foreground": "color.on-primary", "background": "color.primary-hover", "kind": "text", "usage": "Primary button hover and pressed" },
+    { "foreground": "color.on-primary", "background": "color.brand-navy", "kind": "text", "usage": "Text on navigation background" },
+    { "foreground": "color.on-primary", "background": "color.danger", "kind": "text", "usage": "Danger button label" },
+    { "foreground": "color.primary", "background": "color.surface", "kind": "text", "usage": "Links, secondary and text button labels" },
+    { "foreground": "color.primary", "background": "color.primary-tint", "kind": "text", "usage": "Secondary button label on hover" },
+    { "foreground": "color.brand-navy", "background": "color.primary-tint", "kind": "text", "usage": "Text on soft selection" },
+    { "foreground": "color.fg", "background": "color.primary-tint", "kind": "text", "usage": "Selected card content" },
+    { "foreground": "color.brand-navy", "background": "color.accent", "kind": "text", "usage": "Text on accent fill" },
+    { "foreground": "color.brand-navy", "background": "color.accent-tint", "kind": "text", "usage": "Available slot time" },
+    { "foreground": "color.accent-strong", "background": "color.surface", "kind": "text", "usage": "Accent text and icons on white" },
+    { "foreground": "color.fg-muted", "background": "color.occupied-bg", "kind": "text", "usage": "Occupied slot label" },
+    { "foreground": "color.success", "background": "color.surface", "kind": "text", "usage": "Success status text" },
+    { "foreground": "color.warning", "background": "color.surface", "kind": "text", "usage": "Warning status text" },
+    { "foreground": "color.danger", "background": "color.surface", "kind": "text", "usage": "Field error message" },
+    { "foreground": "color.fg-muted", "background": "color.surface", "kind": "component", "usage": "Field border at rest" },
+    { "foreground": "color.primary", "background": "color.surface", "kind": "component", "usage": "Focused field border, secondary button border, selected card border" },
+    { "foreground": "color.danger", "background": "color.surface", "kind": "component", "usage": "Field border in error" },
+    { "foreground": "color.accent-strong", "background": "color.accent-tint", "kind": "component", "usage": "Available slot border" },
+    { "foreground": "color.focus", "background": "color.surface", "kind": "component", "usage": "Focus ring on white" },
+    { "foreground": "color.focus", "background": "color.surface-alt", "kind": "component", "usage": "Focus ring on secondary backgrounds" },
+    { "foreground": "color.focus", "background": "color.accent-tint", "kind": "component", "usage": "Focus ring on an available slot" },
+    { "foreground": "color.focus", "background": "color.occupied-bg", "kind": "component", "usage": "Focus ring on an occupied slot" },
+    { "foreground": "color.primary", "background": "color.primary-tint", "kind": "component", "usage": "Selected card border on its tint" },
+    { "foreground": "color.disabled-fg", "background": "color.disabled-bg", "kind": "exempt", "usage": "Disabled button label (WCAG 1.4.3 exempts inactive controls; reported only)" },
+    { "foreground": "color.disabled-border", "background": "color.surface", "kind": "exempt", "usage": "Disabled secondary button (WCAG 1.4.3 exempts inactive controls; reported only)" }
+  ]
+}

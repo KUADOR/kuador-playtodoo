@@ -1,0 +1,229 @@
+{
+  "name": "week-readonly",
+  "description": "Same data as week-mixed in readonly mode (backoffice): nothing is selectable and the selection is ignored.",
+  "input": {
+    "slotDurationMinutes": 60,
+    "view": "week",
+    "mode": "readonly",
+    "today": "2026-12-02",
+    "selected": {
+      "date": "2026-12-02",
+      "start": "19:00"
+    },
+    "days": [
+      {
+        "date": "2026-11-30",
+        "slots": [
+          {
+            "start": "18:00",
+            "status": "available"
+          },
+          {
+            "start": "19:00",
+            "status": "occupied"
+          },
+          {
+            "start": "20:00",
+            "status": "available"
+          }
+        ]
+      },
+      {
+        "date": "2026-12-01",
+        "slots": []
+      },
+      {
+        "date": "2026-12-02",
+        "slots": [
+          {
+            "start": "18:00",
+            "status": "occupied"
+          },
+          {
+            "start": "19:00",
+            "status": "available"
+          },
+          {
+            "start": "20:00",
+            "status": "available"
+          }
+        ]
+      },
+      {
+        "date": "2026-12-04",
+        "slots": [
+          {
+            "start": "19:00",
+            "status": "available"
+          },
+          {
+            "start": "20:00",
+            "status": "occupied"
+          },
+          {
+            "start": "21:00",
+            "status": "available"
+          }
+        ]
+      },
+      {
+        "date": "2026-12-05",
+        "slots": [
+          {
+            "start": "09:00",
+            "status": "available"
+          },
+          {
+            "start": "10:00",
+            "status": "available"
+          },
+          {
+            "start": "11:00",
+            "status": "occupied"
+          }
+        ]
+      },
+      {
+        "date": "2026-12-06",
+        "slots": [
+          {
+            "start": "09:00",
+            "status": "occupied"
+          },
+          {
+            "start": "10:00",
+            "status": "occupied"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "range": {
+      "from": "2026-11-30",
+      "to": "2026-12-06"
+    },
+    "selected": null,
+    "title": "30 nov – 6 dic 2026",
+    "week": {
+      "columns": [
+        {
+          "date": "2026-11-30",
+          "header": "lun 30",
+          "isToday": false,
+          "summary": "2 libres"
+        },
+        {
+          "date": "2026-12-01",
+          "header": "mar 1",
+          "isToday": false,
+          "summary": "Sin horarios"
+        },
+        {
+          "date": "2026-12-02",
+          "header": "mié 2",
+          "isToday": true,
+          "summary": "2 libres"
+        },
+        {
+          "date": "2026-12-03",
+          "header": "jue 3",
+          "isToday": false,
+          "summary": "Sin horarios"
+        },
+        {
+          "date": "2026-12-04",
+          "header": "vie 4",
+          "isToday": false,
+          "summary": "2 libres"
+        },
+        {
+          "date": "2026-12-05",
+          "header": "sáb 5",
+          "isToday": false,
+          "summary": "2 libres"
+        },
+        {
+          "date": "2026-12-06",
+          "header": "dom 6",
+          "isToday": false,
+          "summary": "Sin horarios"
+        }
+      ],
+      "rows": [
+        "09:00",
+        "10:00",
+        "11:00",
+        "18:00",
+        "19:00",
+        "20:00",
+        "21:00"
+      ],
+      "cells": [
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          "available",
+          "occupied"
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          "available",
+          "occupied"
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          "occupied",
+          null
+        ],
+        [
+          "available",
+          null,
+          "occupied",
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "occupied",
+          null,
+          "available",
+          null,
+          "available",
+          null,
+          null
+        ],
+        [
+          "available",
+          null,
+          "available",
+          null,
+          "occupied",
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          "available",
+          null,
+          null
+        ]
+      ]
+    }
+  }
+}

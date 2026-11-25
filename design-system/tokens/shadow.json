@@ -1,0 +1,13 @@
+{
+  "shadow": {
+    "$type": "shadow",
+    "card": {
+      "$value": { "offsetX": "0px", "offsetY": "1px", "blur": "3px", "spread": "0px", "color": "rgba(11, 47, 102, 0.14)" },
+      "$description": "Cards"
+    },
+    "overlay": {
+      "$value": { "offsetX": "0px", "offsetY": "8px", "blur": "24px", "spread": "0px", "color": "rgba(11, 47, 102, 0.2)" },
+      "$description": "Menus and dialogs"
+    }
+  }
+}

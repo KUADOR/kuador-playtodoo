@@ -1,0 +1,27 @@
+{
+  "color": {
+    "$type": "color",
+    "brand-navy": { "$value": "#0B2F66", "$description": "Titles, brand text, navigation background" },
+    "primary": { "$value": "#0B4FB3", "$description": "Primary button, links, active navigation, selected slot" },
+    "primary-hover": { "$value": "#093F8F", "$description": "Hover and pressed state of primary" },
+    "primary-tint": { "$value": "#E8F0FB", "$description": "Soft selection background, row focus" },
+    "on-primary": { "$value": "{color.surface}", "$description": "Text and icons on primary, primary-hover and danger" },
+    "accent": { "$value": "#4DB82A", "$description": "Brand accent fill. Never as text colour on white nor with white text" },
+    "accent-strong": { "$value": "#277A18", "$description": "Accent for text, icons and borders on white" },
+    "accent-tint": { "$value": "#E3F5DC", "$description": "Available slot background, active tag" },
+    "surface": { "$value": "#FFFFFF", "$description": "Main background" },
+    "surface-alt": { "$value": "#F3F6FA", "$description": "Secondary backgrounds, alternate rows, disabled field" },
+    "fg": { "$value": "#111827", "$description": "Main text" },
+    "fg-muted": { "$value": "#4B5563", "$description": "Secondary text, neutral icons, interactive borders" },
+    "border": { "$value": "#C7D0DC", "$description": "Decorative borders of cards. Interactive borders use fg-muted" },
+    "success": { "$value": "#15803D", "$description": "Confirmed booking, active subscription" },
+    "warning": { "$value": "#B45309", "$description": "Pending, subscription about to expire" },
+    "danger": { "$value": "#B91C1C", "$description": "Errors, cancellation, suspension" },
+    "focus": { "$value": "{color.primary}", "$description": "Focus ring" },
+    "focus-halo": { "$value": "#9CC0F5", "$description": "Halo around the focus ring" },
+    "disabled-bg": { "$value": "#E5E7EB", "$description": "Disabled primary and danger button background" },
+    "disabled-fg": { "$value": "#4B5563", "$description": "Disabled button text" },
+    "disabled-border": { "$value": "#9CA3AF", "$description": "Disabled secondary button border and text" },
+    "occupied-bg": { "$value": "#E5E7EB", "$description": "Occupied slot background" }
+  }
+}
