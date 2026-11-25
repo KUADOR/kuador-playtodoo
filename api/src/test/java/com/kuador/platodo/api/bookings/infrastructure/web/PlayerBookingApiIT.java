@@ -38,8 +38,8 @@ import com.kuador.platodo.api.bookings.domain.event.BookingEvent;
 import com.kuador.platodo.api.bookings.support.MutableClock;
 import com.kuador.platodo.api.bookings.support.StubCourtSlotRules;
 import com.kuador.platodo.api.bookings.support.StubCurrentPlayer;
-import com.kuador.platodo.api.support.FixedTenantScopeFilter;
 import com.kuador.platodo.api.support.TenantDatabase;
+import com.kuador.platodo.api.support.TenantHostRequests;
 import com.kuador.platodo.api.support.TestTenants;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 import com.kuador.platodo.api.tenancy.infrastructure.persistence.TenantMigrations;
@@ -54,6 +54,7 @@ import com.kuador.platodo.api.tenancy.infrastructure.persistence.TenantMigration
 class PlayerBookingApiIT {
 
     private static final TenantId TENANT = new TenantId("0c000000-0000-4000-8000-000000000001");
+    private static final TenantId OTHER_TENANT = new TenantId("0c000000-0000-4000-8000-000000000005");
 
     private static final Instant NOW = Instant.parse("2026-12-04T18:00:00Z");
     private static final String EIGHT_PM = "2026-12-04T20:00:00Z";
@@ -62,11 +63,12 @@ class PlayerBookingApiIT {
     @TestConfiguration(proxyBeanMethods = false)
     static class Doubles {
 
-        /** Stand-in for the subdomain resolution of PLATODO-50: every request runs in this class's tenant. */
+        /** Every request goes to the host of this class's tenant and is resolved by Tenancy. */
         @Bean
         @DependsOn(FLYWAY_INITIALIZER)
-        FixedTenantScopeFilter tenantScope(TenantMigrations migrations) {
-            return new FixedTenantScopeFilter(TestTenants.provision(migrations, TENANT));
+        TenantHostRequests tenantHost(TenantMigrations migrations) {
+            TestTenants.provision(migrations, OTHER_TENANT);
+            return new TenantHostRequests(TestTenants.provision(migrations, TENANT));
         }
 
         @Bean
@@ -234,6 +236,16 @@ class PlayerBookingApiIT {
                 .andExpect(jsonPath("$.cancelledAt").value("2026-12-04T18:00:00Z"));
         expectProblem(mvc.perform(post("/api/v1/bookings/{id}/cancel", confirmed)), 409, "BOOKING_NOT_PENDING",
                 "https://playtodoo.com/problems/booking-not-pending");
+    }
+
+    @Test
+    void aBookingOfThisComplexIsNotFoundFromTheHostOfAnotherComplex_criterion5() throws Exception {
+        String id = bookingId(createBooking(court, EIGHT_PM, false));
+
+        expectProblem(mvc.perform(get("/api/v1/bookings/{id}", id)
+                        .with(TenantHostRequests.onHost(TestTenants.hostOf(OTHER_TENANT)))),
+                404, "BOOKING_NOT_FOUND", "https://playtodoo.com/problems/booking-not-found");
+        mvc.perform(get("/api/v1/bookings/{id}", id)).andExpect(status().isOk());
     }
 
     @Test
