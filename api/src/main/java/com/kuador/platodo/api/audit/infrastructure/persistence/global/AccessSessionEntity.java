@@ -32,6 +32,8 @@ class AccessSessionEntity {
     private Instant expiresAt;
     @Column(name = "closed_at")
     private Instant closedAt;
+    @Column(name = "reason_redacted_at", updatable = false)
+    private Instant reasonRedactedAt;
 
     protected AccessSessionEntity() {
     }

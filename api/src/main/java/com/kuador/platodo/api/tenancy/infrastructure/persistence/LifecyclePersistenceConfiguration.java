@@ -30,8 +30,9 @@ class LifecyclePersistenceConfiguration {
     }
 
     @Bean
-    TenantSchemas tenantSchemas(TenantMigrations migrations) {
-        return new MigratingTenantSchemas(migrations);
+    TenantSchemas tenantSchemas(TenantMigrations migrations,
+            @Qualifier(PersistenceConfiguration.CONNECTION_POOL) DataSource pool) {
+        return new PostgresTenantSchemas(migrations, JdbcClient.create(pool));
     }
 
     @Bean

@@ -139,6 +139,55 @@ class TenantTest {
         assertInvalid(status, tenant -> tenant.changeRetention(RETENTION, T1));
     }
 
+    /** Criterion 13: the purge starts once the purge date is reached and keeps the archive fields. */
+    @Test
+    void anArchivedComplexStartsItsPurgeFromThePurgeDateOn() {
+        Tenant archived = active().archive(T1, RETENTION);
+
+        Tenant purging = archived.startPurge(archived.purgeDueAt());
+
+        assertThat(purging.status()).isEqualTo(TenantStatus.PURGING);
+        assertThat(purging.archivedAt()).isEqualTo(T1);
+        assertThat(purging.purgeDueAt()).isEqualTo(archived.purgeDueAt());
+        assertThat(purging.purgedAt()).isNull();
+    }
+
+    @Test
+    void thePurgeNeverStartsBeforeThePurgeDate() {
+        Tenant archived = active().archive(T1, RETENTION);
+
+        assertThatThrownBy(() -> archived.startPurge(archived.purgeDueAt().minusMillis(1)))
+                .isInstanceOf(InvalidTransitionException.class);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TenantStatus.class, names = "ARCHIVED", mode = EnumSource.Mode.EXCLUDE)
+    void onlyArchivedComplexesStartAPurge(TenantStatus status) {
+        assertInvalid(status, tenant -> tenant.startPurge(T1));
+    }
+
+    /** Criterion 16: the tombstone keeps the id, the commercial name, the state and the dates. */
+    @Test
+    void aPurgedComplexKeepsItsTombstone() {
+        Tenant archived = active().archive(T1, RETENTION);
+        Instant purgedAt = archived.purgeDueAt().plusSeconds(5);
+
+        Tenant purged = archived.startPurge(archived.purgeDueAt()).markPurged(purgedAt);
+
+        assertThat(purged.status()).isEqualTo(TenantStatus.PURGED);
+        assertThat(purged.purgedAt()).isEqualTo(purgedAt);
+        assertThat(purged.id()).isEqualTo(ID);
+        assertThat(purged.displayName()).isEqualTo("Canchas El Sol");
+        assertThat(purged.createdAt()).isEqualTo(T0);
+        assertThat(purged.archivedAt()).isEqualTo(T1);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TenantStatus.class, names = "PURGING", mode = EnumSource.Mode.EXCLUDE)
+    void onlyPurgingComplexesBecomePurged(TenantStatus status) {
+        assertInvalid(status, tenant -> tenant.markPurged(T1));
+    }
+
     @Test
     void theDisplayNameIsRequiredAndBounded() {
         assertThatIllegalArgumentException().isThrownBy(() -> Tenant.provisioning(ID, " ", T0));

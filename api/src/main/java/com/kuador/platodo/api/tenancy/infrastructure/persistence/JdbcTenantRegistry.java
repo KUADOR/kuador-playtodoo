@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.dao.DuplicateKeyException;
@@ -36,6 +37,15 @@ public final class JdbcTenantRegistry implements TenantRegistry {
             """.formatted(TENANT_COLUMNS);
 
     private static final String LOCK_TENANT_ROW = " FOR UPDATE OF t";
+    private static final String LOCK_TENANT_ROW_UNLESS_HELD = " FOR UPDATE OF t SKIP LOCKED";
+
+    private static final String ARCHIVED_DUE = """
+            SELECT %s
+            FROM global.tenant t
+            LEFT JOIN global.tenant_domain d ON d.tenant_id = t.id AND d.is_current
+            WHERE t.status = 'ARCHIVED' AND t.purge_due_at <= :now
+            ORDER BY t.purge_due_at, t.id
+            """.formatted(TENANT_COLUMNS);
 
     private final JdbcClient global;
 
@@ -70,12 +80,35 @@ public final class JdbcTenantRegistry implements TenantRegistry {
     }
 
     @Override
+    public Optional<RegisteredTenant> tryLock(TenantId id) {
+        return queryOne(FIND + LOCK_TENANT_ROW_UNLESS_HELD, id);
+    }
+
+    @Override
+    public List<RegisteredTenant> lockArchivedDueBy(Instant now) {
+        return global.sql(ARCHIVED_DUE + LOCK_TENANT_ROW_UNLESS_HELD)
+                .param("now", toTimestamp(now))
+                .query((row, number) -> registeredTenant(row))
+                .list();
+    }
+
+    @Override
+    public List<TenantId> purging() {
+        return global.sql("SELECT id::text FROM global.tenant WHERE status = 'PURGING' ORDER BY purge_due_at, id")
+                .query(String.class)
+                .list()
+                .stream()
+                .map(TenantId::new)
+                .toList();
+    }
+
+    @Override
     public void save(Tenant tenant) {
         global.sql("""
                         UPDATE global.tenant
                         SET status = :status, activated_at = :activatedAt, suspended_at = :suspendedAt,
                             archived_at = :archivedAt, retention_days = :retentionDays, purge_due_at = :purgeDueAt,
-                            version = version + 1
+                            purged_at = :purgedAt, version = version + 1
                         WHERE id = :id::uuid
                         """)
                 .param("id", tenant.id().value())
@@ -85,19 +118,25 @@ public final class JdbcTenantRegistry implements TenantRegistry {
                 .param("archivedAt", toTimestamp(tenant.archivedAt()))
                 .param("retentionDays", tenant.retentionDays())
                 .param("purgeDueAt", toTimestamp(tenant.purgeDueAt()))
+                .param("purgedAt", toTimestamp(tenant.purgedAt()))
                 .update();
     }
 
     @Override
     public void replaceSubdomain(RegisteredTenant tenant, Subdomain next, Instant at) {
+        retireCurrentSubdomain(tenant.tenant().id(), at);
+        insertCurrentSubdomain(tenant.tenant().id(), next, at);
+    }
+
+    @Override
+    public void retireCurrentSubdomain(TenantId id, Instant at) {
         global.sql("""
                         UPDATE global.tenant_domain SET is_current = false, retired_at = :at
-                        WHERE subdomain = :subdomain AND is_current
+                        WHERE tenant_id = :tenantId::uuid AND is_current
                         """)
-                .param("subdomain", tenant.subdomain().value())
+                .param("tenantId", id.value())
                 .param("at", toTimestamp(at))
                 .update();
-        insertCurrentSubdomain(tenant.tenant().id(), next, at);
     }
 
     /** The only unique key a new current subdomain can break is the subdomain itself: the old one is retired. */
