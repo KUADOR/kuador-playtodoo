@@ -54,6 +54,29 @@ public interface BookingRepository {
      */
     Optional<Booking> cancelIfPending(UUID id, UUID playerId, Instant now);
 
+    /**
+     * Cancels the booking or block whatever its holder, only if it still occupies its slot at {@code now}
+     * (confirmed, or pending and not overdue).
+     *
+     * @return the cancelled booking, or empty if no booking matched those conditions
+     */
+    Optional<Booking> cancelIfActive(UUID id, UUID cancelledBy, Instant now);
+
+    /**
+     * An active reservation of the court (confirmed, or pending and not overdue) that overlaps {@code period};
+     * blocks are not considered.
+     */
+    Optional<Booking> findActiveReservationOverlapping(UUID courtId, TimePeriod period, Instant now);
+
+    /**
+     * Reservations and blocks of all courts that occupy their slot at {@code now} and overlap {@code range};
+     * ordered by start.
+     */
+    List<Booking> findActiveOverlapping(TimePeriod range, Instant now);
+
+    /** Like {@link #findActiveOverlapping}, restricted to one court. */
+    List<Booking> findActiveOfCourtOverlapping(UUID courtId, TimePeriod range, Instant now);
+
     /** An active booking of the player (confirmed, or pending and not overdue) that overlaps {@code period}. */
     Optional<Booking> findActiveOfPlayerOverlapping(UUID playerId, TimePeriod period, Instant now);
 

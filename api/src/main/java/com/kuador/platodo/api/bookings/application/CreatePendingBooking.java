@@ -1,7 +1,6 @@
 package com.kuador.platodo.api.bookings.application;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -29,7 +28,7 @@ public class CreatePendingBooking {
     }
 
     private final BookingRepository bookings;
-    private final CourtSlotRules courtSlotRules;
+    private final CourtSlots courtSlots;
     private final CurrentPlayer currentPlayer;
     private final BookingEventPublisher events;
     private final TransactionOperations transactions;
@@ -39,7 +38,7 @@ public class CreatePendingBooking {
             CurrentPlayer currentPlayer, BookingEventPublisher events, TransactionOperations transactions,
             Clock clock) {
         this.bookings = bookings;
-        this.courtSlotRules = courtSlotRules;
+        this.courtSlots = new CourtSlots(courtSlotRules);
         this.currentPlayer = currentPlayer;
         this.events = events;
         this.transactions = transactions;
@@ -56,7 +55,7 @@ public class CreatePendingBooking {
     public Booking create(Command command) {
         UUID playerId = currentPlayer.require();
         Instant now = clock.instant();
-        TimePeriod period = slotOf(command.courtId(), command.start(), now);
+        TimePeriod period = courtSlots.slotStartingAt(command.courtId(), command.start(), now);
         if (!command.acknowledgeOwnOverlap()) {
             rejectOwnOverlap(playerId, period, now);
         }
@@ -71,15 +70,6 @@ public class CreatePendingBooking {
         events.publish(new BookingCreated(pending.id(), pending.courtId(), pending.period().start(),
                 pending.period().end(), pending.expiresAt()));
         return pending;
-    }
-
-    private TimePeriod slotOf(UUID courtId, Instant start, Instant now) {
-        Duration slotDuration = courtSlotRules.slotDurationOf(courtId)
-                .orElseThrow(() -> new CourtNotFoundException(courtId));
-        if (!start.isAfter(now) || !courtSlotRules.isValidSlotStart(courtId, start)) {
-            throw new InvalidSlotException(courtId, start);
-        }
-        return new TimePeriod(start, start.plus(slotDuration));
     }
 
     /** Only the active tenant is checked: looking at other complexes would cross schemas (D6). */

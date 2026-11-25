@@ -13,6 +13,8 @@ enum ProblemCode {
 
     SLOT_UNAVAILABLE(HttpStatus.CONFLICT, "slot-unavailable", "Slot unavailable",
             "The requested range overlaps an active booking or block of the court."),
+    SLOT_HAS_BOOKING(HttpStatus.CONFLICT, "slot-has-booking", "Slot has an active booking",
+            "Cancel the conflicting booking before blocking this slot."),
     OWN_OVERLAP_NEEDS_CONFIRMATION(HttpStatus.CONFLICT, "own-overlap-needs-confirmation",
             "Overlapping booking of the same player",
             "Retry with acknowledgeOwnOverlap set to true to book anyway."),
@@ -29,7 +31,9 @@ enum ProblemCode {
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "invalid-request", "Invalid request",
             "Malformed body or parameters."),
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "unauthenticated", "Authentication required",
-            "A valid player access token is required.");
+            "A valid access token is required."),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "forbidden", "Not allowed for this complex",
+            "The caller is not staff of this complex.");
 
     private static final String TYPE_BASE = "https://playtodoo.com/problems/";
 

@@ -84,6 +84,32 @@ public class PostgresBookingRepository implements BookingRepository {
             RETURNING %s
             """.formatted(BOOKING_COLUMNS);
 
+    private static final String CANCEL_IF_ACTIVE = """
+            UPDATE booking SET status = 'CANCELLED', cancelled_at = :now, cancelled_by = :cancelledBy,
+                               version = version + 1
+            WHERE id = :id AND %s
+            RETURNING %s
+            """.formatted(STILL_OCCUPYING, BOOKING_COLUMNS);
+
+    private static final String SELECT_ACTIVE_RESERVATION_OVERLAPPING = """
+            SELECT %s FROM booking
+            WHERE court_id = :courtId AND kind = 'RESERVATION' AND %s AND %s
+            ORDER BY lower(period)
+            LIMIT 1
+            """.formatted(BOOKING_COLUMNS, OVERLAPPING, STILL_OCCUPYING);
+
+    private static final String SELECT_ACTIVE_OVERLAPPING = """
+            SELECT %s FROM booking
+            WHERE %s AND %s
+            ORDER BY lower(period), court_id
+            """.formatted(BOOKING_COLUMNS, OVERLAPPING, STILL_OCCUPYING);
+
+    private static final String SELECT_ACTIVE_OF_COURT_OVERLAPPING = """
+            SELECT %s FROM booking
+            WHERE court_id = :courtId AND %s AND %s
+            ORDER BY lower(period)
+            """.formatted(BOOKING_COLUMNS, OVERLAPPING, STILL_OCCUPYING);
+
     private static final String SELECT_ACTIVE_OF_PLAYER_OVERLAPPING = """
             SELECT %s FROM booking
             WHERE player_id = :playerId AND %s AND %s
@@ -163,6 +189,48 @@ public class PostgresBookingRepository implements BookingRepository {
     @Override
     public Optional<Booking> cancelIfPending(UUID id, UUID playerId, Instant now) {
         return updateReturning(CANCEL_IF_PENDING, id, playerId, now);
+    }
+
+    @Override
+    public Optional<Booking> cancelIfActive(UUID id, UUID cancelledBy, Instant now) {
+        return jdbcClient.sql(CANCEL_IF_ACTIVE)
+                .param("id", id)
+                .param("cancelledBy", cancelledBy)
+                .param("now", toTimestamp(now))
+                .query((row, rowNumber) -> toBooking(row))
+                .optional();
+    }
+
+    @Override
+    public Optional<Booking> findActiveReservationOverlapping(UUID courtId, TimePeriod period, Instant now) {
+        return jdbcClient.sql(SELECT_ACTIVE_RESERVATION_OVERLAPPING)
+                .param("courtId", courtId)
+                .param("now", toTimestamp(now))
+                .param("periodStart", toTimestamp(period.start()))
+                .param("periodEnd", toTimestamp(period.end()))
+                .query((row, rowNumber) -> toBooking(row))
+                .optional();
+    }
+
+    @Override
+    public List<Booking> findActiveOverlapping(TimePeriod range, Instant now) {
+        return jdbcClient.sql(SELECT_ACTIVE_OVERLAPPING)
+                .param("now", toTimestamp(now))
+                .param("periodStart", toTimestamp(range.start()))
+                .param("periodEnd", toTimestamp(range.end()))
+                .query((row, rowNumber) -> toBooking(row))
+                .list();
+    }
+
+    @Override
+    public List<Booking> findActiveOfCourtOverlapping(UUID courtId, TimePeriod range, Instant now) {
+        return jdbcClient.sql(SELECT_ACTIVE_OF_COURT_OVERLAPPING)
+                .param("courtId", courtId)
+                .param("now", toTimestamp(now))
+                .param("periodStart", toTimestamp(range.start()))
+                .param("periodEnd", toTimestamp(range.end()))
+                .query((row, rowNumber) -> toBooking(row))
+                .list();
     }
 
     @Override

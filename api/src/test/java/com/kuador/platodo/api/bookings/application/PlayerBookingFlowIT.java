@@ -331,7 +331,7 @@ class PlayerBookingFlowIT {
         assertThatThrownBy(() -> inA.occupancy.occupiedPeriods(court, EIGHT_PM, EIGHT_PM))
                 .isInstanceOf(InvalidOccupancyRangeException.class);
         assertThatThrownBy(() -> inA.occupancy.occupiedPeriods(court, NOW,
-                NOW.plus(GetCourtOccupancy.MAX_RANGE).plusSeconds(1)))
+                NOW.plus(CalendarRange.MAX_RANGE).plusSeconds(1)))
                 .isInstanceOf(InvalidOccupancyRangeException.class);
         assertThatThrownBy(() -> inA.occupancy.occupiedPeriods(UUID.randomUUID(), NOW, EIGHT_PM))
                 .isInstanceOf(CourtNotFoundException.class);
