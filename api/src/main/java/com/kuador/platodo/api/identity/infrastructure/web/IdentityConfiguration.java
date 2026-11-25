@@ -2,6 +2,8 @@ package com.kuador.platodo.api.identity.infrastructure.web;
 
 import java.time.Clock;
 
+import javax.sql.DataSource;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -9,6 +11,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
@@ -21,9 +24,11 @@ import com.kuador.platodo.api.identity.domain.AccountType;
 import com.kuador.platodo.api.identity.infrastructure.crypto.DelegatingPasswordHashes;
 import com.kuador.platodo.api.identity.infrastructure.persistence.global.JpaPlatformUsers;
 import com.kuador.platodo.api.identity.infrastructure.persistence.global.JpaPlayerAccounts;
+import com.kuador.platodo.api.identity.infrastructure.persistence.tenant.JdbcTenantOwnerAccounts;
 import com.kuador.platodo.api.identity.infrastructure.persistence.tenant.JpaStaffUsers;
 import com.kuador.platodo.api.identity.infrastructure.token.AccessTokenProperties;
 import com.kuador.platodo.api.identity.infrastructure.token.JwtAccessTokens;
+import com.kuador.platodo.api.tenancy.application.port.out.TenantOwnerAccounts;
 
 import jakarta.persistence.EntityManagerFactory;
 
@@ -65,6 +70,14 @@ class IdentityConfiguration {
     @Qualifier(STAFF)
     AccountDirectory staffUsers(@Qualifier(TENANT_ENTITY_MANAGER_FACTORY) EntityManagerFactory tenant) {
         return new JpaStaffUsers(SharedEntityManagerCreator.createSharedEntityManager(tenant));
+    }
+
+    /** Owner accounts that Tenancy provisions in the schema of each new complex. */
+    @Bean
+    TenantOwnerAccounts tenantOwnerAccounts(DataSource tenantData, PasswordHashes passwords,
+            ObjectProvider<Clock> clock) {
+        return new JdbcTenantOwnerAccounts(JdbcClient.create(tenantData), passwords,
+                clock.getIfAvailable(Clock::systemUTC));
     }
 
     @Bean

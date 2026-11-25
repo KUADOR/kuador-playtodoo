@@ -15,11 +15,14 @@ final class TenancyApiPaths {
     static final String API = "/api";
     static final String V1 = API + "/v1";
     static final String TENANT_STATE = V1 + "/tenant";
+    static final String TENANT_SUBDOMAIN = TENANT_STATE + "/subdomain";
+    static final String SUBDOMAINS = V1 + "/subdomains";
+    static final String PLATFORM_TENANTS = V1 + "/platform/tenants";
 
     private static final List<PathPattern> GLOBAL_CONTEXT = parse(
             V1 + "/auth/players/**",
             V1 + "/auth/platform/**",
-            V1 + "/subdomains/**",
+            SUBDOMAINS + "/**",
             V1 + "/platform/**");
 
     private TenancyApiPaths() {

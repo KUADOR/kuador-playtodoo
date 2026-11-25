@@ -38,6 +38,11 @@ class TenancyWebConfiguration {
     }
 
     @Bean
+    TenantUrls tenantUrls(@Value("${playtodoo.tenant-url-pattern}") String pattern) {
+        return new TenantUrls(pattern);
+    }
+
+    @Bean
     ResolveTenant resolveTenant(TenantDomains domains) {
         return new ResolveTenant(domains);
     }
