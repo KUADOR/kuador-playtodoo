@@ -21,14 +21,15 @@ import com.kuador.platodo.api.bookings.application.port.out.BookingEventPublishe
 import com.kuador.platodo.api.bookings.application.port.out.BookingRepository;
 import com.kuador.platodo.api.bookings.application.port.out.CourtSlotRules;
 import com.kuador.platodo.api.bookings.application.port.out.CurrentStaff;
-import com.kuador.platodo.api.bookings.infrastructure.failclosed.UnauthenticatedCurrentStaff;
 import com.kuador.platodo.api.bookings.infrastructure.failclosed.UnconfiguredCourtSlotRules;
+import com.kuador.platodo.api.bookings.infrastructure.identity.PrincipalCurrentStaff;
 import com.kuador.platodo.api.bookings.infrastructure.web.ConditionalOnStaffApiEnabled;
 
 /**
- * Wires the staff booking use cases on the adapters of {@link BookingsConfiguration}. Until the Courts and
- * Identity modules register their {@link CourtSlotRules} and {@link CurrentStaff} beans, fail-closed defaults
- * reject every request.
+ * Wires the staff booking use cases on the adapters of {@link BookingsConfiguration}. The staff member of each
+ * request comes from the access token accepted by Identity and Access ({@code PrincipalCurrentStaff}); a
+ * {@link CurrentStaff} bean, if one is registered (tests), replaces it. Until the Courts module registers its
+ * {@link CourtSlotRules}, a fail-closed default reports every court as not found.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnStaffApiEnabled
@@ -47,7 +48,7 @@ class StaffBookingConfiguration {
         this.bookings = bookings;
         this.events = events;
         this.courtSlotRules = courtSlotRules.getIfAvailable(UnconfiguredCourtSlotRules::new);
-        this.currentStaff = currentStaff.getIfAvailable(UnauthenticatedCurrentStaff::new);
+        this.currentStaff = currentStaff.getIfAvailable(PrincipalCurrentStaff::new);
         this.transactions = new TransactionTemplate(
                 transactionManager.getIfAvailable(() -> new DataSourceTransactionManager(dataSource)));
         this.clock = clock.getIfAvailable(Clock::systemUTC);

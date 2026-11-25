@@ -10,7 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 
 /**
  * Registers the annotated bean only when {@value #PROPERTY} is {@code true} (default {@code false}).
- * The staff API stays off until Tenancy resolves the tenant per request and Identity authenticates staff.
+ * Tenancy and Identity are in place; the staff API stays off until the Courts module provides the slot rules.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)

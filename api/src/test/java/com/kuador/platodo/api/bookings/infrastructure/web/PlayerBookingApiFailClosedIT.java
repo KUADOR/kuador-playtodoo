@@ -26,7 +26,7 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 import com.kuador.platodo.api.tenancy.infrastructure.persistence.TenantMigrations;
 
 /**
- * With the player API enabled but no Identity or Courts adapters registered, the default adapters reject
+ * With the player API enabled but no Courts adapter registered and no access token, the default adapters reject
  * every request instead of writing without an authenticated player or an invented slot duration.
  */
 @SpringBootTest(properties = ConditionalOnPlayerApiEnabled.PROPERTY + "=true")

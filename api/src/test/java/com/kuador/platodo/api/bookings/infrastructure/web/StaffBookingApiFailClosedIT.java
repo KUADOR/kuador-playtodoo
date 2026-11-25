@@ -29,7 +29,7 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 import com.kuador.platodo.api.tenancy.infrastructure.persistence.TenantMigrations;
 
 /**
- * With only the staff API enabled and no Identity or Courts adapters registered, the default adapters reject
+ * With only the staff API enabled and no Courts adapter registered and no access token, the default adapters reject
  * every request instead of acting without an authenticated staff member, and no player endpoint exists.
  */
 @SpringBootTest(properties = ConditionalOnStaffApiEnabled.PROPERTY + "=true")

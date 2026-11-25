@@ -21,14 +21,15 @@ import com.kuador.platodo.api.bookings.application.port.out.BookingEventPublishe
 import com.kuador.platodo.api.bookings.application.port.out.BookingRepository;
 import com.kuador.platodo.api.bookings.application.port.out.CourtSlotRules;
 import com.kuador.platodo.api.bookings.application.port.out.CurrentPlayer;
-import com.kuador.platodo.api.bookings.infrastructure.failclosed.UnauthenticatedCurrentPlayer;
 import com.kuador.platodo.api.bookings.infrastructure.failclosed.UnconfiguredCourtSlotRules;
+import com.kuador.platodo.api.bookings.infrastructure.identity.PrincipalCurrentPlayer;
 import com.kuador.platodo.api.bookings.infrastructure.web.ConditionalOnPlayerApiEnabled;
 
 /**
- * Wires the player booking use cases on the adapters of {@link BookingsConfiguration}. Until the Courts and
- * Identity modules register their {@link CourtSlotRules} and {@link CurrentPlayer} beans, fail-closed defaults
- * reject every request.
+ * Wires the player booking use cases on the adapters of {@link BookingsConfiguration}. The player of each
+ * request comes from the access token accepted by Identity and Access ({@code PrincipalCurrentPlayer}); a
+ * {@link CurrentPlayer} bean, if one is registered (tests), replaces it. Until the Courts module registers its
+ * {@link CourtSlotRules}, a fail-closed default reports every court as not found.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnPlayerApiEnabled
@@ -45,7 +46,7 @@ class PlayerBookingConfiguration {
             ObjectProvider<PlatformTransactionManager> transactionManager, ObjectProvider<Clock> clock) {
         this.bookings = bookings;
         this.courtSlotRules = courtSlotRules.getIfAvailable(UnconfiguredCourtSlotRules::new);
-        this.currentPlayer = currentPlayer.getIfAvailable(UnauthenticatedCurrentPlayer::new);
+        this.currentPlayer = currentPlayer.getIfAvailable(PrincipalCurrentPlayer::new);
         this.transactions = new TransactionTemplate(
                 transactionManager.getIfAvailable(() -> new DataSourceTransactionManager(dataSource)));
         this.clock = clock.getIfAvailable(Clock::systemUTC);

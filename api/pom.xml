@@ -63,6 +63,17 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Identity and access: HS256 access tokens (Nimbus via Spring Security JOSE) and BCrypt password hashes.
+             No spring-security-web: Tenancy and Identity own the servlet filters of the api. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
