@@ -1,0 +1,62 @@
+/* Alert: values come only from design tokens (Pantallas · componente 3). */
+
+.alert {
+  --alert-color: var(--color-primary);
+
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width-md) solid var(--alert-color);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font-family: var(--font-family-body);
+}
+
+.alert[data-variant='error'] {
+  --alert-color: var(--color-danger);
+}
+
+.alert[data-variant='warning'] {
+  --alert-color: var(--color-warning);
+}
+
+.alert[data-variant='success'] {
+  --alert-color: var(--color-success);
+}
+
+.icon {
+  flex-shrink: 0;
+  width: var(--font-size-lg);
+  height: var(--font-size-lg);
+  color: var(--alert-color);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.text {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+.text > p {
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
