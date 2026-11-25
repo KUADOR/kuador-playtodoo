@@ -71,4 +71,28 @@
       }
     </div>
   </section>
+
+  <section aria-labelledby="calendar-title">
+    <h2 id="calendar-title">Calendario de reservas (solo lectura)</h2>
+    <p class="catalog__intro">
+      En el backoffice el calendario es siempre de solo lectura: muestra la ocupación de otro
+      complejo sin seleccionar franjas.
+    </p>
+    <div class="catalog__stack">
+      @for (example of calendars; track example.name) {
+        <div class="catalog__example">
+          <h3>{{ example.name }}</h3>
+          <div class="catalog__surface">
+            <app-booking-calendar
+              [slotDurationMinutes]="example.source.input.slotDurationMinutes"
+              [today]="example.source.input.today"
+              [days]="example.source.input.days"
+              [initialView]="example.source.input.view"
+              [status]="example.status"
+            />
+          </div>
+        </div>
+      }
+    </div>
+  </section>
 </main>

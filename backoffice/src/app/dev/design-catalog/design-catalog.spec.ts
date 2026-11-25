@@ -15,9 +15,9 @@ describe('DesignCatalog', () => {
   }
 
   it('shows every button variant in normal, loading and disabled states', () => {
-    expect(count('app-button')).toBe(12);
-    expect(count('button[aria-busy="true"]')).toBe(4);
-    expect(count('button:disabled')).toBe(4);
+    expect(count('[aria-labelledby="buttons-title"] app-button')).toBe(12);
+    expect(count('[aria-labelledby="buttons-title"] button[aria-busy="true"]')).toBe(4);
+    expect(count('[aria-labelledby="buttons-title"] button:disabled')).toBe(4);
   });
 
   it('shows text and select fields, including error and disabled states', () => {
@@ -30,6 +30,14 @@ describe('DesignCatalog', () => {
     expect(count('app-card')).toBe(15);
     expect(count('app-card.card--selected')).toBe(5);
     expect(count('app-card[aria-busy="true"]')).toBe(5);
+  });
+
+  it('shows the read-only calendar in every view and in loading, error and empty states', () => {
+    expect(count('app-booking-calendar')).toBe(8);
+    expect(count('.calendar__readonly')).toBe(8);
+    expect(count('.calendar[aria-busy="true"]')).toBe(1);
+    expect(count('.calendar [role="alert"]')).toBe(1);
+    expect(count('.calendar__empty')).toBe(1);
   });
 
   it('has no axe violations', async () => {

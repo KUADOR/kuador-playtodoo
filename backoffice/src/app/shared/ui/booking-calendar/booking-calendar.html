@@ -1,0 +1,174 @@
+<div
+  class="calendar"
+  role="group"
+  aria-label="Calendario de reservas"
+  [attr.aria-busy]="isLoading() || null"
+>
+  <p class="calendar__readonly">
+    <svg lucideEye [size]="iconSize"></svg>
+    <span>Solo lectura</span>
+  </p>
+
+  <div class="calendar__toolbar">
+    <div class="calendar__period">
+      <button
+        type="button"
+        class="calendar__icon-button"
+        [attr.aria-label]="currentOption().previousLabel"
+        [disabled]="isLoading()"
+        (click)="goToPreviousPeriod()"
+      >
+        <svg lucideChevronLeft [size]="iconSize"></svg>
+      </button>
+      <p class="calendar__title" aria-live="polite">{{ title() }}</p>
+      <button
+        type="button"
+        class="calendar__icon-button"
+        [attr.aria-label]="currentOption().nextLabel"
+        [disabled]="isLoading()"
+        (click)="goToNextPeriod()"
+      >
+        <svg lucideChevronRight [size]="iconSize"></svg>
+      </button>
+    </div>
+
+    <div class="calendar__views" role="group" aria-label="Vista">
+      @for (option of viewOptions; track option.view) {
+        <button
+          type="button"
+          class="calendar__view"
+          [attr.aria-pressed]="option.view === view()"
+          [disabled]="isLoading()"
+          (click)="changeView(option.view)"
+        >
+          {{ option.label }}
+        </button>
+      }
+    </div>
+  </div>
+
+  @switch (status()) {
+    @case ('loading') {
+      <div class="calendar__skeleton">
+        <span class="visually-hidden">Cargando horarios…</span>
+        @for (line of skeletonLines; track line) {
+          <span class="calendar__skeleton-line" aria-hidden="true"></span>
+        }
+      </div>
+    }
+    @case ('error') {
+      <div class="calendar__error">
+        <p class="calendar__error-message" role="alert">
+          <svg lucideCircleAlert [size]="iconSize"></svg>
+          <span>No pudimos cargar los horarios.</span>
+        </p>
+        <app-button variant="secondary" label="Reintentar" (press)="retry.emit()" />
+      </div>
+    }
+    @default {
+      @let shown = content();
+      @switch (shown.view) {
+        @case ('day') {
+          @if (shown.day.isToday) {
+            <p class="calendar__today"><span class="calendar__today-dot"></span>Hoy</p>
+          }
+          <p class="calendar__summary">{{ shown.day.summary }}</p>
+          @if (shown.day.emptyMessage) {
+            <p class="calendar__empty">{{ shown.day.emptyMessage }}</p>
+          } @else {
+            <ul class="calendar__slots" aria-label="Franjas del día">
+              @for (slot of shown.day.slots; track slot.start) {
+                <li><app-calendar-slot [slot]="slot" /></li>
+              }
+            </ul>
+          }
+        }
+        @case ('week') {
+          <div class="calendar__scroll" role="region" aria-label="Semana" tabindex="0">
+            <table class="calendar__grid calendar__grid--week">
+              <thead>
+                <tr>
+                  <th scope="col"><span class="visually-hidden">Hora de inicio</span></th>
+                  @for (column of shown.week.columns; track column.date) {
+                    <th scope="col">
+                      <button
+                        type="button"
+                        class="calendar__day-button"
+                        [attr.aria-label]="column.accessibleLabel"
+                        (click)="openDay(column.date)"
+                      >
+                        <span class="calendar__day-name">{{ column.header }}</span>
+                        <span class="calendar__day-summary">{{ column.summary }}</span>
+                        @if (column.isToday) {
+                          <span class="calendar__today">
+                            <span class="calendar__today-dot"></span>Hoy
+                          </span>
+                        }
+                      </button>
+                    </th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (start of shown.week.rows; track start; let row = $index) {
+                  <tr>
+                    <th scope="row" class="calendar__row-header">{{ start }}</th>
+                    @for (cell of shown.week.cells[row]; track $index) {
+                      <td>
+                        @if (cell) {
+                          <app-calendar-slot [slot]="cell" />
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @case ('month') {
+          <div class="calendar__scroll" role="region" aria-label="Mes" tabindex="0">
+            <table class="calendar__grid calendar__grid--month">
+              <thead>
+                <tr>
+                  @for (header of shown.month.weekdayHeaders; track header) {
+                    <th scope="col">{{ header }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (week of shown.month.weeks; track $index) {
+                  <tr>
+                    @for (day of week; track $index) {
+                      <td>
+                        @if (day) {
+                          <button
+                            type="button"
+                            class="calendar__day-button calendar__month-day"
+                            [attr.data-date]="day.date"
+                            [attr.aria-label]="day.accessibleLabel"
+                            [tabIndex]="day.date === monthFocusDate() ? 0 : -1"
+                            (click)="openDay(day.date)"
+                            (keydown)="moveMonthFocus($event, day.date)"
+                          >
+                            <span class="calendar__day-name">{{ day.dayOfMonth }}</span>
+                            @if (day.isToday) {
+                              <span class="calendar__today">
+                                <span class="calendar__today-dot"></span>Hoy
+                              </span>
+                            }
+                            <span class="calendar__day-summary">{{ day.summary }}</span>
+                          </button>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    }
+  }
+</div>

@@ -1,0 +1,35 @@
+/* Read-only slot: same colours as the editable contract, without cursor, hover or focus. */
+:host {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  min-width: var(--size-touch-min);
+  min-height: var(--size-touch-min);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-heading);
+  white-space: nowrap;
+}
+
+:host([data-status='available']) {
+  border: var(--border-width-sm) solid var(--color-accent-strong);
+  background: var(--color-accent-tint);
+  color: var(--color-brand-navy);
+}
+
+:host([data-status='occupied']) {
+  border: var(--border-width-sm) solid transparent;
+  background: var(--color-occupied-bg);
+  color: var(--color-fg-muted);
+}
+
+.slot__occupied {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: var(--font-weight-regular);
+}
