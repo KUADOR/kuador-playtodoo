@@ -1,0 +1,75 @@
+{
+  "name": "day-all-occupied",
+  "description": "Every slot is occupied: nothing is selectable and the selection is ignored.",
+  "input": {
+    "slotDurationMinutes": 60,
+    "view": "day",
+    "mode": "editable",
+    "today": "2026-12-04",
+    "selected": {
+      "date": "2026-12-04",
+      "start": "19:00"
+    },
+    "days": [
+      {
+        "date": "2026-12-04",
+        "slots": [
+          {
+            "start": "18:00",
+            "status": "occupied"
+          },
+          {
+            "start": "19:00",
+            "status": "occupied"
+          },
+          {
+            "start": "20:00",
+            "status": "occupied"
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "range": {
+      "from": "2026-12-04",
+      "to": "2026-12-04"
+    },
+    "selected": null,
+    "title": "viernes 4 de diciembre de 2026",
+    "day": {
+      "date": "2026-12-04",
+      "isToday": true,
+      "availableCount": 0,
+      "occupiedCount": 3,
+      "summary": "Sin horarios",
+      "emptyMessage": null,
+      "slots": [
+        {
+          "start": "18:00",
+          "end": "19:00",
+          "label": "18:00–19:00",
+          "status": "occupied",
+          "accessibleLabel": "18:00 a 19:00, Ocupado",
+          "selectable": false
+        },
+        {
+          "start": "19:00",
+          "end": "20:00",
+          "label": "19:00–20:00",
+          "status": "occupied",
+          "accessibleLabel": "19:00 a 20:00, Ocupado",
+          "selectable": false
+        },
+        {
+          "start": "20:00",
+          "end": "21:00",
+          "label": "20:00–21:00",
+          "status": "occupied",
+          "accessibleLabel": "20:00 a 21:00, Ocupado",
+          "selectable": false
+        }
+      ]
+    }
+  }
+}

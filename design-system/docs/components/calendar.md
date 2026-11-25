@@ -1,0 +1,127 @@
+# BookingCalendar · calendario de reservas
+
+Contrato común de las tres implementaciones: `app` (React), `backoffice` (Angular, solo lectura) y `movil` (Flutter). La apariencia sale de la Identidad visual (DESIGN.md v2) y solo de los tokens de `design-system/tokens`. Diseño de la solución: PLATODO-15, sección 5.
+
+El calendario es **presentacional**: muestra lo que recibe y emite la selección. No llama a la `api`, no calcula disponibilidad ni aplica reglas de reserva (conflictos, duplicados y concurrencia son del módulo Reservas).
+
+## Uso
+
+- **`movil`** (jugadores): elegir día y franja para reservar. Vista inicial `day`.
+- **`app`** (personal del complejo): consultar ocupación y elegir franja. Vista inicial `week`.
+- **`backoffice`** (Kuador): consultar ocupación de otro complejo. Vista inicial `week`, siempre `readonly`.
+
+## Entradas
+
+| Propiedad | Tipo | Regla |
+|---|---|---|
+| `slotDurationMinutes` | entero > 0 | Duración de franja del complejo (configurable por complejo). Define la hora de fin de cada franja |
+| `days` | `{ date: "YYYY-MM-DD", slots: { start: "HH:mm", status: "available" \| "occupied" }[] }[]` | Hora local del complejo, sin conversión de zona horaria. Un día que no viene o viene sin franjas no tiene horarios |
+| `view` / `initialView` | `day` · `week` · `month` | Por defecto `day` en `movil`, `week` en `app` y `backoffice` |
+| `mode` | `editable` · `readonly` | En `backoffice` siempre `readonly` |
+| `selected` | `{ date, start }` o `null` | Una franja a la vez. Si apunta a una franja ocupada o inexistente se ignora (se muestra sin selección) |
+| `today` | `"YYYY-MM-DD"` | Se inyecta; el componente nunca lee el reloj. El calendario abre en el período que contiene `today` |
+| `status` | `loading` · `error` · `ready` | Esqueleto, error con «Reintentar» o contenido |
+
+La zona horaria del complejo es [POR DEFINIR: país y zona horaria] y se resuelve fuera del componente.
+
+## Salidas
+
+| Evento | Cuándo |
+|---|---|
+| `selectionChange({ date, start } \| null)` | Al activar una franja disponible, o la seleccionada para quitarla. Nunca en ocupadas ni en `readonly` |
+| `rangeChange({ from, to })` | Al cambiar de vista o de período, para que la pantalla cargue los datos |
+| `retry()` | Al pulsar «Reintentar» en el estado de error |
+
+## Reglas de presentación
+
+Estas reglas producen la salida esperada (`expected`) de cada fixture; las tres implementaciones deben coincidir con ella.
+
+- **Fin de franja:** `start + slotDurationMinutes`, en `HH:mm`; pasada la medianoche vuelve a `00:00` (p. ej. `22:30` + 90 → `00:00`).
+- **Etiqueta visible:** `«inicio»–«fin»` con raya corta (U+2013), p. ej. `18:00–19:00`.
+- **Etiqueta accesible:** `«inicio» a «fin», «estado»`, con estado `Libre`, `Ocupado` o `Seleccionado`, p. ej. `18:00 a 19:00, Libre`.
+- **Orden:** franjas por hora de inicio, aunque lleguen desordenadas.
+- **Estado mostrado:** `selected` si coincide con la selección efectiva; si no, el recibido.
+- **Seleccionable:** solo en `editable` y si el estado no es `occupied`.
+- **Resumen del día:** `N libres` (`1 libre` en singular; cuenta disponibles y la seleccionada) o `Sin horarios` si no queda ninguna libre.
+- **Día sin franjas (vista diaria):** «Este día no tiene horarios. Prueba con otro día.»
+- **Hoy:** `isToday` marca el día con punto y texto «Hoy».
+- **Períodos (`range`):** `day` = el día; `week` = de lunes a domingo; `month` = del día 1 al último del mes.
+- **Títulos:** `day` → `viernes 4 de diciembre de 2026`; `week` → `30 nov – 6 dic 2026`; `month` → `diciembre 2026`. Días y meses en español, sin depender del idioma del dispositivo.
+- **Vista semanal:** columnas de lunes a domingo con cabecera `lun 30`; filas = todas las horas de inicio de la semana, ordenadas; celda vacía (`null`) si ese día no tiene esa franja.
+- **Vista mensual:** cuadrícula de semanas de lunes a domingo; los días fuera del mes son `null`; cada día muestra su resumen. Al elegir un día se pasa a la vista diaria de ese día.
+
+## Estados
+
+### Franja (iguales en las tres vistas; nunca solo color)
+
+| Estado | Fondo | Borde | Icono y texto | Comportamiento |
+|---|---|---|---|---|
+| Disponible | `color-accent-tint` | `color-accent-strong`, `border-width-sm` | Hora en `color-brand-navy` (+ «Libre» para lectores) | Seleccionable |
+| Ocupado | `color-occupied-bg` | ninguno | Candado + «Ocupado»; texto `color-fg-muted` | No seleccionable, `aria-disabled` |
+| Seleccionado | `color-primary` | `color-primary` | Check + hora en `color-on-primary` | Una a la vez; activarla de nuevo la quita |
+| Foco | el del estado | Anillo `color-focus` de `border-focus-ring` con separación `border-focus-offset` y halo `color-focus-halo` | — | Flechas entre franjas; Enter o Espacio selecciona |
+
+### Componente
+
+| Estado | Qué se ve |
+|---|---|
+| Cargando (`status: loading`) | Esqueleto; respeta `prefers-reduced-motion`. Cambiar vista y período queda deshabilitado |
+| Error (`status: error`) | «No pudimos cargar los horarios.» + botón «Reintentar» (emite `retry`) |
+| Vacío | «Este día no tiene horarios. Prueba con otro día.» |
+| Solo lectura | Mismo aspecto sin acción ni hover; aviso fijo «Solo lectura» con icono de ojo |
+
+## Accesibilidad
+
+- Teclado: roving tabindex (una sola franja en el orden de tabulación); flechas entre franjas; Enter o Espacio selecciona. En Flutter, `Shortcuts` + `FocusTraversalGroup`.
+- Lectores: etiqueta accesible de cada franja; `aria-selected` en la seleccionada y `aria-disabled` en las ocupadas (en Flutter, `Semantics`).
+- Área mínima de cada franja: `size-touch-min` × `size-touch-min` (44 × 44).
+- Contraste: los pares usados están en `design-system/contrast-pairs.json` y se validan con `npm test`.
+
+## Diferencias aceptadas por plataforma
+
+| Plataforma | Diferencia |
+|---|---|
+| `movil` | Vista diaria por defecto; franjas en rejilla de 3 columnas; vista semanal con desplazamiento horizontal; ripple de Material |
+| `app` | Vista semanal por defecto |
+| `backoffice` | Siempre `readonly`: no emite `selectionChange` |
+
+## Fixtures compartidos
+
+En `design-system/fixtures/calendar/` y copiados por `npm run build` a:
+
+- `app/src/shared/ui/booking-calendar/fixtures/`
+- `backoffice/src/app/shared/ui/booking-calendar/fixtures/`
+- `movil/test/shared/ui/booking_calendar/fixtures/`
+
+Cada archivo tiene `name`, `description`, `input` (las entradas del contrato) y `expected` (la salida). Las pruebas de cada pieza montan el componente con `input` y comprueban `expected`.
+
+| Fixture | Qué cubre |
+|---|---|
+| `day-30min` | Mismo día con franjas de 30 min; la selección apunta a una ocupada y se ignora; franjas desordenadas en la entrada |
+| `day-60min` | Mismo día con franjas de 60 min y una selección válida |
+| `day-90min` | Mismo día con franjas de 90 min; la última termina a medianoche (`22:30–00:00`) |
+| `day-empty` | Día sin franjas: mensaje de vacío |
+| `day-all-occupied` | Todas ocupadas: nada seleccionable, resumen «Sin horarios» y selección ignorada |
+| `week-mixed` | Semana con horas distintas por día, un día vacío, un día ausente en la entrada y una selección válida |
+| `week-readonly` | Los mismos datos de `week-mixed` en `readonly` (para `backoffice`): nada seleccionable |
+| `month-mixed` | Diciembre de 2026 (empieza en martes): días con libres, totalmente ocupados, vacíos y sin datos |
+
+Forma de `expected`:
+
+```json
+{
+  "range": { "from": "2026-12-04", "to": "2026-12-04" },
+  "selected": { "date": "2026-12-04", "start": "19:00" },
+  "title": "viernes 4 de diciembre de 2026",
+  "day": {
+    "date": "2026-12-04", "isToday": true, "availableCount": 3, "occupiedCount": 1,
+    "summary": "3 libres", "emptyMessage": null,
+    "slots": [
+      { "start": "19:00", "end": "20:00", "label": "19:00–20:00", "status": "selected",
+        "accessibleLabel": "19:00 a 20:00, Seleccionado", "selectable": true }
+    ]
+  }
+}
+```
+
+En `week` la clave `day` se reemplaza por `week: { columns, rows, cells }` y en `month` por `month: { weekdayHeaders, weeks }`. Los tres casos de 30, 60 y 90 min muestran el mismo día de complejos distintos: es la prueba a nivel de componente de que la duración de franja de cada complejo se respeta.

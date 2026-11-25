@@ -1,0 +1,31 @@
+{
+  "space": {
+    "$type": "dimension",
+    "1": { "$value": "4px" },
+    "2": { "$value": "8px" },
+    "3": { "$value": "12px" },
+    "4": { "$value": "16px", "$description": "Card padding, mobile page margin" },
+    "5": { "$value": "24px" },
+    "6": { "$value": "32px" },
+    "7": { "$value": "48px" }
+  },
+  "radius": {
+    "$type": "dimension",
+    "md": { "$value": "10px", "$description": "Fields and buttons" },
+    "lg": { "$value": "16px", "$description": "Cards" },
+    "pill": { "$value": "9999px", "$description": "Tags" }
+  },
+  "size": {
+    "$type": "dimension",
+    "touch-min": { "$value": "44px", "$description": "Minimum touch target (width and height)" },
+    "content-max": { "$value": "1200px", "$description": "Maximum content width on web" }
+  },
+  "border": {
+    "$type": "dimension",
+    "width-sm": { "$value": "1px", "$description": "Available slot border" },
+    "width-md": { "$value": "1.5px", "$description": "Secondary button border" },
+    "width-lg": { "$value": "2px", "$description": "Focused and error field border, selected card border" },
+    "focus-ring": { "$value": "2px", "$description": "Focus ring width" },
+    "focus-offset": { "$value": "2px", "$description": "Gap between the element and its focus ring" }
+  }
+}

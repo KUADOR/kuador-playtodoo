@@ -1,0 +1,60 @@
+// GENERATED – do not edit. Source: design-system/tokens. Regenerate with `npm run build` in design-system/.
+import 'package:flutter/painting.dart';
+
+/// Design tokens of Playtodoo. Map them to ThemeData in app_theme.dart.
+abstract final class AppTokens {
+  static const Color colorBrandNavy = Color(0xFF0B2F66);
+  static const Color colorPrimary = Color(0xFF0B4FB3);
+  static const Color colorPrimaryHover = Color(0xFF093F8F);
+  static const Color colorPrimaryTint = Color(0xFFE8F0FB);
+  static const Color colorOnPrimary = Color(0xFFFFFFFF);
+  static const Color colorAccent = Color(0xFF4DB82A);
+  static const Color colorAccentStrong = Color(0xFF277A18);
+  static const Color colorAccentTint = Color(0xFFE3F5DC);
+  static const Color colorSurface = Color(0xFFFFFFFF);
+  static const Color colorSurfaceAlt = Color(0xFFF3F6FA);
+  static const Color colorFg = Color(0xFF111827);
+  static const Color colorFgMuted = Color(0xFF4B5563);
+  static const Color colorBorder = Color(0xFFC7D0DC);
+  static const Color colorSuccess = Color(0xFF15803D);
+  static const Color colorWarning = Color(0xFFB45309);
+  static const Color colorDanger = Color(0xFFB91C1C);
+  static const Color colorFocus = Color(0xFF0B4FB3);
+  static const Color colorFocusHalo = Color(0xFF9CC0F5);
+  static const Color colorDisabledBg = Color(0xFFE5E7EB);
+  static const Color colorDisabledFg = Color(0xFF4B5563);
+  static const Color colorDisabledBorder = Color(0xFF9CA3AF);
+  static const Color colorOccupiedBg = Color(0xFFE5E7EB);
+  static const List<BoxShadow> shadowCard = [BoxShadow(color: Color.fromRGBO(11, 47, 102, 0.14), offset: Offset(0.0, 1.0), blurRadius: 3.0, spreadRadius: 0.0)];
+  static const List<BoxShadow> shadowOverlay = [BoxShadow(color: Color.fromRGBO(11, 47, 102, 0.2), offset: Offset(0.0, 8.0), blurRadius: 24.0, spreadRadius: 0.0)];
+  static const double space1 = 4.0;
+  static const double space2 = 8.0;
+  static const double space3 = 12.0;
+  static const double space4 = 16.0;
+  static const double space5 = 24.0;
+  static const double space6 = 32.0;
+  static const double space7 = 48.0;
+  static const double radiusMd = 10.0;
+  static const double radiusLg = 16.0;
+  static const double radiusPill = 9999.0;
+  static const double sizeTouchMin = 44.0;
+  static const double sizeContentMax = 1200.0;
+  static const double borderWidthSm = 1.0;
+  static const double borderWidthMd = 1.5;
+  static const double borderWidthLg = 2.0;
+  static const double borderFocusRing = 2.0;
+  static const double borderFocusOffset = 2.0;
+  static const String fontFamilyHeading = 'Nunito';
+  static const String fontFamilyBody = 'Inter';
+  static const double fontSizeXs = 12.0;
+  static const double fontSizeSm = 14.0;
+  static const double fontSizeMd = 16.0;
+  static const double fontSizeLg = 20.0;
+  static const double fontSizeXl = 24.0;
+  static const double fontSize2xl = 32.0;
+  static const FontWeight fontWeightRegular = FontWeight.w400;
+  static const FontWeight fontWeightSemibold = FontWeight.w600;
+  static const FontWeight fontWeightExtrabold = FontWeight.w800;
+  static const double lineHeightBody = 1.5;
+  static const double lineHeightHeading = 1.25;
+}

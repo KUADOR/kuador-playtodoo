@@ -1,0 +1,27 @@
+{
+  "font-family": {
+    "$type": "fontFamily",
+    "heading": { "$value": ["Nunito", "system-ui", "sans-serif"], "$description": "Titles and highlighted figures" },
+    "body": { "$value": ["Inter", "system-ui", "sans-serif"], "$description": "Text and data" }
+  },
+  "font-size": {
+    "$type": "dimension",
+    "xs": { "$value": "12px" },
+    "sm": { "$value": "14px", "$description": "Minimum size on web" },
+    "md": { "$value": "16px", "$description": "Minimum size for main text on mobile" },
+    "lg": { "$value": "20px" },
+    "xl": { "$value": "24px" },
+    "2xl": { "$value": "32px" }
+  },
+  "font-weight": {
+    "$type": "fontWeight",
+    "regular": { "$value": 400, "$description": "Text" },
+    "semibold": { "$value": 600, "$description": "Labels and buttons" },
+    "extrabold": { "$value": 800, "$description": "Titles and highlighted figures" }
+  },
+  "line-height": {
+    "$type": "number",
+    "body": { "$value": 1.5, "$description": "Reading text" },
+    "heading": { "$value": 1.25, "$description": "Titles" }
+  }
+}
