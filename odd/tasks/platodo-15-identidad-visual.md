@@ -36,7 +36,9 @@
 - PLATODO-24: dos desvíos de paridad corregidos en `movil`:
   - `AppButton` en «cargando» se veía gris, como deshabilitado. Ahora conserva los colores de su variante, como en `app` y `backoffice`.
   - El check de `AppCard` seleccionada ahora va sobre un círculo `color-primary`, igual que en web.
-  Los dos cambios tienen pruebas nuevas.
+  - Con movimiento reducido, el indicador de «cargando» queda quieto como un arco de tres cuartos, igual que el icono de web (antes se congelaba como un arco mínimo).
+  - El catálogo de `movil` muestra ahora los mismos estados que los de web: cada variante de botón en normal, cargando y deshabilitado, y las cinco variantes de tarjeta más seleccionada y cargando (devolución de QA).
+  Todos los cambios tienen pruebas nuevas.
 - PLATODO-24: documentación final de los cuatro componentes (uso, propiedades, estados, ejemplos por pieza y tabla completa de diferencias aceptadas por plataforma con su motivo).
 
 ### Verificado
@@ -81,6 +83,6 @@ Los criterios 3 a 12 los verificaron sus tareas: PLATODO-18 a 23, con capturas e
   - `design-system`: `npm run tokens:check` sin diferencias; `npm test` pasa (pruebas y contraste).
   - `app`: `pnpm lint` sin avisos; `pnpm build` correcto; `pnpm test` 132/132.
   - `backoffice`: `npx prettier --check src` correcto; `npm run build` correcto; `npm test -- --watch=false` 95/95.
-  - `movil`: `flutter analyze` sin problemas; `flutter test` 87/87 (83 antes, más 4 nuevas de paridad).
+  - `movil`: `flutter analyze` sin problemas; `flutter test` 90/90 (83 antes, más 7 nuevas de paridad).
 - CI de `develop` en verde para `design-system`, `app`, `backoffice` y `movil` en los merges de PLATODO-19 a 23. La del PR de PLATODO-24 queda enlazada en el PR.
 - Capturas de las tareas anteriores: `docs/evidence/platodo-18`, `platodo-19`, `platodo-20`, `platodo-21`, `docs/screenshots/platodo-22`, `platodo-23`.

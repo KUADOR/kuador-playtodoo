@@ -83,12 +83,12 @@ const AppButton(label: 'Guardar cambios', onPressed: null); // deshabilitado
 | `disabled` | `onPressed: null` (Semantics `enabled: false`, fuera del recorrido de foco) |
 | `press` | `onPressed` |
 
-- **Cargando:** el botón de Material queda deshabilitado (ignora toques y sale del recorrido de foco), pero conserva los colores de su variante, como en web; se muestra un `CircularProgressIndicator` con `loadingLabel` y el cambio se anuncia como región viva de Semantics.
+- **Cargando:** el botón de Material queda deshabilitado (ignora toques y sale del recorrido de foco), pero conserva los colores de su variante, como en web; se muestra un `CircularProgressIndicator` con `loadingLabel` y el cambio se anuncia como región viva de Semantics. Con movimiento reducido (`MediaQuery.disableAnimations`) el indicador queda quieto como un arco de tres cuartos (`AppButton.reducedMotionSpinnerValue`), igual que el icono `LoaderCircle` de web.
 - **Foco:** `AppFocusRing` (anillo `color-focus` de `border-focus-ring`, separado `border-focus-offset`, con halo `color-focus-halo`), solo con foco de teclado (`FocusHighlightMode.traditional`, equivalente a `:focus-visible`).
 - **Tamaño táctil:** `minimumSize` de `size-touch-min` (44 × 44) y `MaterialTapTargetSize.padded`.
 - **Pendientes ([POR DEFINIR]):** el pulsado del secundario usa `color-primary-tint` y el de peligro mantiene `color-danger` (más el ripple), hasta que la identidad defina esos tonos.
 - **Pruebas:** `movil/test/shared/ui/app_button_test.dart` (cada variante: 44 × 44, `androidTapTargetGuideline`, `iOSTapTargetGuideline`, `labeledTapTargetGuideline`, `textContrastGuideline`; deshabilitado; cargando; anillo de foco).
-- **Catálogo:** `flutter run` en `movil/` y «Ver catálogo de diseño» en la pantalla de inicio, o `flutter run --route /design-catalog` (solo en depuración).
+- **Catálogo:** `flutter run` en `movil/` y «Ver catálogo de diseño» en la pantalla de inicio, o `flutter run --route /design-catalog` (solo en depuración). Muestra cada variante en normal, cargando y deshabilitado, como los catálogos web.
 
 ## Angular (`backoffice`)
 

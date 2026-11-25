@@ -129,6 +129,33 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets('loading with reduced motion: static three-quarter arc', (
+    tester,
+  ) async {
+    await pumpThemed(
+      tester,
+      AppButton(label: label, isLoading: true, onPressed: () {}),
+      disableAnimations: true,
+    );
+
+    final spinner = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(spinner.value, AppButton.reducedMotionSpinnerValue);
+  });
+
+  testWidgets('loading with motion: spinning indicator', (tester) async {
+    await pumpThemed(
+      tester,
+      AppButton(label: label, isLoading: true, onPressed: () {}),
+    );
+
+    final spinner = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(spinner.value, isNull);
+  });
+
   testWidgets('shows the focus ring only with keyboard focus', (tester) async {
     FocusManager.instance.highlightStrategy =
         FocusHighlightStrategy.alwaysTraditional;

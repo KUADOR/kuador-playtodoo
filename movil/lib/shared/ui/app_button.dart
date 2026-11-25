@@ -26,6 +26,10 @@ class AppButton extends StatelessWidget {
 
   static const String defaultLoadingLabel = 'Guardando…';
 
+  /// With reduced motion the spinner stops as a three-quarter arc, like the
+  /// web `LoaderCircle` icon.
+  static const double reducedMotionSpinnerValue = 0.75;
+
   final String label;
   final VoidCallback? onPressed;
   final AppButtonVariant variant;
@@ -137,6 +141,9 @@ class _ButtonContent extends StatelessWidget {
         ? SizedBox.square(
             dimension: _indicatorSize,
             child: CircularProgressIndicator(
+              value: MediaQuery.disableAnimationsOf(context)
+                  ? AppButton.reducedMotionSpinnerValue
+                  : null,
               strokeWidth: AppTokens.borderWidthLg,
               color: foreground,
             ),
