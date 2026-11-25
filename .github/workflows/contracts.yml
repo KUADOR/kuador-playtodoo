@@ -1,0 +1,29 @@
+# Lints the OpenAPI contracts. Runs only when contracts/ or this workflow changes.
+name: contracts
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/contracts.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/contracts.yml'
+permissions:
+  contents: read
+jobs:
+  contracts:
+    name: contracts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Lint OpenAPI contracts
+        run: npx --yes @redocly/cli@2.83.0 lint *.openapi.yaml

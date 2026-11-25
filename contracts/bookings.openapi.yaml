@@ -1,0 +1,943 @@
+openapi: 3.1.0
+info:
+  title: Playtodoo Bookings API
+  version: 1.0.0
+  summary: Player and staff booking endpoints with conflict-free slots.
+  description: |
+    Contract of the **Bookings** module of the `api` (epic PLATODO-25, ADR-006).
+
+    **Tenant resolution.** Every request is served for the complex (tenant) resolved from the
+    subdomain (`{tenant}.playtodoo.com`, ADR-002). All reads and writes happen only in that
+    tenant's schema; no endpoint crosses tenants.
+
+    **Conflict guarantee.** A court never holds two active entries (pending or confirmed bookings,
+    or blocks) whose time ranges overlap. Ranges are half-open `[start, end)`: 20:00–21:00 and
+    21:00–22:00 do not conflict, 20:00–21:00 and 20:30–21:30 do. The guarantee is enforced by a
+    PostgreSQL exclusion constraint, so concurrent requests get exactly one success and the rest
+    receive `409 SLOT_UNAVAILABLE`.
+
+    **Duration.** Clients only send `start`. The server computes `end` from the court's configured
+    slot duration at creation time; later changes to that duration do not alter existing bookings.
+
+    **Pending hold.** A player booking is created as `PENDING` and holds the slot for 5 minutes
+    (`expiresAt`, set by the server). It must be confirmed before that instant; otherwise it becomes
+    `EXPIRED` and frees the slot. Reads always return the effective status: a `PENDING` booking whose
+    `expiresAt` has passed is reported as `EXPIRED`.
+
+    **Times.** Request instants are ISO-8601 date-times with an offset. Responses are always in UTC
+    (`Z`). Converting to the complex's local time is the client's job.
+
+    **Errors.** Every error uses Problem Details (RFC 9457) with a stable machine-readable `code`.
+    Clients map `code` to the user-facing text; `title` and `detail` are for developers and logs.
+  contact:
+    name: Kuador
+servers:
+  - url: https://{tenant}.playtodoo.com/api/v1
+    description: Tenant (sports complex) resolved by subdomain.
+    variables:
+      tenant:
+        default: example
+        description: Subdomain of the sports complex.
+tags:
+  - name: Player bookings
+    description: Used by `movil`. Requires an authenticated player.
+  - name: Staff bookings
+    description: Used by `app`. Requires a staff role of the resolved tenant.
+security:
+  - bearerAuth: []
+paths:
+  /courts/{courtId}/occupancy:
+    get:
+      tags: [Player bookings]
+      operationId: getCourtOccupancy
+      summary: List occupied time ranges of a court.
+      description: |
+        Returns the ranges that overlap `[from, to)` and are taken by a pending (not expired) or
+        confirmed booking, or by a block. Kinds and holders are not disclosed: every range is just
+        occupied. Results are ordered by `start`.
+      parameters:
+        - $ref: '#/components/parameters/CourtId'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: Occupied ranges, possibly empty.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OccupiedRange'
+              examples:
+                fridayEvening:
+                  summary: Two occupied slots on a Friday evening
+                  value:
+                    - start: '2026-12-04T23:00:00Z'
+                      end: '2026-12-05T00:00:00Z'
+                    - start: '2026-12-05T00:00:00Z'
+                      end: '2026-12-05T01:30:00Z'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/CourtNotFound'
+  /bookings:
+    post:
+      tags: [Player bookings]
+      operationId: createPendingBooking
+      summary: Create a pending booking that holds a slot for 5 minutes.
+      description: |
+        Creates a `PENDING` booking for the authenticated player. The slot is held until `expiresAt`.
+
+        If the player already has an active booking in this complex that overlaps the requested
+        range (on another court), the request is rejected with `OWN_OVERLAP_NEEDS_CONFIRMATION`
+        unless `acknowledgeOwnOverlap` is `true`. The check covers only the current complex.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePendingBookingRequest'
+            examples:
+              firstAttempt:
+                summary: First attempt, no acknowledgement
+                value:
+                  courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+                  start: '2026-12-04T23:00:00Z'
+              acknowledged:
+                summary: Retry after the player accepted the overlap warning
+                value:
+                  courtId: 7b9e2d14-5c3a-4f6e-8a1b-2c3d4e5f6a7b
+                  start: '2026-12-04T23:00:00Z'
+                  acknowledgeOwnOverlap: true
+      responses:
+        '201':
+          description: Pending booking created.
+          headers:
+            Location:
+              $ref: '#/components/headers/BookingLocation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerBooking'
+              examples:
+                pending:
+                  $ref: '#/components/examples/PendingBooking'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/CourtNotFound'
+        '409':
+          description: |
+            `SLOT_UNAVAILABLE`: the range overlaps an active booking or block.
+            `OWN_OVERLAP_NEEDS_CONFIRMATION`: the player already holds an overlapping booking in
+            this complex; retry with `acknowledgeOwnOverlap: true`.
+          content:
+            application/problem+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Problem'
+                  - $ref: '#/components/schemas/OwnOverlapProblem'
+              examples:
+                slotUnavailable:
+                  $ref: '#/components/examples/SlotUnavailable'
+                ownOverlap:
+                  $ref: '#/components/examples/OwnOverlapNeedsConfirmation'
+        '422':
+          $ref: '#/components/responses/InvalidSlot'
+  /bookings/{bookingId}:
+    get:
+      tags: [Player bookings]
+      operationId: getBooking
+      summary: Get the effective status of one of the player's bookings.
+      description: |
+        Used when the app returns from background or the countdown reaches zero. Bookings of other
+        players are reported as not found.
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: The booking with its effective status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerBooking'
+              examples:
+                pending:
+                  $ref: '#/components/examples/PendingBooking'
+                expired:
+                  $ref: '#/components/examples/ExpiredBooking'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+  /bookings/{bookingId}/confirm:
+    post:
+      tags: [Player bookings]
+      operationId: confirmBooking
+      summary: Confirm a pending booking before it expires.
+      description: |
+        Succeeds only while the booking is `PENDING` and `expiresAt` is in the future. Confirming a
+        booking that is already `CONFIRMED` returns it unchanged (safe retry).
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: Booking confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerBooking'
+              examples:
+                confirmed:
+                  $ref: '#/components/examples/ConfirmedBooking'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          description: |
+            `BOOKING_EXPIRED`: the 5-minute hold ended; the slot was released.
+            `BOOKING_NOT_PENDING`: the booking was cancelled.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                expired:
+                  $ref: '#/components/examples/BookingExpiredProblem'
+                notPending:
+                  $ref: '#/components/examples/BookingNotPendingProblem'
+  /bookings/{bookingId}/cancel:
+    post:
+      tags: [Player bookings]
+      operationId: cancelOwnPendingBooking
+      summary: Cancel one of the player's pending bookings.
+      description: |
+        Releases the slot. Only `PENDING` bookings can be cancelled by the player; cancelling a
+        confirmed booking depends on the cancellation policy, which is out of scope.
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: Booking cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerBooking'
+              examples:
+                cancelled:
+                  $ref: '#/components/examples/CancelledBooking'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          description: '`BOOKING_NOT_PENDING`: the booking is confirmed, cancelled or expired.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                notPending:
+                  $ref: '#/components/examples/BookingNotPendingProblem'
+  /staff/bookings:
+    get:
+      tags: [Staff bookings]
+      operationId: listStaffBookings
+      summary: List active bookings and blocks for the staff calendar.
+      description: |
+        Returns pending (not expired) and confirmed bookings and blocks that overlap `[from, to)`,
+        ordered by `start`. `holderName` is null for pending bookings, so personal data is not
+        exposed during a 5-minute hold.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: courtId
+          in: query
+          required: false
+          description: Restrict the result to one court.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Calendar entries, possibly empty.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffBooking'
+              examples:
+                mixed:
+                  summary: A pending player booking, a manual booking and a block
+                  value:
+                    - id: 0b8f3c1e-2d4a-4b6c-8e0f-1a2b3c4d5e6f
+                      courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+                      kind: RESERVATION
+                      status: PENDING
+                      start: '2026-12-04T23:00:00Z'
+                      end: '2026-12-05T00:00:00Z'
+                      holderName: null
+                      blockReason: null
+                    - id: 5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d
+                      courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+                      kind: RESERVATION
+                      status: CONFIRMED
+                      start: '2026-12-05T00:00:00Z'
+                      end: '2026-12-05T01:00:00Z'
+                      holderName: Alex Example
+                      blockReason: null
+                    - id: 9c8b7a6f-5e4d-4c3b-8a2f-1e0d9c8b7a6f
+                      courtId: 7b9e2d14-5c3a-4f6e-8a1b-2c3d4e5f6a7b
+                      kind: BLOCK
+                      status: CONFIRMED
+                      start: '2026-12-05T13:00:00Z'
+                      end: '2026-12-05T14:30:00Z'
+                      holderName: null
+                      blockReason: Maintenance
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Staff bookings]
+      operationId: createStaffBooking
+      summary: Create a manual booking on behalf of a customer.
+      description: |
+        Manual bookings (for example, taken by phone) are created directly as `CONFIRMED`, with no
+        pending hold. The same conflict rule as for players applies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStaffBookingRequest'
+            examples:
+              byPhone:
+                summary: Booking taken by phone
+                value:
+                  courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+                  start: '2026-12-05T00:00:00Z'
+                  holderName: Alex Example
+                  holderPhone: '+000 0000 0000'
+      responses:
+        '201':
+          description: Manual booking created.
+          headers:
+            Location:
+              $ref: '#/components/headers/StaffBookingLocation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffBooking'
+              examples:
+                created:
+                  $ref: '#/components/examples/StaffManualBooking'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/CourtNotFound'
+        '409':
+          description: '`SLOT_UNAVAILABLE`: the range overlaps an active booking or block.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                slotUnavailable:
+                  $ref: '#/components/examples/SlotUnavailable'
+        '422':
+          $ref: '#/components/responses/InvalidSlot'
+  /staff/blocks:
+    post:
+      tags: [Staff bookings]
+      operationId: blockSlot
+      summary: Block a free slot of a court.
+      description: |
+        A block makes the slot unavailable to players. It never cancels an existing booking: if the
+        range overlaps an active booking the request is rejected with `SLOT_HAS_BOOKING`, and the
+        staff must cancel that booking first. If it overlaps another block, the response is
+        `SLOT_UNAVAILABLE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockSlotRequest'
+            examples:
+              maintenance:
+                summary: Block for maintenance
+                value:
+                  courtId: 7b9e2d14-5c3a-4f6e-8a1b-2c3d4e5f6a7b
+                  start: '2026-12-05T13:00:00Z'
+                  reason: Maintenance
+      responses:
+        '201':
+          description: Block created.
+          headers:
+            Location:
+              $ref: '#/components/headers/StaffBookingLocation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffBooking'
+              examples:
+                created:
+                  $ref: '#/components/examples/StaffBlock'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/CourtNotFound'
+        '409':
+          description: |
+            `SLOT_HAS_BOOKING`: an active booking occupies the range; cancel it first.
+            `SLOT_UNAVAILABLE`: another block occupies the range.
+          content:
+            application/problem+json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/SlotHasBookingProblem'
+                  - $ref: '#/components/schemas/Problem'
+              examples:
+                slotHasBooking:
+                  $ref: '#/components/examples/SlotHasBooking'
+                slotUnavailable:
+                  $ref: '#/components/examples/SlotUnavailable'
+        '422':
+          $ref: '#/components/responses/InvalidSlot'
+  /staff/bookings/{bookingId}:
+    get:
+      tags: [Staff bookings]
+      operationId: getStaffBooking
+      summary: Get a booking or block of the complex.
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: The entry with its effective status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffBooking'
+              examples:
+                manual:
+                  $ref: '#/components/examples/StaffManualBooking'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+  /staff/bookings/{bookingId}/cancel:
+    post:
+      tags: [Staff bookings]
+      operationId: cancelBookingByStaff
+      summary: Cancel any booking or remove a block.
+      description: |
+        Cancels a pending or confirmed booking, or removes a block, and releases the slot.
+        Idempotent: if the entry is already `CANCELLED` or `EXPIRED` it is returned unchanged.
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: Entry cancelled (or already inactive).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffBooking'
+              examples:
+                cancelled:
+                  $ref: '#/components/examples/StaffCancelledBooking'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Access token of a player (player endpoints) or of a staff member of the resolved tenant
+        (staff endpoints). The identity provider is defined by the Identity and Access module.
+  parameters:
+    CourtId:
+      name: courtId
+      in: path
+      required: true
+      description: Court identifier within the resolved tenant.
+      schema:
+        type: string
+        format: uuid
+    BookingId:
+      name: bookingId
+      in: path
+      required: true
+      description: Booking or block identifier within the resolved tenant.
+      schema:
+        type: string
+        format: uuid
+    From:
+      name: from
+      in: query
+      required: true
+      description: Inclusive lower bound of the queried range (ISO-8601 with offset).
+      schema:
+        type: string
+        format: date-time
+      example: '2026-12-04T03:00:00Z'
+    To:
+      name: to
+      in: query
+      required: true
+      description: |
+        Exclusive upper bound of the queried range (ISO-8601 with offset). Must be after `from`
+        and at most 31 days later.
+      schema:
+        type: string
+        format: date-time
+      example: '2026-12-05T03:00:00Z'
+  headers:
+    BookingLocation:
+      description: URL of the created booking (`/bookings/{bookingId}`).
+      schema:
+        type: string
+        format: uri-reference
+      example: /api/v1/bookings/0b8f3c1e-2d4a-4b6c-8e0f-1a2b3c4d5e6f
+    StaffBookingLocation:
+      description: URL of the created entry (`/staff/bookings/{bookingId}`).
+      schema:
+        type: string
+        format: uri-reference
+      example: /api/v1/staff/bookings/5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d
+  schemas:
+    BookingKind:
+      type: string
+      enum: [RESERVATION, BLOCK]
+      description: '`RESERVATION` is a booking for a player or customer; `BLOCK` makes the slot unavailable.'
+    BookingStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, CANCELLED, EXPIRED]
+      description: |
+        Effective status. `PENDING` and `CONFIRMED` occupy the slot; `CANCELLED` and `EXPIRED`
+        release it. Blocks are only `CONFIRMED` or `CANCELLED`.
+    OccupiedRange:
+      type: object
+      additionalProperties: false
+      required: [start, end]
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: Inclusive start, UTC.
+        end:
+          type: string
+          format: date-time
+          description: Exclusive end, UTC.
+    CreatePendingBookingRequest:
+      type: object
+      additionalProperties: false
+      required: [courtId, start]
+      properties:
+        courtId:
+          type: string
+          format: uuid
+        start:
+          type: string
+          format: date-time
+          description: Start of a valid slot of the court. The end is derived from the court's duration.
+        acknowledgeOwnOverlap:
+          type: boolean
+          default: false
+          description: Set to `true` after the player accepted the warning about an overlapping booking of their own.
+    PlayerBooking:
+      type: object
+      additionalProperties: false
+      required: [id, courtId, start, end, status, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        courtId:
+          type: string
+          format: uuid
+        start:
+          type: string
+          format: date-time
+          description: Inclusive start, UTC.
+        end:
+          type: string
+          format: date-time
+          description: Exclusive end, UTC.
+        status:
+          $ref: '#/components/schemas/BookingStatus'
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+          description: End of the pending hold, set by the server. Clients drive the countdown from this value.
+        createdAt:
+          type: string
+          format: date-time
+        confirmedAt:
+          type: [string, 'null']
+          format: date-time
+        cancelledAt:
+          type: [string, 'null']
+          format: date-time
+    CreateStaffBookingRequest:
+      type: object
+      additionalProperties: false
+      required: [courtId, start, holderName]
+      properties:
+        courtId:
+          type: string
+          format: uuid
+        start:
+          type: string
+          format: date-time
+          description: Start of a valid slot of the court. The end is derived from the court's duration.
+        holderName:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Name of the person the booking is for.
+        holderPhone:
+          type: string
+          maxLength: 32
+          description: Optional contact phone of the holder.
+    BlockSlotRequest:
+      type: object
+      additionalProperties: false
+      required: [courtId, start]
+      properties:
+        courtId:
+          type: string
+          format: uuid
+        start:
+          type: string
+          format: date-time
+          description: Start of a valid slot of the court. The end is derived from the court's duration.
+        reason:
+          type: string
+          maxLength: 200
+          description: Optional internal reason, visible only to staff.
+    StaffBooking:
+      type: object
+      additionalProperties: false
+      required: [id, courtId, kind, status, start, end, holderName, blockReason]
+      properties:
+        id:
+          type: string
+          format: uuid
+        courtId:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/BookingKind'
+        status:
+          $ref: '#/components/schemas/BookingStatus'
+        start:
+          type: string
+          format: date-time
+          description: Inclusive start, UTC.
+        end:
+          type: string
+          format: date-time
+          description: Exclusive end, UTC.
+        holderName:
+          type: [string, 'null']
+          description: Holder of a reservation. Null for blocks and for pending bookings.
+        blockReason:
+          type: [string, 'null']
+          description: Reason of a block. Null for reservations.
+    ProblemCode:
+      type: string
+      description: Stable machine-readable error code. Clients map it to the user-facing text.
+      enum:
+        - SLOT_UNAVAILABLE
+        - BOOKING_EXPIRED
+        - OWN_OVERLAP_NEEDS_CONFIRMATION
+        - SLOT_HAS_BOOKING
+        - BOOKING_NOT_PENDING
+        - INVALID_SLOT
+        - COURT_NOT_FOUND
+        - BOOKING_NOT_FOUND
+        - INVALID_REQUEST
+        - UNAUTHENTICATED
+        - FORBIDDEN
+    Problem:
+      type: object
+      description: Problem Details (RFC 9457) with a stable `code` extension.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: URI identifying the problem type.
+        title:
+          type: string
+          description: Short developer-facing summary. Not shown to end users.
+        status:
+          type: integer
+          format: int32
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+          description: Developer-facing explanation of this occurrence. Never contains personal data.
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+    OwnOverlapProblem:
+      description: '`OWN_OVERLAP_NEEDS_CONFIRMATION` with the overlapping booking of the player.'
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [existingBooking]
+          properties:
+            existingBooking:
+              $ref: '#/components/schemas/PlayerBooking'
+    SlotHasBookingProblem:
+      description: '`SLOT_HAS_BOOKING` with the booking that must be cancelled before blocking.'
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [conflictingBookingId]
+          properties:
+            conflictingBookingId:
+              type: string
+              format: uuid
+  responses:
+    InvalidRequest:
+      description: '`INVALID_REQUEST`: malformed body or parameters (for example, `to` not after `from`).'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            invalidRange:
+              value:
+                type: https://playtodoo.com/problems/invalid-request
+                title: Invalid request
+                status: 400
+                detail: '`to` must be after `from`.'
+                code: INVALID_REQUEST
+    Unauthenticated:
+      description: '`UNAUTHENTICATED`: missing or invalid access token.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unauthenticated:
+              value:
+                type: https://playtodoo.com/problems/unauthenticated
+                title: Authentication required
+                status: 401
+                code: UNAUTHENTICATED
+    Forbidden:
+      description: '`FORBIDDEN`: the caller is not staff of the resolved tenant.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            forbidden:
+              value:
+                type: https://playtodoo.com/problems/forbidden
+                title: Not allowed for this complex
+                status: 403
+                code: FORBIDDEN
+    CourtNotFound:
+      description: '`COURT_NOT_FOUND`: the court does not exist in the resolved tenant.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            courtNotFound:
+              value:
+                type: https://playtodoo.com/problems/court-not-found
+                title: Court not found
+                status: 404
+                code: COURT_NOT_FOUND
+    BookingNotFound:
+      description: '`BOOKING_NOT_FOUND`: the booking does not exist in the resolved tenant or belongs to another player.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            bookingNotFound:
+              value:
+                type: https://playtodoo.com/problems/booking-not-found
+                title: Booking not found
+                status: 404
+                code: BOOKING_NOT_FOUND
+    InvalidSlot:
+      description: '`INVALID_SLOT`: `start` is in the past or is not a valid slot start for the court.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            invalidSlot:
+              value:
+                type: https://playtodoo.com/problems/invalid-slot
+                title: Invalid slot
+                status: 422
+                detail: The requested start is not a valid slot of the court.
+                code: INVALID_SLOT
+  examples:
+    PendingBooking:
+      summary: Pending booking holding the slot for 5 minutes
+      value:
+        id: 0b8f3c1e-2d4a-4b6c-8e0f-1a2b3c4d5e6f
+        courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+        start: '2026-12-04T23:00:00Z'
+        end: '2026-12-05T00:00:00Z'
+        status: PENDING
+        expiresAt: '2026-12-01T15:05:00Z'
+        createdAt: '2026-12-01T15:00:00Z'
+        confirmedAt: null
+        cancelledAt: null
+    ConfirmedBooking:
+      summary: Booking confirmed within the hold
+      value:
+        id: 0b8f3c1e-2d4a-4b6c-8e0f-1a2b3c4d5e6f
+        courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+        start: '2026-12-04T23:00:00Z'
+        end: '2026-12-05T00:00:00Z'
+        status: CONFIRMED
+        expiresAt: '2026-12-01T15:05:00Z'
+        createdAt: '2026-12-01T15:00:00Z'
+        confirmedAt: '2026-12-01T15:03:12Z'
+        cancelledAt: null
+    ExpiredBooking:
+      summary: Pending booking whose hold ended
+      value:
+        id: 0b8f3c1e-2d4a-4b6c-8e0f-1a2b3c4d5e6f
+        courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+        start: '2026-12-04T23:00:00Z'
+        end: '2026-12-05T00:00:00Z'
+        status: EXPIRED
+        expiresAt: '2026-12-01T15:05:00Z'
+        createdAt: '2026-12-01T15:00:00Z'
+        confirmedAt: null
+        cancelledAt: null
+    CancelledBooking:
+      summary: Pending booking cancelled by the player
+      value:
+        id: 0b8f3c1e-2d4a-4b6c-8e0f-1a2b3c4d5e6f
+        courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+        start: '2026-12-04T23:00:00Z'
+        end: '2026-12-05T00:00:00Z'
+        status: CANCELLED
+        expiresAt: '2026-12-01T15:05:00Z'
+        createdAt: '2026-12-01T15:00:00Z'
+        confirmedAt: null
+        cancelledAt: '2026-12-01T15:02:40Z'
+    StaffManualBooking:
+      summary: Manual booking created by staff
+      value:
+        id: 5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d
+        courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+        kind: RESERVATION
+        status: CONFIRMED
+        start: '2026-12-05T00:00:00Z'
+        end: '2026-12-05T01:00:00Z'
+        holderName: Alex Example
+        blockReason: null
+    StaffBlock:
+      summary: Block created by staff
+      value:
+        id: 9c8b7a6f-5e4d-4c3b-8a2f-1e0d9c8b7a6f
+        courtId: 7b9e2d14-5c3a-4f6e-8a1b-2c3d4e5f6a7b
+        kind: BLOCK
+        status: CONFIRMED
+        start: '2026-12-05T13:00:00Z'
+        end: '2026-12-05T14:30:00Z'
+        holderName: null
+        blockReason: Maintenance
+    StaffCancelledBooking:
+      summary: Booking cancelled by staff
+      value:
+        id: 5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d
+        courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+        kind: RESERVATION
+        status: CANCELLED
+        start: '2026-12-05T00:00:00Z'
+        end: '2026-12-05T01:00:00Z'
+        holderName: Alex Example
+        blockReason: null
+    SlotUnavailable:
+      summary: The slot was taken by another booking or block
+      value:
+        type: https://playtodoo.com/problems/slot-unavailable
+        title: Slot unavailable
+        status: 409
+        detail: The requested range overlaps an active booking or block of the court.
+        code: SLOT_UNAVAILABLE
+    OwnOverlapNeedsConfirmation:
+      summary: The player already holds an overlapping booking in this complex
+      value:
+        type: https://playtodoo.com/problems/own-overlap-needs-confirmation
+        title: Overlapping booking of the same player
+        status: 409
+        detail: Retry with acknowledgeOwnOverlap set to true to book anyway.
+        code: OWN_OVERLAP_NEEDS_CONFIRMATION
+        existingBooking:
+          id: 0b8f3c1e-2d4a-4b6c-8e0f-1a2b3c4d5e6f
+          courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+          start: '2026-12-04T23:00:00Z'
+          end: '2026-12-05T00:00:00Z'
+          status: CONFIRMED
+          expiresAt: '2026-12-01T15:05:00Z'
+          createdAt: '2026-12-01T15:00:00Z'
+          confirmedAt: '2026-12-01T15:03:12Z'
+          cancelledAt: null
+    SlotHasBooking:
+      summary: Block rejected because the slot has an active booking
+      value:
+        type: https://playtodoo.com/problems/slot-has-booking
+        title: Slot has an active booking
+        status: 409
+        detail: Cancel the conflicting booking before blocking this slot.
+        code: SLOT_HAS_BOOKING
+        conflictingBookingId: 5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d
+    BookingExpiredProblem:
+      summary: The 5-minute hold ended before confirmation
+      value:
+        type: https://playtodoo.com/problems/booking-expired
+        title: Booking expired
+        status: 409
+        detail: The pending hold ended and the slot was released.
+        code: BOOKING_EXPIRED
+    BookingNotPendingProblem:
+      summary: The booking is no longer pending
+      value:
+        type: https://playtodoo.com/problems/booking-not-pending
+        title: Booking is not pending
+        status: 409
+        detail: Only pending bookings accept this operation.
+        code: BOOKING_NOT_PENDING
