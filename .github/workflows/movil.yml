@@ -1,0 +1,63 @@
+# Flutter app for players: static analysis and tests with a pinned Flutter version.
+name: movil
+
+on:
+  pull_request:
+    paths:
+      - movil/**
+      - .github/workflows/movil.yml
+  push:
+    branches: [main, develop]
+    paths:
+      - movil/**
+      - .github/workflows/movil.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: movil-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.50.1
+
+jobs:
+  movil:
+    name: movil
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: movil
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Detect Flutter project
+        id: project
+        run: |
+          if [ -f pubspec.yaml ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::movil/pubspec.yaml not found: skipping flutter analyze and flutter test until the Flutter project is created."
+          fi
+
+      - uses: subosito/flutter-action@v2
+        if: steps.project.outputs.exists == 'true'
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        if: steps.project.outputs.exists == 'true'
+        run: flutter pub get
+
+      - name: Analyze
+        if: steps.project.outputs.exists == 'true'
+        run: flutter analyze
+
+      - name: Test
+        if: steps.project.outputs.exists == 'true'
+        run: flutter test
