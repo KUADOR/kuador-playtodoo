@@ -39,8 +39,37 @@ Medidas: alto mínimo `size-touch-min`; radio `radius-md`; texto mínimo `font-s
 
 El mensaje de error y la ayuda se asocian al campo (`aria-describedby` en web, `Semantics` en Flutter); el error también se marca con `aria-invalid`.
 
+## Flutter (`movil`)
+
+`movil/lib/shared/ui/app_field.dart`. `AppField.text` usa `TextField` y `AppField.select` usa `DropdownButtonFormField`, los dos con el `InputDecorationTheme` de `AppTheme.light()`.
+
+```dart
+AppField.text(label: 'Correo', keyboardType: TextInputType.emailAddress, onChanged: setEmail);
+AppField.text(label: 'Correo', errorText: 'Ese correo no es válido. Revisa que tenga @.');
+AppField<String>.select(
+  label: 'Deporte',
+  options: const [AppSelectOption(value: 'futbol', label: 'Fútbol')],
+  value: sport,
+  onChanged: setSport,
+);
+```
+
+| Contrato | Flutter |
+|---|---|
+| `kind` | Constructor `AppField.text` o `AppField.select` |
+| `label` | `label`: texto encima del campo (no etiqueta flotante) |
+| `help` | `helperText` |
+| `error` | `errorText`: borde `color-danger` de `border-width-lg`, icono de alerta y mensaje debajo |
+| `disabled` | `enabled: false` (fondo `color-surface-alt`) |
+| `options` | `options: List<AppSelectOption<T>>` |
+| `change` | `onChanged` |
+
+- **Semantics:** la etiqueta, el error y la ayuda forman un solo nodo (`MergeSemantics`): el lector dice «Correo, campo de texto, Ese correo no es válido…». Las copias visibles del error y la ayuda se excluyen para no leerlas dos veces.
+- **Selección:** se usa `DropdownButtonFormField` en lugar de `DropdownMenu` porque acepta el mismo `InputDecoration` (con el error como widget, con su icono), y el campo de texto y el de selección quedan iguales.
+- **Pruebas:** `movil/test/shared/ui/app_field_test.dart` (etiqueta encima; error con borde, icono, mensaje y Semantics; selección que emite el valor; deshabilitado; 44 de alto).
+
 ## Diferencias aceptadas por plataforma
 
 | Plataforma | Diferencia |
 |---|---|
-| `movil` | Teclado en pantalla y selectores nativos |
+| `movil` | Teclado en pantalla del sistema según `keyboardType` (correo, número, teléfono). La selección abre el menú de Material en las dos plataformas. Fecha y hora (fuera de esta tarea) usarán los selectores nativos de cada plataforma |
