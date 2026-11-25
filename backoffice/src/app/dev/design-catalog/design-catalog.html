@@ -1,0 +1,74 @@
+<main class="catalog">
+  <header>
+    <h1>Componentes base</h1>
+    <p class="catalog__intro">
+      Catálogo de desarrollo del backoffice. Cada componente usa solo los tokens de
+      <code>design-system/tokens</code>. Esta página no existe en producción.
+    </p>
+  </header>
+
+  <section aria-labelledby="buttons-title">
+    <h2 id="buttons-title">Botones</h2>
+    <div class="catalog__grid">
+      @for (button of buttons; track button.variant) {
+        <div class="catalog__example">
+          <h3>{{ button.name }}</h3>
+          <div class="catalog__row">
+            <app-button [variant]="button.variant" [label]="button.label" />
+            <app-button [variant]="button.variant" [label]="button.label" [loading]="true" />
+            <app-button [variant]="button.variant" [label]="button.label" [disabled]="true" />
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section aria-labelledby="fields-title">
+    <h2 id="fields-title">Campos</h2>
+    <div class="catalog__grid">
+      <app-field label="Nombre del complejo" placeholder="Ej.: Canchas El Sol" />
+      <app-field label="Subdominio" value="canchaselsol" help="Solo letras minúsculas y números." />
+      <app-field
+        label="Correo de contacto"
+        value="contacto@"
+        error="El correo está incompleto. Escríbelo completo, por ejemplo nombre@dominio.com."
+      />
+      <app-field label="Código del complejo" value="CES-001" [disabled]="true" />
+      <app-field kind="select" label="Plan" placeholder="Elige un plan" [options]="planOptions" />
+      <app-field
+        kind="select"
+        label="Plan de la suscripción"
+        placeholder="Elige un plan"
+        [options]="planOptions"
+        error="Falta el plan. Elige uno para continuar."
+      />
+      <app-field
+        kind="select"
+        label="Plan actual"
+        value="pro"
+        [options]="planOptions"
+        [disabled]="true"
+      />
+    </div>
+  </section>
+
+  <section aria-labelledby="cards-title">
+    <h2 id="cards-title">Tarjetas</h2>
+    <div class="catalog__grid">
+      @for (card of cards; track card.variant) {
+        <div class="catalog__example">
+          <h3>{{ card.name }}</h3>
+          <app-card [variant]="card.variant">
+            <p class="catalog__card-title">{{ card.title }}</p>
+            <p class="catalog__card-detail">{{ card.detail }}</p>
+          </app-card>
+          <app-card [variant]="card.variant" [selected]="true">
+            <p class="catalog__card-title">{{ card.title }}</p>
+            <p class="catalog__card-detail">{{ card.detail }}</p>
+          </app-card>
+          <app-card [variant]="card.variant" [loading]="true" />
+        </div>
+      }
+    </div>
+  </section>
+</main>

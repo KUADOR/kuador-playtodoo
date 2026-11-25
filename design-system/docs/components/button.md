@@ -36,6 +36,36 @@ Medidas: alto mínimo `size-touch-min`; radio `radius-md`; etiqueta en `font-fam
 
 Foco visible con anillo de `border-focus-ring` y separación `border-focus-offset`; activable con Enter y Espacio; nombre accesible = `label`.
 
+## React (`app`)
+
+Ubicación: `app/src/shared/ui/button/Button.tsx` (exportado desde `app/src/shared/ui`). Estilos en `Button.module.css`, solo con `var(--…)`.
+
+```tsx
+import { Button } from '../shared/ui'
+
+<Button label="Reservar cancha" onClick={reserve} />
+<Button variant="secondary" label="Ver horarios" />
+<Button variant="danger" label="Cancelar reserva" loading loadingLabel="Cancelando…" />
+<Button label="Guardar cambios" disabled />
+```
+
+| Contrato | React |
+|---|---|
+| `variant` | `variant` (`primary` por defecto) |
+| `label` | `label` (texto visible y nombre accesible) |
+| `loading` | `loading`; texto `loadingLabel` (por defecto «Guardando…») |
+| `disabled` | `disabled` (atributo nativo: fuera del orden de tabulación) |
+| `press` | `onClick` |
+
+Además acepta los atributos de `<button>` (`type` es `button` por defecto).
+
+- **Cargando:** `aria-busy="true"` y `aria-disabled="true"`; sigue enfocable para no perder el foco del teclado, pero `onClick` no se llama. El spinner (Lucide `LoaderCircle`) no gira con `prefers-reduced-motion`.
+- **Foco:** anillo `color-focus` de `border-focus-ring` separado `border-focus-offset`, con halo `color-focus-halo`, solo con `:focus-visible` (`app/src/shared/ui/a11y.module.css`).
+- **Pulsado del primario:** `color-primary-hover` + sombra interior de `border-width-md` en `color-brand-navy`, provisional hasta definir la sombra exacta.
+- **Pendientes ([POR DEFINIR]):** el pulsado del secundario usa el mismo `color-primary-tint` del hover y el hover de peligro mantiene `color-danger`, hasta que la identidad defina esos tonos.
+- **Pruebas:** `Button.test.tsx` (activación con mouse, Enter y Espacio; deshabilitado; cargando; axe en cada variante × normal, cargando y deshabilitado).
+- **Catálogo:** `pnpm dev` y abrir `/dev/design` (solo en desarrollo).
+
 ## Flutter (`movil`)
 
 `movil/lib/shared/ui/app_button.dart`. Se apoya en `FilledButton` (primario y peligro), `OutlinedButton` (secundario) y `TextButton` (texto) con los estilos de `AppTheme.light()`, para conservar el ripple, la activación con teclado y la semántica nativos.
@@ -67,3 +97,29 @@ const AppButton(label: 'Guardar cambios', onPressed: null); // deshabilitado
 | Plataforma | Diferencia |
 |---|---|
 | `movil` | Ripple de Material al pulsar, en Android y en iOS (no se usa el resaltado de Cupertino). Sin hover: el estado hover solo aplica con puntero |
+
+## Angular (`backoffice`)
+
+Componente standalone `Button` en `backoffice/src/app/shared/ui/button/` (selector `app-button`), con iconos de `@lucide/angular`.
+
+| Contrato | Angular |
+|---|---|
+| `variant`, `label`, `loading`, `disabled` | Entradas con el mismo nombre (`label` es obligatoria) |
+| `press` | Salida `(press)`: solo se emite si no está `loading` ni `disabled` |
+| — | `type` (`button` por defecto · `submit` · `reset`) para usarlo en formularios |
+| — | `loadingLabel` (por defecto «Guardando…»): texto que reemplaza la etiqueta mientras carga |
+
+```html
+<app-button label="Guardar cambios" (press)="save()" />
+<app-button variant="secondary" label="Ver complejo" />
+<app-button variant="danger" label="Suspender complejo" [loading]="saving()" />
+<app-button variant="text" label="Cancelar" [disabled]="true" />
+```
+
+- **Cargando:** spinner `LucideLoaderCircle` (oculto a lectores) + `loadingLabel`; el botón sigue enfocable, con `aria-busy="true"` y `aria-disabled="true"`, y si es `submit` no envía el formulario.
+- **Deshabilitado:** atributo nativo `disabled` (sale del orden de tabulación).
+- **Foco:** `:focus-visible` con anillo `color-focus` de `border-focus-ring` y separación `border-focus-offset`.
+- **Pulsado del primario:** `color-primary-hover` + `inset var(--shadow-card)` como sombra interior.
+- **Sin estilo propio mientras sigan [POR DEFINIR]:** hover del peligro y pulsado del secundario (este usa el mismo `color-primary-tint` del hover).
+- El spinner respeta `prefers-reduced-motion`.
+- Catálogo vivo: `npm start` en `backoffice/` y abrir `/design` (solo en desarrollo). Capturas en `docs/evidence/platodo-20/`.

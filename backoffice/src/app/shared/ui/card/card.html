@@ -1,0 +1,17 @@
+@if (selected()) {
+  <span class="card__selected-mark">
+    <svg lucideCheck [size]="checkIconSize"></svg>
+    <span class="visually-hidden">{{ selectedText }}</span>
+  </span>
+}
+
+@if (loading()) {
+  <div class="card__skeleton">
+    <span class="visually-hidden">{{ loadingText }}</span>
+    <span class="card__skeleton-line card__skeleton-line--title"></span>
+    <span class="card__skeleton-line"></span>
+    <span class="card__skeleton-line card__skeleton-line--short"></span>
+  </div>
+} @else {
+  <ng-content />
+}

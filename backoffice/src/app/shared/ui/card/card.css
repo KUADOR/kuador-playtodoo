@@ -1,0 +1,71 @@
+:host {
+  /* Skeleton proportions and pulse speed: layout choices, not identity tokens. */
+  --card-skeleton-title-width: 60%;
+  --card-skeleton-short-width: 40%;
+  --card-skeleton-pulse-duration: 1.5s;
+
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border: var(--border-width-sm) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  color: var(--color-fg);
+  font-family: var(--font-family-body);
+  line-height: var(--line-height-body);
+}
+
+/* The thicker border is compensated in the padding so the content does not shift. */
+:host(.card--selected) {
+  padding: calc(var(--space-4) - (var(--border-width-lg) - var(--border-width-sm)));
+  border: var(--border-width-lg) solid var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.card__selected-mark {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: inline-flex;
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.card__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.card__skeleton-line {
+  display: block;
+  height: var(--font-size-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-disabled-bg);
+  animation: card-pulse var(--card-skeleton-pulse-duration) ease-in-out infinite;
+}
+
+.card__skeleton-line--title {
+  width: var(--card-skeleton-title-width);
+  height: var(--font-size-lg);
+}
+
+.card__skeleton-line--short {
+  width: var(--card-skeleton-short-width);
+}
+
+@keyframes card-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card__skeleton-line {
+    animation: none;
+  }
+}

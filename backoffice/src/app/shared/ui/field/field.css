@@ -1,0 +1,80 @@
+:host {
+  --field-padding-inline: var(--space-3);
+  --field-border-growth: calc(var(--border-width-lg) - var(--border-width-sm));
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-family: var(--font-family-body);
+  line-height: var(--line-height-body);
+}
+
+.field__label {
+  color: var(--color-fg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.field__control {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--size-touch-min);
+  padding: 0 var(--field-padding-inline);
+  border: var(--border-width-sm) solid var(--color-fg-muted);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.field__control::placeholder {
+  color: var(--color-fg-muted);
+}
+
+/* The thicker border is compensated in the padding so the text does not shift. */
+.field__control:focus,
+.field__control--error {
+  border-width: var(--border-width-lg);
+  padding-inline: calc(var(--field-padding-inline) - var(--field-border-growth));
+}
+
+.field__control:focus {
+  border-color: var(--color-primary);
+}
+
+.field__control:focus-visible {
+  outline: var(--border-focus-ring) solid var(--color-focus);
+  outline-offset: var(--border-focus-offset);
+}
+
+.field__control--error {
+  border-color: var(--color-danger);
+}
+
+.field__control:disabled {
+  background: var(--color-surface-alt);
+  color: var(--color-fg-muted);
+  cursor: not-allowed;
+}
+
+.field__help,
+.field__error {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.field__help {
+  color: var(--color-fg-muted);
+}
+
+.field__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-danger);
+}
+
+.field__error-icon {
+  flex-shrink: 0;
+}
