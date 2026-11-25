@@ -18,6 +18,11 @@ public final class DelegatingPasswordHashes implements PasswordHashes {
     private final String unknownAccountHash = encoder.encode(UUID.randomUUID().toString());
 
     @Override
+    public String hash(String rawPassword) {
+        return encoder.encode(rawPassword);
+    }
+
+    @Override
     public boolean matches(String rawPassword, String passwordHash) {
         return encoder.matches(rawPassword, passwordHash);
     }

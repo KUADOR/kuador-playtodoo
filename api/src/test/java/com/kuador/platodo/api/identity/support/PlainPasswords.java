@@ -8,6 +8,11 @@ public final class PlainPasswords implements PasswordHashes {
     private int unknownAccountChecks;
 
     @Override
+    public String hash(String rawPassword) {
+        return rawPassword;
+    }
+
+    @Override
     public boolean matches(String rawPassword, String passwordHash) {
         return rawPassword.equals(passwordHash);
     }

@@ -1,7 +1,10 @@
 package com.kuador.platodo.api.identity.application.port.out;
 
-/** Verifies passwords against their stored hashes. */
+/** Hashes passwords and verifies them against their stored hashes. */
 public interface PasswordHashes {
+
+    /** The hash to store for {@code rawPassword}; it names its algorithm, so it can be upgraded later. */
+    String hash(String rawPassword);
 
     boolean matches(String rawPassword, String passwordHash);
 
