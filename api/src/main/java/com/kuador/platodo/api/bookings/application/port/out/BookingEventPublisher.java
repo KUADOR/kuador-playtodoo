@@ -3,7 +3,7 @@ package com.kuador.platodo.api.bookings.application.port.out;
 import com.kuador.platodo.api.bookings.domain.event.BookingEvent;
 
 /**
- * Publishes the domain events of the Bookings module. Called inside the transaction that changed the
+ * Announces booking lifecycle changes to other modules. Called inside the transaction that changed the
  * booking, so after-commit listeners only see committed changes.
  */
 public interface BookingEventPublisher {
