@@ -22,6 +22,17 @@ describe('DesignCatalog', () => {
     expect(fields.getAllByText('Ese horario ya fue reservado. Elige otro disponible.')).toHaveLength(2)
   })
 
+  it('shows the booking calendar in every view and state', () => {
+    render(<DesignCatalog />)
+
+    const calendars = within(screen.getByRole('region', { name: 'Calendario de reservas' }))
+    expect(calendars.getAllByRole('grid')).toHaveLength(3)
+    expect(calendars.getByRole('listbox')).toBeInTheDocument()
+    expect(calendars.getByText('Solo lectura')).toBeInTheDocument()
+    expect(calendars.getByText('Cargando horarios…')).toBeInTheDocument()
+    expect(calendars.getByRole('alert')).toHaveTextContent('No pudimos cargar los horarios.')
+  })
+
   it('has no axe violations', async () => {
     const { container } = render(<DesignCatalog />)
 
