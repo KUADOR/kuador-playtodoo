@@ -1,0 +1,71 @@
+/* The selected state uses a 2px border: the padding shrinks by the extra width so the content does not move. */
+.card {
+  position: relative;
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border: var(--border-width-sm) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  color: var(--color-fg);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-body);
+}
+
+.card[data-selected] {
+  padding: calc(var(--space-4) - var(--border-width-lg) + var(--border-width-sm));
+  border: var(--border-width-lg) solid var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.selectedMark {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-3);
+  display: inline-flex;
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.icon {
+  width: var(--font-size-md);
+  height: var(--font-size-md);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonLine {
+  display: block;
+  height: var(--font-size-md);
+  border-radius: var(--radius-md);
+  background: var(--color-disabled-bg);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonTitle {
+  width: 60%;
+  height: var(--font-size-xl);
+}
+
+.skeletonShort {
+  width: 40%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLine {
+    animation: none;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}

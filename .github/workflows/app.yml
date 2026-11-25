@@ -1,0 +1,36 @@
+# CI of the app piece (React · Vite · TypeScript). Runs only when app/ or this workflow changes.
+name: app
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'app/**'
+      - '.github/workflows/app.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'app/**'
+      - '.github/workflows/app.yml'
+permissions:
+  contents: read
+jobs:
+  app:
+    name: app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm test

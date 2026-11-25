@@ -1,0 +1,65 @@
+.page {
+  max-width: var(--size-content-max);
+  margin-inline: auto;
+  padding: var(--space-4);
+}
+
+.hint {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+.section {
+  margin-block-start: var(--space-6);
+}
+
+.row {
+  margin-block-end: var(--space-5);
+}
+
+.rowTitle {
+  margin-block: 0 var(--space-2);
+  font-size: var(--font-size-md);
+}
+
+.states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.stateName {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-xs);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+.cardTitle {
+  margin: 0;
+  padding-inline-end: var(--space-6);
+  font-size: var(--font-size-lg);
+}
+
+.cardDetail {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* 768px: first breakpoint where two columns fit with 16px gaps. */
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

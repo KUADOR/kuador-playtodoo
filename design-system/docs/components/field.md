@@ -39,6 +39,35 @@ Medidas: alto mínimo `size-touch-min`; radio `radius-md`; texto mínimo `font-s
 
 El mensaje de error y la ayuda se asocian al campo (`aria-describedby` en web, `Semantics` en Flutter); el error también se marca con `aria-invalid`.
 
+## React (`app`)
+
+Ubicación: `app/src/shared/ui/field/Field.tsx` (exportado desde `app/src/shared/ui`). Estilos en `Field.module.css`, solo con `var(--…)`.
+
+```tsx
+import { Field } from '../shared/ui'
+
+<Field kind="text" label="Nombre del complejo" help="Así lo verán los jugadores." value={name} onChange={(e) => setName(e.target.value)} />
+<Field kind="text" label="Horario" value={time} error="Ese horario ya fue reservado. Elige otro disponible." />
+<Field kind="select" label="Cancha" placeholder="Elige una cancha" options={[{ value: 'court-1', label: 'Cancha 1' }]} />
+<Field kind="select" label="Cancha" options={courts} disabled />
+```
+
+| Contrato | React |
+|---|---|
+| `kind` | `kind` (`text` → `<input>`, `select` → `<select>`) |
+| `label`, `help`, `error`, `disabled` | Mismos nombres |
+| `options` | `options: { value, label }[]`; `placeholder` opcional agrega una primera opción vacía |
+| `change` | `onChange` nativo del control |
+
+Además acepta los atributos del `<input>` o del `<select>` (`value`, `defaultValue`, `name`, `placeholder`, `required`…), salvo `id`, `aria-describedby`, `aria-invalid` y `disabled`, que maneja el componente.
+
+- **Asociación:** `<label for>` con un `id` de `useId`; ayuda y error se enlazan con `aria-describedby` (primero la ayuda, después el error) y el error marca `aria-invalid="true"`.
+- **Error:** borde `color-danger` de `border-width-lg`, icono Lucide `CircleAlert` (decorativo, `aria-hidden`) y mensaje en `color-danger`.
+- **Foco:** borde `color-primary` de `border-width-lg` + anillo `color-focus` con halo.
+- **Texto:** `font-size-md` en el control (también evita el zoom del navegador móvil); etiqueta, ayuda y error en `font-size-sm`.
+- **Pruebas:** `Field.test.tsx` (etiqueta, cambios, ayuda, error asociado, ids únicos, deshabilitado; axe en cada estado de texto y de selección).
+- **Catálogo:** `/dev/design`, sección «Campo».
+
 ## Diferencias aceptadas por plataforma
 
 | Plataforma | Diferencia |
