@@ -15,8 +15,6 @@ enum IdentityProblem {
             "The e-mail or the password is not valid."),
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "unauthenticated", "Authentication required",
             "A valid access token is required."),
-    ACCESS_SESSION_INVALID(HttpStatus.FORBIDDEN, "access-session-invalid", "Access session invalid",
-            "A valid access session for this complex is required."),
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "invalid-request", "Invalid request",
             "Malformed body or parameters.");
 

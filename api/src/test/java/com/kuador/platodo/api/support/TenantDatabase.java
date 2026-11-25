@@ -24,8 +24,14 @@ public final class TenantDatabase {
     private static final String POSTGRES_IMAGE = "postgres:18-alpine";
     private static final Path EXTENSIONS_SCRIPT = Path.of("docker/postgres/initdb/01-extensions.sql");
     private static final String EXTENSIONS_SCHEMA = "extensions";
+    /**
+     * Every cached test application context keeps its own connection pool open on this one server, so the default
+     * limit of 100 connections is not enough for the whole suite.
+     */
+    private static final String MAX_CONNECTIONS = "max_connections=300";
 
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(POSTGRES_IMAGE)
+            .withCommand("postgres", "-c", "fsync=off", "-c", MAX_CONNECTIONS)
             .withCopyFileToContainer(
                     MountableFile.forHostPath(EXTENSIONS_SCRIPT),
                     "/docker-entrypoint-initdb.d/" + EXTENSIONS_SCRIPT.getFileName());

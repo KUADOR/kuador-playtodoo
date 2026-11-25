@@ -6,8 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 
 /**
- * Problem Details answered by Tenancy ({@code contracts/tenancy.openapi.yaml}). Title and detail are developer-facing;
- * clients map {@code code} to the text shown to people. Details never name the host, the state or personal data.
+ * Problem Details answered by Tenancy: tenant resolution, the platform access guard, the lifecycle and the subdomain
+ * operations ({@code contracts/tenancy.openapi.yaml}). Title and detail are developer-facing; clients map {@code code}
+ * to the text shown to people. Details never name the host, the state or personal data.
  */
 enum TenancyProblem {
 
@@ -39,7 +40,9 @@ enum TenancyProblem {
     RETENTION_EXPIRED(HttpStatus.CONFLICT, "retention-expired", "Retention expired",
             "The purge date has passed; the complex can no longer be reactivated."),
     RETENTION_INVALID(HttpStatus.UNPROCESSABLE_CONTENT, "retention-invalid", "Invalid retention",
-            "The resulting purge date must be in the future.");
+            "The resulting purge date must be in the future."),
+    ACCESS_SESSION_INVALID(HttpStatus.FORBIDDEN, "access-session-invalid", "Access session invalid",
+            "A valid access session for this complex is required.");
 
     private static final String TYPE_BASE = "https://playtodoo.com/problems/";
     private static final String CODE = "code";

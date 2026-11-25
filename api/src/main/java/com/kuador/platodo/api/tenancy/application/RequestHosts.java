@@ -26,6 +26,11 @@ public final class RequestHosts {
         this.rootSuffix = LABEL_SEPARATOR + normalize(rootDomain);
     }
 
+    /** Host of the complex whose current subdomain is {@code subdomain}: {@code <subdomain>.<root domain>}. */
+    public String tenantHost(String subdomain) {
+        return subdomain + rootSuffix;
+    }
+
     public RequestHost classify(String host) {
         if (host == null) {
             return new RequestHost.Foreign();

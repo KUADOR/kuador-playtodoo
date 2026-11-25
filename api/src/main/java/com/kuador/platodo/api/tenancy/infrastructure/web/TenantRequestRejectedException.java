@@ -1,6 +1,9 @@
 package com.kuador.platodo.api.tenancy.infrastructure.web;
 
-/** Tenant resolution refused a request before any handler ran; {@link TenancyProblemHandler} answers it. */
+/**
+ * Tenant resolution or the platform access guard refused a request before its handler ran;
+ * {@link TenancyProblemHandler} answers it.
+ */
 final class TenantRequestRejectedException extends RuntimeException {
 
     private final TenancyProblem problem;

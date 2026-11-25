@@ -83,14 +83,25 @@ class AuthenticateRequestTest {
         assertThat(onHostOf(A, token)).isEqualTo(new Rejected(Reason.UNAUTHENTICATED));
     }
 
+    /** On the host of a complex the access session is checked afterwards by Tenancy's PlatformAccessGuard. */
     @Test
-    void platformTokenIsAcceptedOnlyOnTheGlobalHost() {
+    void platformTokenIsAcceptedOnEveryHostWhileTheAccountIsActive() {
         AuthenticatedPrincipal owner = AuthenticatedPrincipal.global(
                 platformUsers.add("o@example.com", "x", "PLATFORM_OWNER"), AccountType.PLATFORM, "PLATFORM_OWNER");
         String token = tokens.issue(owner).value();
 
         assertThat(authenticateRequest.authenticate(token)).isEqualTo(new Authenticated(owner));
-        assertThat(onHostOf(A, token)).isEqualTo(new Rejected(Reason.ACCESS_SESSION_INVALID));
+        assertThat(onHostOf(A, token)).isEqualTo(new Authenticated(owner));
+    }
+
+    @Test
+    void platformTokenOfADisabledAccountIsRejectedOnTheHostOfAComplex() {
+        UUID ownerId = platformUsers.add("d@example.com", "x", "PLATFORM_OWNER");
+        String token = tokens.issue(AuthenticatedPrincipal.global(ownerId, AccountType.PLATFORM, "PLATFORM_OWNER"))
+                .value();
+        platformUsers.disable(ownerId);
+
+        assertThat(onHostOf(A, token)).isEqualTo(new Rejected(Reason.UNAUTHENTICATED));
     }
 
     @Test

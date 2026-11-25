@@ -7,12 +7,18 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.web.servlet.HandlerExceptionResolver;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import com.kuador.platodo.api.tenancy.application.RequestHosts;
 import com.kuador.platodo.api.tenancy.application.ResolveTenant;
+import com.kuador.platodo.api.tenancy.application.port.out.PlatformAccessAuthorization;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantDomains;
 
-/** Tenant resolution by subdomain for every api request (ADR-002, ADR-012). */
+/**
+ * Tenant resolution by subdomain for every api request (ADR-002, ADR-012), the guard of Kuador access to a complex
+ * and the CORS of the api (ADR-011).
+ */
 @Configuration(proxyBeanMethods = false)
 class TenancyWebConfiguration {
 
@@ -23,6 +29,7 @@ class TenancyWebConfiguration {
     static final int FILTER_ORDER = Ordered.HIGHEST_PRECEDENCE + 10;
 
     private static final String API_URL_PATTERN = TenancyApiPaths.API + "/*";
+    private static final String API_PATH_PATTERN = TenancyApiPaths.API + "/**";
     private static final String HANDLER_EXCEPTION_RESOLVER = "handlerExceptionResolver";
 
     @Bean
@@ -49,5 +56,21 @@ class TenancyWebConfiguration {
         registration.addUrlPatterns(API_URL_PATTERN);
         registration.setOrder(FILTER_ORDER);
         return registration;
+    }
+
+    @Bean
+    WebMvcConfigurer platformAccessGuard(PlatformAccessAuthorization authorization) {
+        PlatformAccessGuard guard = new PlatformAccessGuard(authorization);
+        return new WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(InterceptorRegistry registry) {
+                registry.addInterceptor(guard).addPathPatterns(API_PATH_PATTERN);
+            }
+        };
+    }
+
+    @Bean
+    WebMvcConfigurer backofficeCors(@Value("${playtodoo.cors.backoffice-origin}") String backofficeOrigin) {
+        return new BackofficeCors(backofficeOrigin);
     }
 }
