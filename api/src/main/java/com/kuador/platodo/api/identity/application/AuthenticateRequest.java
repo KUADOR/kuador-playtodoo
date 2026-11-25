@@ -18,14 +18,14 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantScope;
  *   <li>{@code STAFF}: only on the host of its own complex ({@code tid} = resolved tenant) and while the account is
  *       active there. Elsewhere, the global host included, it is not accepted.</li>
  *   <li>{@code PLAYER}: on every host, while the global account is active.</li>
- *   <li>{@code PLATFORM}: on the global host while the account is active. On the host of a complex it needs an
- *       access session, which this version does not grant yet (ADR-011), so it is refused.</li>
+ *   <li>{@code PLATFORM}: on every host while the account is active. On the host of a complex the request still
+ *       needs a valid access session: Tenancy's {@code PlatformAccessGuard} checks and audits it before the handler
+ *       runs (ADR-011).</li>
  * </ul>
  */
 public final class AuthenticateRequest {
 
     private static final RequestAuthentication UNAUTHENTICATED = new Rejected(Reason.UNAUTHENTICATED);
-    private static final RequestAuthentication ACCESS_SESSION_INVALID = new Rejected(Reason.ACCESS_SESSION_INVALID);
 
     private final AccessTokens tokens;
     private final AccountDirectory staff;
@@ -53,9 +53,7 @@ public final class AuthenticateRequest {
                     ? activeIn(staff, principal)
                     : UNAUTHENTICATED;
             case PLAYER -> activeIn(players, principal);
-            case PLATFORM -> hostTenant.isPresent()
-                    ? ACCESS_SESSION_INVALID
-                    : activeIn(platformUsers, principal);
+            case PLATFORM -> activeIn(platformUsers, principal);
         };
     }
 

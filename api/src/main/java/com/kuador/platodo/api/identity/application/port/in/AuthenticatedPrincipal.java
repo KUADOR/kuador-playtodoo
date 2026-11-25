@@ -17,6 +17,9 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
  */
 public record AuthenticatedPrincipal(UUID accountId, AccountType type, TenantId tenant, String role) {
 
+    /** The only Kuador role that may reach the data of a complex (ADR-003). */
+    public static final String PLATFORM_OWNER_ROLE = "PLATFORM_OWNER";
+
     public AuthenticatedPrincipal {
         Objects.requireNonNull(accountId, "accountId");
         Objects.requireNonNull(type, "type");
@@ -41,5 +44,10 @@ public record AuthenticatedPrincipal(UUID accountId, AccountType type, TenantId 
 
     public boolean is(AccountType expected) {
         return type == expected;
+    }
+
+    /** Whether this is a Kuador account with the {@value #PLATFORM_OWNER_ROLE} role. */
+    public boolean isPlatformOwner() {
+        return type == AccountType.PLATFORM && PLATFORM_OWNER_ROLE.equals(role);
     }
 }
