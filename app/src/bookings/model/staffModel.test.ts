@@ -3,7 +3,7 @@ import type { StaffBooking } from '../api/staffBookingsApi'
 import { slotStartsOf } from './court'
 import type { Court } from './court'
 import { buildSchedule, dayQuery, entryStateOf } from './staffSchedule'
-import { submitErrorTexts } from './staffText'
+import { errorText, submitErrorTexts } from './staffText'
 import { toInstant, toLocal } from './zonedTime'
 
 const COURT: Court = { id: 'court-1', name: 'Cancha 1', slotDurationMinutes: 60, opensAt: '18:00', closesAt: '22:00' }
@@ -120,5 +120,12 @@ describe('submitErrorTexts', () => {
 
   it('puts any other failure over the form', () => {
     expect(submitErrorTexts('NETWORK_ERROR')).toEqual({ form: 'Revisa tu conexión e inténtalo de nuevo.' })
+  })
+})
+
+describe('errorText for missing resources', () => {
+  it.each(['BOOKING_NOT_FOUND', 'COURT_NOT_FOUND'] as const)('%s uses the generic not-found message', (code) => {
+    expect(errorText(code)).toMatch(/^No encontramos lo que buscas\./)
+    expect(errorText(code)).not.toMatch(/complejo/i)
   })
 })
