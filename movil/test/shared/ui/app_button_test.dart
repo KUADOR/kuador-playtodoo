@@ -38,6 +38,38 @@ void main() {
         handle.dispose();
       });
 
+      testWidgets('keeps the variant colors while loading', (tester) async {
+        Material buttonMaterial() => tester.widget<Material>(
+          find
+              .descendant(
+                of: find.byType(AppButton),
+                matching: find.byType(Material),
+              )
+              .first,
+        );
+
+        await pumpThemed(
+          tester,
+          AppButton(label: label, variant: variant, onPressed: () {}),
+        );
+        final idle = buttonMaterial();
+
+        await pumpThemed(
+          tester,
+          AppButton(
+            label: label,
+            variant: variant,
+            isLoading: true,
+            onPressed: () {},
+          ),
+        );
+        final loading = buttonMaterial();
+
+        expect(loading.color, idle.color);
+        expect(loading.textStyle?.color, idle.textStyle?.color);
+        expect(loading.shape, idle.shape);
+      });
+
       testWidgets('calls onPressed when tapped', (tester) async {
         var taps = 0;
         await pumpThemed(

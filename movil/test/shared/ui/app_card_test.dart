@@ -49,6 +49,17 @@ void main() {
       expect(border.top.color, AppTokens.colorPrimary);
       expect(border.top.width, AppTokens.borderWidthLg);
       expect(checkIcon, findsOneWidget);
+      expect(tester.widget<AppIcon>(checkIcon).color, AppTokens.colorOnPrimary);
+      final badge = tester.widget<DecoratedBox>(
+        find.ancestor(of: checkIcon, matching: find.byType(DecoratedBox)).first,
+      );
+      expect(
+        badge.decoration,
+        const ShapeDecoration(
+          color: AppTokens.colorPrimary,
+          shape: CircleBorder(),
+        ),
+      );
       expect(
         tester.getSemantics(find.byType(AppCard)),
         isSemantics(label: content, isSelected: true, isButton: true),

@@ -64,7 +64,7 @@ class AppCard extends StatelessWidget {
           ),
           if (selected) ...[
             const SizedBox(width: AppTokens.space2),
-            AppIcon(AppIcons.check, color: scheme.primary),
+            const _SelectedMark(),
           ],
         ],
       ),
@@ -102,6 +102,29 @@ class AppCard extends StatelessWidget {
       selected: selected,
       button: onTap != null,
       child: card,
+    );
+  }
+}
+
+/// Check on a primary circle, the same selected mark as the web cards.
+class _SelectedMark extends StatelessWidget {
+  const _SelectedMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DecoratedBox(
+      decoration: ShapeDecoration(
+        color: AppTokens.colorPrimary,
+        shape: CircleBorder(),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(AppTokens.space1),
+        child: AppIcon(
+          AppIcons.check,
+          size: AppTokens.fontSizeMd,
+          color: AppTokens.colorOnPrimary,
+        ),
+      ),
     );
   }
 }
