@@ -1,0 +1,287 @@
+/* BookingCalendar: values come only from design tokens (calendar.md · Estados). Mobile first. */
+
+.calendar {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-family: var(--font-family-body);
+  color: var(--color-fg);
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.controls,
+.navigation,
+.viewSwitcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.controls {
+  justify-content: space-between;
+}
+
+.icon {
+  flex-shrink: 0;
+  width: var(--font-size-md);
+  height: var(--font-size-md);
+}
+
+.readonlyNotice {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.message {
+  margin: 0;
+  color: var(--color-fg-muted);
+}
+
+.summary {
+  display: block;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-regular);
+}
+
+.today {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-accent-strong);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.todayDot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-strong);
+}
+
+/* Slot: the same look in the day and week views. */
+.slot {
+  min-width: var(--size-touch-min);
+  height: var(--size-touch-min);
+  min-height: var(--size-touch-min);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width-sm) solid transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.slot[data-status='available'] {
+  background: var(--color-accent-tint);
+  border-color: var(--color-accent-strong);
+  color: var(--color-brand-navy);
+}
+
+.slot[data-status='occupied'] {
+  background: var(--color-occupied-bg);
+  color: var(--color-fg-muted);
+  cursor: not-allowed;
+}
+
+.slot[data-status='selected'] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* Hover only where there is an action: never on occupied slots nor in readonly. */
+.slot[data-selectable] {
+  cursor: pointer;
+}
+
+.slot[data-status='available'][data-selectable]:hover {
+  box-shadow: inset 0 0 0 var(--border-width-sm) var(--color-accent-strong);
+}
+
+.slotContent {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.slotTime,
+.slotState {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+/* Day view */
+.day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.daySummary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+.slotList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(3 * var(--size-touch-min)), 1fr));
+  gap: var(--space-2);
+}
+
+.slotList .slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+}
+
+/* Week and month views: tables that scroll sideways on narrow screens. */
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: calc(7 * var(--size-touch-min));
+  border-collapse: separate;
+  border-spacing: var(--space-1);
+  table-layout: fixed;
+}
+
+.columnHeader {
+  padding: var(--space-1);
+  color: var(--color-brand-navy);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  vertical-align: top;
+}
+
+.columnTitle {
+  display: block;
+}
+
+/* A week column fits a full slot label (`18:00–19:00`) and its state; narrower screens scroll sideways. */
+.weekTable {
+  min-width: calc(7 * 3 * var(--size-touch-min));
+}
+
+/* A month day fits «Sin horarios» on two lines; narrower screens scroll sideways. */
+.monthTable {
+  min-width: calc(7 * 2 * var(--size-touch-min));
+}
+
+.timeHeader,
+.rowHeader {
+  width: calc(1.5 * var(--size-touch-min));
+}
+
+.rowHeader {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-align: end;
+}
+
+.emptyCell {
+  padding: 0;
+}
+
+.monthDay {
+  height: var(--size-touch-min);
+  min-width: var(--size-touch-min);
+  padding: var(--space-1);
+  border: var(--border-width-sm) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  text-align: center;
+  vertical-align: top;
+  cursor: pointer;
+}
+
+.monthDay:hover {
+  background: var(--color-primary-tint);
+}
+
+.dayNumber {
+  display: block;
+  color: var(--color-brand-navy);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Loading and error states */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonRow {
+  display: block;
+  height: var(--size-touch-min);
+  border-radius: var(--radius-md);
+  background: var(--color-disabled-bg);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonRow {
+    animation: none;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 768px: the toolbar fits on one line next to the title (same breakpoint as the design catalog grid). */
+@media (min-width: 768px) {
+  .toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .controls {
+    gap: var(--space-4);
+  }
+}

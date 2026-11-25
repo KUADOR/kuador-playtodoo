@@ -125,3 +125,34 @@ Forma de `expected`:
 ```
 
 En `week` la clave `day` se reemplaza por `week: { columns, rows, cells }` y en `month` por `month: { weekdayHeaders, weeks }`. Los tres casos de 30, 60 y 90 min muestran el mismo día de complejos distintos: es la prueba a nivel de componente de que la duración de franja de cada complejo se respeta.
+
+## React (`app`)
+
+Ubicación: `app/src/shared/ui/booking-calendar/` (exportado desde `app/src/shared/ui`). Estilos en `BookingCalendar.module.css`, solo con `var(--…)`. Las reglas de presentación viven en funciones puras (`calendarModel.ts`, `calendarText.ts`, `calendarDates.ts`) que producen la forma de `expected`; el componente solo las pinta.
+
+```tsx
+import { BookingCalendar } from '../shared/ui'
+
+<BookingCalendar
+  slotDurationMinutes={60}
+  days={days}
+  today="2026-12-02"
+  selected={selected}
+  status={status}
+  onSelectionChange={setSelected}
+  onRangeChange={loadDays}
+  onRetry={reload}
+/>
+```
+
+| Contrato | React |
+|---|---|
+| `slotDurationMinutes`, `days`, `today`, `selected`, `mode`, `status` | Mismo nombre (`mode` por defecto `editable`, `status` por defecto `ready`, `selected` controlado por la pantalla) |
+| `view` / `initialView` | `initialView` (por defecto `week`); luego la vista la cambia la persona |
+| `selectionChange` · `rangeChange` · `retry` | `onSelectionChange` · `onRangeChange` · `onRetry` |
+
+- **Vistas:** `day` es un `listbox` de selección única (`option` con `aria-selected` y `aria-disabled` en ocupadas); `week` y `month` son `grid` (tablas con `gridcell`). En `readonly`, `aria-readonly="true"`.
+- **Teclado:** roving tabindex en las tres vistas: una sola celda en el orden de tabulación (la seleccionada, si no la de hoy, si no la primera). Flechas izquierda y derecha en orden de lectura, arriba y abajo por la misma columna (saltan los días sin esa franja), Inicio y Fin. Enter o Espacio seleccionan; en el mes abren la vista diaria de ese día.
+- **Navegación:** botones «Día/Semana/Mes anterior» y «… siguiente» y el selector de vista (`aria-pressed`); se deshabilitan con `status: loading`. En `readonly` se puede navegar (emite `rangeChange` para cargar datos), pero activar franjas no emite nada.
+- **Contenedor:** `role="group"` con el título como nombre (no es un landmark, para que una pantalla pueda mostrar varios calendarios).
+- **Pantallas angostas:** las vistas semanal y mensual se desplazan horizontalmente cuando no caben.
