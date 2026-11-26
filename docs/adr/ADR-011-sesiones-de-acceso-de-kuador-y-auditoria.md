@@ -5,6 +5,24 @@
 - **Épica:** PLATODO-26 · Aislamiento de datos por complejo (decisiones D6, D7 y D12 del diseño de la solución).
 - **Detalla:** ADR-003 (acceso de Kuador con motivo y auditoría).
 - **Contrato:** `contracts/tenancy.openapi.yaml` (etiqueta «Platform access»).
+- **Ajustado por:** ADR-017 y ADR-020 (PLATODO-27, 2026-11-26).
+
+## Ajustes de PLATODO-27
+
+Lo que sigue en este ADR vale salvo estos puntos, que mandan:
+
+| Punto | Antes | Ahora |
+|---|---|---|
+| Quién abre la sesión | Solo `PLATFORM_OWNER` | `SUPER_ADMIN`, y `OPERATOR` con la capacidad `TENANT_DATA_ACCESS` (ADR-017). `PLATFORM_OWNER` se migra a `SUPER_ADMIN` |
+| Estados del complejo | Solo `ACTIVE` (los demás respondían «no disponible») | `ACTIVE` para ambos roles; `SUSPENDED` y `ARCHIVED` solo para `SUPER_ADMIN`, con lectura y edición (ADR-020) |
+| Nombre y rutas | Sesión de acceso: `POST /api/v1/platform/tenants/{tenantId}/access-sessions`, `DELETE /api/v1/platform/access-sessions/{id}` | Sesión de soporte: `POST /api/v1/platform/complexes/{complexId}/support-sessions`, `DELETE /api/v1/platform/support-sessions/{sessionId}` (`contracts/platform-backoffice.openapi.yaml`) |
+| Cabecera | `X-Platform-Access-Session` | `X-Support-Session` |
+| Error de sesión | `403 ACCESS_SESSION_INVALID` | `403 SUPPORT_SESSION_INVALID`; al abrir en un estado no permitido, `403 TENANT_NOT_ACCESSIBLE` |
+| Motivo | Texto no vacío | 1 a 500 caracteres, no solo espacios |
+| Auditoría | Método, plantilla de ruta, resultado, quién, cuándo y motivo | Además `operationId` y código de denegación; retención de 365 días; consulta en `GET /complexes/{complexId}/audit-entries` solo para `SUPER_ADMIN` |
+| Purga | — | Al pasar a `PURGING` se invalidan las sesiones abiertas |
+
+Se mantienen: sesión ligada a un tenant y a una persona, 30 minutos configurables, acceso por el host del complejo, auditoría síncrona antes de ejecutar con falla cerrada, plantilla de ruta en vez de ruta concreta y CORS limitado al `backoffice`.
 
 ## Contexto
 

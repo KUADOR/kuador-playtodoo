@@ -4,6 +4,22 @@
 - **Fecha:** 2026-11-25
 - **Épica:** PLATODO-26 · Aislamiento de datos por complejo (decisiones D8, D9, D10 y D11 del diseño de la solución).
 - **Contrato:** `contracts/tenancy.openapi.yaml` (etiqueta «Platform tenants»).
+- **Ajustado por:** ADR-014, ADR-015 y ADR-016 (PLATODO-27, 2026-11-26).
+
+## Ajustes de PLATODO-27
+
+Lo que sigue en este ADR vale salvo estos puntos, que mandan:
+
+| Punto | Antes | Ahora |
+|---|---|---|
+| Quién cambia el estado | Kuador cambia el tenant directamente (`suspend`, `activate`, `archive`, `reactivate`) | Kuador cambia la suscripción y Tenancy aplica el efecto de forma síncrona (ADR-014). Las operaciones directas quedan `deprecated` |
+| Estados | `PROVISIONING → ACTIVE ⇄ SUSPENDED`, `ACTIVE \| SUSPENDED → ARCHIVED`, `ARCHIVED → ACTIVE`, `ARCHIVED → PURGING → PURGED` | `PROVISIONING → ACTIVE \| PROVISIONING_FAILED`, `PROVISIONING_FAILED → PROVISIONING` (reintento), `ACTIVE ⇄ SUSPENDED` (reactivar solo antes del plazo), `ACTIVE \| SUSPENDED → ARCHIVED`, `SUSPENDED \| ARCHIVED → PURGING → PURGED`. **`ARCHIVED` ya no se reactiva**: la suscripción cancelada es terminal |
+| Plazo de conservación | Solo al archivar, desde `archived_at` | También al suspender, desde `suspended_at`. Si un suspendido se cancela, conserva su `purge_due_at`. Se cambia en `SUSPENDED` y `ARCHIVED` con `PUT /complexes/{complexId}/retention` (solo `SUPER_ADMIN`). Parámetro `retention.default-days` (45) |
+| Purga | Solo `ARCHIVED` vencidos | `SUSPENDED` o `ARCHIVED` vencidos, automática (ADR-015); al pasar a `PURGING` se invalidan las sesiones de soporte |
+| Respuesta del host | `SUSPENDED` y `ARCHIVED`: `403 TENANT_UNAVAILABLE` para todos | Igual, salvo una sesión de soporte válida de un `SUPER_ADMIN` para ese tenant (ADR-020); `PROVISIONING_FAILED` responde como `PROVISIONING` |
+| Qué se borra | Esquema; se conservan tenant, auditoría, suscripción y pagos sin datos personales | Además se borra la fila de `complex_catalog` y se redacta `owner_email`; historial y auditoría se conservan 365 días (ADR-016) |
+
+Se mantienen: `SKIP LOCKED`, nombre de esquema validado, idempotencia, correo al propietario por `notification_outbox` y listeners síncronos de `TenantPurged` dentro de la transacción de purga.
 
 ## Contexto
 

@@ -1,0 +1,2752 @@
+openapi: 3.1.0
+info:
+  title: Playtodoo Platform Backoffice API
+  version: 1.0.0
+  summary: Complexes, plans, subscriptions, payments, operator capabilities and audited support access for the Kuador backoffice.
+  description: |
+    Contract of the platform operations used by `backoffice` (epic PLATODO-27; ADR-014 to ADR-020,
+    which adjust ADR-011 and ADR-013). Modules: **Plans and subscriptions**, **Identity and access**,
+    **Support access**, **Audit** and **Tenancy**.
+
+    **Host and base path.** Global host only (`api.playtodoo.com`), base `/api/v1/platform`, the
+    same base used by the platform operations of `tenancy.openapi.yaml`. A request to a tenant host
+    answers `404`. The root domain is configurable per environment (`playtodoo.root-domain`).
+
+    **Authentication.** Bearer access token issued by `POST /auth/platform/login`
+    (`tenancy.openapi.yaml`), with `typ = PLATFORM` and `role` `SUPER_ADMIN` or `OPERATOR`.
+    `STAFF` and `PLAYER` tokens answer `403 FORBIDDEN` on every operation of this contract.
+
+    **Authorization (ADR-017).** Evaluated by the `api` on every request; the `backoffice` only hides
+    what the caller cannot do.
+    - `SUPER_ADMIN`: every operation.
+    - `OPERATOR`: reads the complex list, detail, payments and history, plus the operations guarded
+      by a capability that the `SUPER_ADMIN` enabled: `COMPLEX_CREATE`,
+      `SUBSCRIPTION_PAYMENT_RECORD`, `SUBSCRIPTION_STATUS_CHANGE` and `TENANT_DATA_ACCESS`. All are
+      disabled initially.
+    - Operations marked **SUPER_ADMIN only** answer `403 FORBIDDEN` to an `OPERATOR`. Operations
+      guarded by a capability the operator does not have (or no longer has) answer
+      `403 CAPABILITY_REVOKED`; the change applies to the next request.
+
+    **Complex id.** A complex is identified by its tenant id (`complexId` = `tenantId` of
+    `tenancy.openapi.yaml`). Subdomain availability while registering a complex uses the public
+    `GET /subdomains/{subdomain}/availability` of `tenancy.openapi.yaml`.
+
+    **Optimistic concurrency.** Every mutation on a complex, on the operator capabilities and on a
+    plan or plan field carries the `version` the caller read. If it no longer matches, the `api`
+    answers `409 STALE_STATE` and changes nothing.
+
+    **Subscription and tenant lifecycle (ADR-014).** The commercial status of the subscription and
+    the lifecycle status of the tenant are separate. Status changes are always manual:
+
+    | From | To | Effect on the tenant |
+    |---|---|---|
+    | (registration) | `ACTIVE` | Tenant becomes `ACTIVE` when its schema is created and migrated |
+    | `ACTIVE`, `EXPIRING` | `EXPIRING` | None |
+    | `EXPIRING` | `ACTIVE` | None |
+    | `ACTIVE`, `EXPIRING` | `SUSPENDED` | Tenant `SUSPENDED`, `purgeDueAt = suspendedAt + retentionDays` |
+    | `ACTIVE`, `EXPIRING` | `CANCELLED` | Tenant `ARCHIVED`, `purgeDueAt = archivedAt + retentionDays` |
+    | `SUSPENDED` | `ACTIVE` | Only while `now < purgeDueAt`; tenant `ACTIVE`, retention cleared |
+    | `SUSPENDED` | `CANCELLED` | Tenant `ARCHIVED`, keeps the `purgeDueAt` that was running |
+    | `CANCELLED` | none | Terminal: a cancelled subscription is never reactivated |
+
+    When `purgeDueAt` is reached the purge job deletes the complex schema automatically (ADR-015,
+    ADR-016): the tenant goes `PURGING` then `PURGED`. Subscription, payments, history and audit are
+    kept (history and audit for 365 days).
+
+    **Support on the complex host (ADR-020).** A support session opened here with a reason grants
+    access to the existing staff operations of `bookings.openapi.yaml` on
+    `{subdomain}.playtodoo.com/api/v1`, sending the platform bearer token plus the header
+    `X-Support-Session: <sessionId>`. The tenant is still resolved from the subdomain (ADR-002):
+    - The session must be open, not expired, belong to the caller and to the resolved tenant, and
+      the caller's role must still allow the current tenant status; otherwise
+      `403 SUPPORT_SESSION_INVALID`.
+    - `ACTIVE` tenant: `SUPER_ADMIN`, or `OPERATOR` with `TENANT_DATA_ACCESS`; read and write.
+    - `SUSPENDED` or `ARCHIVED` tenant: only `SUPER_ADMIN`; read and write (query, create, block and
+      cancel). Every booking returned there carries `inactive: true` (ADR-019).
+    - `PROVISIONING`, `PROVISIONING_FAILED`, `PURGING` and `PURGED`: never accessible; open sessions
+      are invalidated when the tenant enters `PURGING`.
+    - Every request under a session, allowed or denied, is audited synchronously before it runs
+      with its `operationId`, method and route template (never the concrete path or query string).
+
+    **Verified while writing this contract (PLATODO-81).**
+    - Migrations: Flyway (ADR-009), global set in `api/src/main/resources/db/migration/global`
+      (V1 to V5 today) and tenant set in `.../tenant`.
+    - Courts and valid slots for support: **there is no endpoint** to list the courts of a complex
+      or its valid slots, on the tenant host or elsewhere. The Courts and Availability modules do
+      not exist yet: `CourtSlotRules` is the fail-closed `UnconfiguredCourtSlotRules`, so every
+      court is reported as not found. Support can read bookings and blocks
+      (`GET /staff/bookings`, which returns `courtId`) and cancel them; creating bookings or blocks
+      answers `404 COURT_NOT_FOUND` until a Courts module exists. Adding courts is out of the scope
+      of PLATODO-27 (internal configuration of the complex); see the risk noted in ADR-020.
+
+    **Errors.** Problem Details (RFC 9457, `application/problem+json`) with a stable `code`. The
+    `backoffice` maps `code` to the Spanish text of «Pantallas»; `title` and `detail` are for
+    developers and never contain personal data. Field validation answers
+    `422 VALIDATION_FAILED` with `fieldErrors`. A malformed body or parameter answers
+    `400 INVALID_REQUEST`.
+
+    **Pagination.** `page` (zero-based) and `size` (default 20, maximum 100). Responses carry
+    `items`, `page`, `size` and `totalItems`.
+
+    **Dates.** Instants in UTC, ISO-8601. `paidOn` is a date without time. Display time zone:
+    [POR DEFINIR: launch country].
+
+    **Money.** Amounts are decimal strings (up to 15 integer digits and 4 decimals) to avoid
+    floating point. Allowed currencies and periodicities come from `GET /plan-options`
+    ([POR DEFINIR: values]).
+  contact:
+    name: Kuador
+servers:
+  - url: https://api.playtodoo.com/api/v1/platform
+    description: Global context (no tenant).
+tags:
+  - name: Me
+    description: The authenticated platform user.
+  - name: Complexes
+    description: Registration, list and detail of complexes with their subscription and tenant status.
+  - name: Subscriptions
+    description: Plan changes, manual status changes, retention, payments and history of a complex.
+  - name: Plans
+    description: Commercial plans with basic and custom fields. SUPER_ADMIN only, except reading published plans.
+  - name: Plan fields
+    description: Definitions of the fields a plan can have. SUPER_ADMIN only.
+  - name: Operator capabilities
+    description: Capabilities the SUPER_ADMIN enables for operators. SUPER_ADMIN only.
+  - name: Support access
+    description: Support sessions with a reason and the audit of every request made under them.
+security:
+  - bearerAuth: []
+paths:
+  /me:
+    get:
+      tags: [Me]
+      operationId: getCurrentPlatformUser
+      summary: Get the authenticated platform user and their effective capabilities.
+      description: |
+        `capabilities` lists the capabilities effective for this request: all of them for a
+        `SUPER_ADMIN`, the enabled ones for an `OPERATOR`. The `backoffice` uses it to show or hide
+        actions; the `api` still checks every request.
+      responses:
+        '200':
+          description: The caller.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentPlatformUser'
+              examples:
+                superAdmin:
+                  summary: Super admin
+                  value:
+                    id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+                    displayName: Sam Example
+                    role: SUPER_ADMIN
+                    capabilities: [COMPLEX_CREATE, SUBSCRIPTION_PAYMENT_RECORD, SUBSCRIPTION_STATUS_CHANGE, TENANT_DATA_ACCESS]
+                operator:
+                  summary: Operator with one capability enabled
+                  value:
+                    id: 6a7b8c9d-0e1f-4a2b-8c3d-4e5f6a7b8c9d
+                    displayName: Robin Example
+                    role: OPERATOR
+                    capabilities: [SUBSCRIPTION_PAYMENT_RECORD]
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /complexes:
+    get:
+      tags: [Complexes]
+      operationId: listComplexes
+      summary: List complexes with their plan, subscription status and last payment.
+      description: |
+        Both roles. Newest first. Includes purged complexes (`tenantStatus = PURGED`, `subdomain`
+        null). Built from the module's own tables plus `TenantDirectory` in one batch query (no N+1).
+        Search and filters are out of scope.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: One page of complexes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplexPage'
+              examples:
+                page:
+                  value:
+                    items:
+                      - id: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+                        displayName: Canchas El Sol
+                        subdomain: canchas-el-sol
+                        plan:
+                          id: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+                          name: Premium
+                        subscriptionStatus: ACTIVE
+                        tenantStatus: ACTIVE
+                        purgeDueAt: null
+                        lastPayment:
+                          amount: '120.00'
+                          currency: USD
+                          paidOn: '2026-12-01'
+                      - id: 8c9d0e1f-2a3b-4c4d-9e5f-6a7b8c9d0e1f
+                        displayName: Complejo La Esquina
+                        subdomain: la-esquina
+                        plan:
+                          id: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+                          name: Basic
+                        subscriptionStatus: SUSPENDED
+                        tenantStatus: SUSPENDED
+                        purgeDueAt: '2027-02-24T12:00:00Z'
+                        lastPayment: null
+                    page: 0
+                    size: 20
+                    totalItems: 2
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Complexes]
+      operationId: registerComplex
+      summary: Register a complex, provision its schema and start its subscription.
+      description: |
+        Capability `COMPLEX_CREATE`. In one global transaction it records the tenant, reserves the
+        subdomain and creates the subscription in `ACTIVE` with a snapshot of the published plan.
+        Then it creates and migrates the schema `t_<uuid>` and the owner staff account
+        (`ownerEmail`). Answers `201` in both outcomes:
+        - `tenantStatus = ACTIVE`: provisioning finished.
+        - `tenantStatus = PROVISIONING_FAILED`: the tenant was recorded but its schema could not be
+          created; retry with `POST /complexes/{complexId}/provisioning-retries`.
+        Sending invitations to the owner is out of scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterComplexRequest'
+            examples:
+              register:
+                value:
+                  displayName: Canchas El Sol
+                  subdomain: canchas-el-sol
+                  ownerEmail: owner@example.com
+                  planId: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+      responses:
+        '201':
+          description: Complex registered. Check `tenantStatus` for the provisioning outcome.
+          headers:
+            Location:
+              description: URL of the complex.
+              schema:
+                type: string
+                format: uri-reference
+              example: /api/v1/platform/complexes/5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplexDetail'
+              examples:
+                active:
+                  $ref: '#/components/examples/ActiveComplex'
+                provisioningFailed:
+                  $ref: '#/components/examples/ProvisioningFailedComplex'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CapabilityForbidden'
+        '409':
+          description: '`SUBDOMAIN_TAKEN`: the subdomain is used, or was used, by a complex (ADR-012).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                subdomainTaken:
+                  $ref: '#/components/examples/SubdomainTakenProblem'
+        '422':
+          description: |
+            `SUBDOMAIN_INVALID`: breaks the format rules. `SUBDOMAIN_RESERVED`: in the reserved list.
+            `PLAN_NOT_PUBLISHED`: the plan does not exist or is a draft.
+            `VALIDATION_FAILED`: `displayName` blank or longer than 120, or `ownerEmail` malformed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                subdomainInvalid:
+                  $ref: '#/components/examples/SubdomainInvalidProblem'
+                subdomainReserved:
+                  $ref: '#/components/examples/SubdomainReservedProblem'
+                planNotPublished:
+                  $ref: '#/components/examples/PlanNotPublishedProblem'
+                validationFailed:
+                  $ref: '#/components/examples/ValidationFailedProblem'
+  /complexes/{complexId}:
+    get:
+      tags: [Complexes]
+      operationId: getComplex
+      summary: Get a complex with its plan snapshot, subscription and tenant lifecycle.
+      description: |
+        Both roles. `allowedTransitions` lists the subscription statuses the complex can move to
+        now (empty while the tenant is not provisioned, after cancellation and once the retention
+        expired). After a purge `ownerEmail` and `subdomain` are null.
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+      responses:
+        '200':
+          description: The complex.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplexDetail'
+              examples:
+                active:
+                  $ref: '#/components/examples/ActiveComplex'
+                suspended:
+                  $ref: '#/components/examples/SuspendedComplex'
+                purged:
+                  $ref: '#/components/examples/PurgedComplex'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+  /complexes/{complexId}/provisioning-retries:
+    post:
+      tags: [Complexes]
+      operationId: retryComplexProvisioning
+      summary: Retry the provisioning of a complex whose schema could not be created.
+      description: |
+        Capability `COMPLEX_CREATE`. Only when `tenantStatus = PROVISIONING_FAILED`. Idempotent:
+        moves the tenant back to `PROVISIONING` and re-runs schema creation, migrations and owner
+        account creation. Answers `202` with the complex; poll `GET /complexes/{complexId}` until
+        `tenantStatus` is `ACTIVE` or `PROVISIONING_FAILED`.
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+      responses:
+        '202':
+          description: Retry accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplexDetail'
+              examples:
+                provisioning:
+                  $ref: '#/components/examples/ProvisioningComplex'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CapabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+        '409':
+          description: '`NOT_PROVISIONING_FAILED`: the tenant is not waiting for a provisioning retry.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                notProvisioningFailed:
+                  value:
+                    type: https://playtodoo.com/problems/not-provisioning-failed
+                    title: Provisioning did not fail
+                    status: 409
+                    code: NOT_PROVISIONING_FAILED
+  /complexes/{complexId}/plan:
+    put:
+      tags: [Subscriptions]
+      operationId: changeComplexPlan
+      summary: Change the plan of a complex.
+      description: |
+        SUPER_ADMIN only. Takes a new snapshot of the published plan; later edits of the plan never
+        change it (ADR-018). Records a `PLAN` entry in the history and publishes
+        `SubscriptionPlanChanged`.
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePlanRequest'
+            examples:
+              upgrade:
+                value:
+                  planId: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+                  version: 3
+      responses:
+        '200':
+          $ref: '#/components/responses/ComplexChanged'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+        '409':
+          $ref: '#/components/responses/StaleState'
+        '422':
+          description: |
+            `PLAN_NOT_PUBLISHED`: the plan does not exist or is a draft. `SAME_PLAN`: it is already
+            the plan of the complex. `SUBSCRIPTION_CANCELLED`: the subscription is cancelled.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                planNotPublished:
+                  $ref: '#/components/examples/PlanNotPublishedProblem'
+                samePlan:
+                  value:
+                    type: https://playtodoo.com/problems/same-plan
+                    title: Same plan
+                    status: 422
+                    code: SAME_PLAN
+                subscriptionCancelled:
+                  value:
+                    type: https://playtodoo.com/problems/subscription-cancelled
+                    title: Subscription cancelled
+                    status: 422
+                    code: SUBSCRIPTION_CANCELLED
+  /complexes/{complexId}/status-changes:
+    post:
+      tags: [Subscriptions]
+      operationId: changeSubscriptionStatus
+      summary: Manually change the subscription status and apply its effect on the tenant.
+      description: |
+        Capability `SUBSCRIPTION_STATUS_CHANGE` (suspend, reactivate, cancel and mark expiring).
+        Allowed transitions are in the table of the contract description. The subscription change,
+        the tenant lifecycle change (`SubscriptionStatusChanged` is handled synchronously by
+        Tenancy) and the catalog visibility are committed in one transaction. The response carries
+        the applied effect (`tenantStatus`, `retentionDays`, `purgeDueAt`). Records a `STATUS`
+        history entry.
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeStatusRequest'
+            examples:
+              suspend:
+                value:
+                  targetStatus: SUSPENDED
+                  version: 3
+              cancel:
+                value:
+                  targetStatus: CANCELLED
+                  version: 4
+      responses:
+        '200':
+          description: Status changed; the body shows the effect on the tenant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplexDetail'
+              examples:
+                suspended:
+                  $ref: '#/components/examples/SuspendedComplex'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CapabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+        '409':
+          $ref: '#/components/responses/StaleState'
+        '422':
+          description: |
+            `TRANSITION_NOT_ALLOWED`: the target is not in `allowedTransitions` (for example from
+            `CANCELLED`, or while the tenant is not provisioned). `RETENTION_EXPIRED`: reactivation
+            after `purgeDueAt`, or while the tenant is `PURGING` or `PURGED`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                transitionNotAllowed:
+                  value:
+                    type: https://playtodoo.com/problems/transition-not-allowed
+                    title: Transition not allowed
+                    status: 422
+                    detail: CANCELLED is terminal.
+                    code: TRANSITION_NOT_ALLOWED
+                retentionExpired:
+                  value:
+                    type: https://playtodoo.com/problems/retention-expired
+                    title: Retention expired
+                    status: 422
+                    detail: The purge date has passed; the complex can no longer be reactivated.
+                    code: RETENTION_EXPIRED
+  /complexes/{complexId}/retention:
+    put:
+      tags: [Subscriptions]
+      operationId: changeComplexRetention
+      summary: Change the retention period of a suspended or archived complex.
+      description: |
+        SUPER_ADMIN only. Only while `tenantStatus` is `SUSPENDED` or `ARCHIVED`. Recomputes
+        `purgeDueAt` from the date retention started (`suspendedAt`, or `archivedAt` when the
+        complex was cancelled while active). The new `purgeDueAt` must be in the future, so this
+        call never triggers a purge. Upper bound: [POR DEFINIR: maximum retention days, if any].
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeRetentionRequest'
+            examples:
+              extend:
+                value:
+                  retentionDays: 60
+                  version: 4
+      responses:
+        '200':
+          $ref: '#/components/responses/ComplexChanged'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+        '409':
+          $ref: '#/components/responses/StaleState'
+        '422':
+          description: |
+            `NOT_IN_RETENTION`: the tenant is not `SUSPENDED` or `ARCHIVED`.
+            `RETENTION_DEADLINE_IN_PAST`: the resulting `purgeDueAt` would not be in the future.
+            `VALIDATION_FAILED`: `retentionDays` lower than 1.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                notInRetention:
+                  value:
+                    type: https://playtodoo.com/problems/not-in-retention
+                    title: Not in retention
+                    status: 422
+                    code: NOT_IN_RETENTION
+                deadlineInPast:
+                  value:
+                    type: https://playtodoo.com/problems/retention-deadline-in-past
+                    title: Retention deadline in the past
+                    status: 422
+                    detail: The resulting purge date must be in the future.
+                    code: RETENTION_DEADLINE_IN_PAST
+  /complexes/{complexId}/payments:
+    get:
+      tags: [Subscriptions]
+      operationId: listComplexPayments
+      summary: List the subscription payments recorded for a complex.
+      description: Both roles. Newest `paidOn` first, then newest `recordedAt`. Also for purged complexes.
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: One page of payments.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentPage'
+              examples:
+                page:
+                  value:
+                    items:
+                      - id: 6f7a8b9c-0d1e-4f2a-9b3c-4d5e6f7a8b9c
+                        amount: '120.00'
+                        currency: USD
+                        paidOn: '2026-12-01'
+                        method: TRANSFER
+                        recordedBy:
+                          id: 6a7b8c9d-0e1f-4a2b-8c3d-4e5f6a7b8c9d
+                          displayName: Robin Example
+                        recordedAt: '2026-12-02T10:15:00Z'
+                    page: 0
+                    size: 20
+                    totalItems: 1
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+    post:
+      tags: [Subscriptions]
+      operationId: recordComplexPayment
+      summary: Record a subscription payment received outside the platform.
+      description: |
+        Capability `SUBSCRIPTION_PAYMENT_RECORD`. Payments are collected outside the platform
+        (ADR-004); this only records them. The currency is taken from the plan snapshot of the
+        subscription. Payments are immutable: no edit or delete. Legal retention of payments:
+        [POR DEFINIR: obligations of the launch country].
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordPaymentRequest'
+            examples:
+              transfer:
+                value:
+                  amount: '100.00'
+                  paidOn: '2026-12-01'
+                  method: TRANSFER
+      responses:
+        '201':
+          description: Payment recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+              examples:
+                recorded:
+                  $ref: '#/components/examples/RecordedPayment'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CapabilityForbidden'
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+        '422':
+          description: '`VALIDATION_FAILED`: `amount` not greater than 0, `paidOn` in the future or unknown `method`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                futureDate:
+                  value:
+                    type: https://playtodoo.com/problems/validation-failed
+                    title: Validation failed
+                    status: 422
+                    code: VALIDATION_FAILED
+                    fieldErrors:
+                      - field: paidOn
+                        code: DATE_IN_FUTURE
+  /complexes/{complexId}/history:
+    get:
+      tags: [Subscriptions]
+      operationId: listComplexHistory
+      summary: List plan and status changes of the last 365 days.
+      description: |
+        Both roles. Newest first. Entries older than `history.retention-days` (365) are deleted by a
+        scheduled job and never returned.
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: One page of history entries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryPage'
+              examples:
+                page:
+                  value:
+                    items:
+                      - id: 3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f
+                        kind: STATUS
+                        before: ACTIVE
+                        after: SUSPENDED
+                        changedBy:
+                          id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+                          displayName: Sam Example
+                        changedAt: '2027-01-10T12:00:00Z'
+                      - id: 4d5e6f7a-8b9c-4d0e-9f1a-2b3c4d5e6f7a
+                        kind: PLAN
+                        before: Basic
+                        after: Premium
+                        changedBy:
+                          id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+                          displayName: Sam Example
+                        changedAt: '2026-12-20T09:30:00Z'
+                    page: 0
+                    size: 20
+                    totalItems: 2
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+  /complexes/{complexId}/audit-entries:
+    get:
+      tags: [Support access]
+      operationId: listComplexAuditEntries
+      summary: List the audited support requests made to a complex.
+      description: |
+        SUPER_ADMIN only. Newest first, last 365 days (`audit.retention-days`). Includes the opening
+        of each session and every request under it, allowed or denied. After a purge the reasons are
+        anonymized and `reasonRedacted` is `true`.
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: One page of audit entries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEntryPage'
+              examples:
+                page:
+                  value:
+                    items:
+                      - id: 7d8e9f0a-1b2c-4d3e-8f4a-5b6c7d8e9f0a
+                        sessionId: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
+                        actor:
+                          id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+                          displayName: Sam Example
+                        reason: Complaint about a duplicated booking, ticket 1234
+                        reasonRedacted: false
+                        operationId: cancelStaffBooking
+                        httpMethod: POST
+                        pathTemplate: /api/v1/staff/bookings/{bookingId}/cancel
+                        result: ALLOWED
+                        denialCode: null
+                        occurredAt: '2027-01-11T15:02:10Z'
+                      - id: 8e9f0a1b-2c3d-4e4f-9a5b-6c7d8e9f0a1b
+                        sessionId: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
+                        actor:
+                          id: 6a7b8c9d-0e1f-4a2b-8c3d-4e5f6a7b8c9d
+                          displayName: Robin Example
+                        reason: Complaint about a duplicated booking, ticket 1234
+                        reasonRedacted: false
+                        operationId: listStaffBookings
+                        httpMethod: GET
+                        pathTemplate: /api/v1/staff/bookings
+                        result: DENIED
+                        denialCode: SUPPORT_SESSION_INVALID
+                        occurredAt: '2027-01-11T15:01:00Z'
+                    page: 0
+                    size: 20
+                    totalItems: 2
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+  /complexes/{complexId}/support-sessions:
+    post:
+      tags: [Support access]
+      operationId: openSupportSession
+      summary: Open a support session with a reason to work on a complex.
+      description: |
+        `ACTIVE` tenant: `SUPER_ADMIN`, or `OPERATOR` with `TENANT_DATA_ACCESS`.
+        `SUSPENDED` or `ARCHIVED` tenant: `SUPER_ADMIN` only. Any other tenant status:
+        `403 TENANT_NOT_ACCESSIBLE`. The reason (1 to 500 characters, not only spaces) is stored with
+        the session and must not contain personal data; it is anonymized when the complex is purged.
+        The session is bound to the caller and to this tenant, lasts `support.session-minutes`
+        (30 by default) and is used on `tenantHost` with the header `X-Support-Session`. The
+        opening is audited.
+      parameters:
+        - $ref: '#/components/parameters/ComplexId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenSupportSessionRequest'
+            examples:
+              complaint:
+                value:
+                  reason: Complaint about a duplicated booking, ticket 1234
+      responses:
+        '201':
+          description: Session opened.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportSession'
+              examples:
+                active:
+                  value:
+                    sessionId: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
+                    expiresAt: '2027-01-11T15:30:00Z'
+                    tenantHost: canchas-el-sol.playtodoo.com
+                    tenantStatus: ACTIVE
+                suspended:
+                  value:
+                    sessionId: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
+                    expiresAt: '2027-01-11T15:30:00Z'
+                    tenantHost: la-esquina.playtodoo.com
+                    tenantStatus: SUSPENDED
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: |
+            `FORBIDDEN`: not a platform token. `CAPABILITY_REVOKED`: operator without
+            `TENANT_DATA_ACCESS`. `TENANT_NOT_ACCESSIBLE`: the tenant status does not allow the
+            caller's role (an operator on a suspended or archived complex, or anyone while
+            provisioning, purging or purged).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                capabilityRevoked:
+                  $ref: '#/components/examples/CapabilityRevokedProblem'
+                tenantNotAccessible:
+                  value:
+                    type: https://playtodoo.com/problems/tenant-not-accessible
+                    title: Complex not accessible
+                    status: 403
+                    code: TENANT_NOT_ACCESSIBLE
+        '404':
+          $ref: '#/components/responses/ComplexNotFound'
+        '422':
+          description: '`REASON_REQUIRED`: the reason is missing, blank or longer than 500 characters.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                reasonRequired:
+                  value:
+                    type: https://playtodoo.com/problems/reason-required
+                    title: Reason required
+                    status: 422
+                    detail: A support session needs a reason of 1 to 500 characters.
+                    code: REASON_REQUIRED
+  /support-sessions/{sessionId}:
+    delete:
+      tags: [Support access]
+      operationId: closeSupportSession
+      summary: Close a support session before it expires.
+      description: Only the platform user who opened it. Closing an already closed or expired session is a no-op.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
+      responses:
+        '204':
+          description: Session closed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: '`SUPPORT_SESSION_NOT_FOUND`: no session with this id for the caller.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                notFound:
+                  value:
+                    type: https://playtodoo.com/problems/support-session-not-found
+                    title: Support session not found
+                    status: 404
+                    code: SUPPORT_SESSION_NOT_FOUND
+  /plans:
+    get:
+      tags: [Plans]
+      operationId: listPlans
+      summary: List plans.
+      description: |
+        `SUPER_ADMIN` sees every plan. Any other platform user (needed to register a complex) may
+        only ask for `status=PUBLISHED`; other values answer `403 FORBIDDEN`. Ordered by name.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by plan status. Omit it to list all (SUPER_ADMIN only).
+          schema:
+            $ref: '#/components/schemas/PlanStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: One page of plans.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanPage'
+              examples:
+                page:
+                  value:
+                    items:
+                      - id: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+                        name: Premium
+                        price: '120.00'
+                        currency: USD
+                        periodicity: MONTHLY
+                        courtLimit: 10
+                        userLimit: 25
+                        customFields:
+                          support-hours: Weekdays 9 to 18
+                        status: PUBLISHED
+                        version: 2
+                    page: 0
+                    size: 20
+                    totalItems: 1
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Plans]
+      operationId: createPlan
+      summary: Create a draft plan.
+      description: |
+        SUPER_ADMIN only. A draft needs only a unique name (case-insensitive). The other basic fields
+        and the custom fields may be filled later; publishing requires them (ADR-018).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanInput'
+            examples:
+              draft:
+                value:
+                  name: Premium
+              complete:
+                value:
+                  name: Premium
+                  price: '120.00'
+                  currency: USD
+                  periodicity: MONTHLY
+                  courtLimit: 10
+                  userLimit: 25
+                  customFields:
+                    support-hours: Weekdays 9 to 18
+                    tournaments-included: true
+      responses:
+        '201':
+          description: Draft created.
+          headers:
+            Location:
+              description: URL of the plan.
+              schema:
+                type: string
+                format: uri-reference
+              example: /api/v1/platform/plans/2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+              examples:
+                draft:
+                  $ref: '#/components/examples/DraftPlan'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/PlanNameTaken'
+        '422':
+          $ref: '#/components/responses/PlanValidationFailed'
+  /plans/{planId}:
+    get:
+      tags: [Plans]
+      operationId: getPlan
+      summary: Get a plan.
+      description: SUPER_ADMIN, or any platform user for a published plan.
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+      responses:
+        '200':
+          description: The plan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+              examples:
+                published:
+                  $ref: '#/components/examples/PublishedPlan'
+                draft:
+                  $ref: '#/components/examples/DraftPlan'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlanNotFound'
+    put:
+      tags: [Plans]
+      operationId: updatePlan
+      summary: Update a plan.
+      description: |
+        SUPER_ADMIN only. Replaces the basic and custom fields. Editing a published plan keeps it
+        published (its required fields must stay complete) and only affects future assignments: the
+        subscriptions that already have it keep their snapshot (ADR-018).
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlanRequest'
+            examples:
+              rename:
+                value:
+                  name: Premium Plus
+                  price: '150.00'
+                  currency: USD
+                  periodicity: MONTHLY
+                  courtLimit: 12
+                  userLimit: 30
+                  customFields:
+                    support-hours: Every day 8 to 22
+                  version: 2
+      responses:
+        '200':
+          description: Plan updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+              examples:
+                published:
+                  $ref: '#/components/examples/PublishedPlan'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlanNotFound'
+        '409':
+          description: '`PLAN_NAME_TAKEN`: another plan has this name. `STALE_STATE`: `version` does not match.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                nameTaken:
+                  $ref: '#/components/examples/PlanNameTakenProblem'
+                staleState:
+                  $ref: '#/components/examples/StaleStateProblem'
+        '422':
+          $ref: '#/components/responses/PlanValidationFailed'
+  /plans/{planId}/publication:
+    post:
+      tags: [Plans]
+      operationId: publishPlan
+      summary: Publish a draft plan so it can be assigned.
+      description: |
+        SUPER_ADMIN only. Requires every basic field and every required, non-retired custom field.
+        Publishing an already published plan is a no-op. Unpublishing is out of scope.
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+      responses:
+        '200':
+          description: Plan published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+              examples:
+                published:
+                  $ref: '#/components/examples/PublishedPlan'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlanNotFound'
+        '422':
+          description: '`PLAN_INCOMPLETE`: basic or required fields are missing; `fieldErrors` lists them.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                incomplete:
+                  value:
+                    type: https://playtodoo.com/problems/plan-incomplete
+                    title: Plan incomplete
+                    status: 422
+                    code: PLAN_INCOMPLETE
+                    fieldErrors:
+                      - field: price
+                        code: REQUIRED
+                      - field: customFields.support-hours
+                        code: REQUIRED
+  /plan-options:
+    get:
+      tags: [Plans]
+      operationId: getPlanOptions
+      summary: Get the allowed currencies and periodicities.
+      description: |
+        Any platform user. Values come from the platform parameters `plan.currencies` and
+        `plan.periodicities` ([POR DEFINIR: values]); the examples are illustrative.
+      responses:
+        '200':
+          description: Allowed values.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanOptions'
+              examples:
+                options:
+                  value:
+                    currencies: [USD]
+                    periodicities: [MONTHLY, YEARLY]
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /plan-fields:
+    get:
+      tags: [Plan fields]
+      operationId: listPlanFields
+      summary: List the plan field definitions.
+      description: SUPER_ADMIN only. Basic fields first, then custom fields by label. Includes retired fields.
+      responses:
+        '200':
+          description: All field definitions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlanField'
+              examples:
+                fields:
+                  value:
+                    - id: 0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d
+                      key: price
+                      label: Price
+                      type: NUMBER
+                      required: true
+                      origin: BASIC
+                      retiredAt: null
+                      version: 0
+                    - id: 9f0a1b2c-3d4e-4f5a-8b6c-7d8e9f0a1b2c
+                      key: support-hours
+                      label: Support hours
+                      type: TEXT
+                      required: false
+                      origin: CUSTOM
+                      retiredAt: null
+                      version: 0
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Plan fields]
+      operationId: createPlanField
+      summary: Create a custom plan field.
+      description: |
+        SUPER_ADMIN only. `key` is derived from `label` (lower case, hyphens) and never changes.
+        `type` is immutable after creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlanFieldRequest'
+            examples:
+              supportHours:
+                value:
+                  label: Support hours
+                  type: TEXT
+                  required: false
+      responses:
+        '201':
+          description: Field created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanField'
+              examples:
+                created:
+                  $ref: '#/components/examples/CustomPlanField'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/FieldNameTaken'
+        '422':
+          $ref: '#/components/responses/PlanFieldValidationFailed'
+  /plan-fields/{fieldId}:
+    put:
+      tags: [Plan fields]
+      operationId: updatePlanField
+      summary: Update the label or the required flag of a custom plan field.
+      description: |
+        SUPER_ADMIN only. Basic fields are read-only. Making a field required does not unpublish
+        plans; it is checked the next time a plan is published or edited.
+      parameters:
+        - $ref: '#/components/parameters/FieldId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlanFieldRequest'
+            examples:
+              required:
+                value:
+                  label: Support hours
+                  required: true
+                  version: 0
+      responses:
+        '200':
+          description: Field updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanField'
+              examples:
+                updated:
+                  $ref: '#/components/examples/CustomPlanField'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlanFieldNotFound'
+        '409':
+          description: '`FIELD_NAME_TAKEN`: another field has this label. `STALE_STATE`: `version` does not match.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                nameTaken:
+                  $ref: '#/components/examples/FieldNameTakenProblem'
+                staleState:
+                  $ref: '#/components/examples/StaleStateProblem'
+        '422':
+          $ref: '#/components/responses/PlanFieldValidationFailed'
+  /plan-fields/{fieldId}/retirement:
+    post:
+      tags: [Plan fields]
+      operationId: retirePlanField
+      summary: Retire a custom plan field.
+      description: |
+        SUPER_ADMIN only. A retired field is no longer offered nor required; existing values in plans
+        and subscription snapshots are kept. Retiring an already retired field is a no-op.
+      parameters:
+        - $ref: '#/components/parameters/FieldId'
+      responses:
+        '200':
+          description: Field retired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanField'
+              examples:
+                retired:
+                  value:
+                    id: 9f0a1b2c-3d4e-4f5a-8b6c-7d8e9f0a1b2c
+                    key: support-hours
+                    label: Support hours
+                    type: TEXT
+                    required: false
+                    origin: CUSTOM
+                    retiredAt: '2027-01-15T10:00:00Z'
+                    version: 2
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/PlanFieldNotFound'
+        '422':
+          $ref: '#/components/responses/BasicFieldReadOnly'
+  /operator-capabilities:
+    get:
+      tags: [Operator capabilities]
+      operationId: listOperatorCapabilities
+      summary: List the delegable capabilities and whether operators have them.
+      description: SUPER_ADMIN only. Capabilities are defined in code; only their enablement is data (ADR-017).
+      responses:
+        '200':
+          description: Capabilities and the version to send back when changing them.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperatorCapabilities'
+              examples:
+                initial:
+                  $ref: '#/components/examples/OperatorCapabilitiesInitial'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Operator capabilities]
+      operationId: changeOperatorCapabilities
+      summary: Enable or disable capabilities for operators in one batch.
+      description: |
+        SUPER_ADMIN only. Only the listed capabilities change. Each effective change is recorded in
+        the capability change log and applies to the operators' next request. Publishes
+        `OperatorCapabilitiesChanged`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeOperatorCapabilitiesRequest'
+            examples:
+              enablePayments:
+                value:
+                  version: 0
+                  changes:
+                    - key: SUBSCRIPTION_PAYMENT_RECORD
+                      enabled: true
+      responses:
+        '200':
+          description: Capabilities after the change.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperatorCapabilities'
+              examples:
+                paymentsEnabled:
+                  value:
+                    version: 1
+                    items:
+                      - key: COMPLEX_CREATE
+                        description: Register complexes and retry their provisioning.
+                        enabled: false
+                      - key: SUBSCRIPTION_PAYMENT_RECORD
+                        description: Record subscription payments.
+                        enabled: true
+                      - key: SUBSCRIPTION_STATUS_CHANGE
+                        description: Mark expiring, suspend, reactivate and cancel subscriptions.
+                        enabled: false
+                      - key: TENANT_DATA_ACCESS
+                        description: Open support sessions with a reason on active complexes to read and edit their data.
+                        enabled: false
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/StaleState'
+  /operator-capabilities/changes:
+    get:
+      tags: [Operator capabilities]
+      operationId: listOperatorCapabilityChanges
+      summary: List the changes to operator capabilities.
+      description: SUPER_ADMIN only. Newest first, last 365 days.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: One page of capability changes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityChangePage'
+              examples:
+                page:
+                  value:
+                    items:
+                      - id: 5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b
+                        key: SUBSCRIPTION_PAYMENT_RECORD
+                        enabled: true
+                        changedBy:
+                          id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+                          displayName: Sam Example
+                        changedAt: '2027-01-05T08:00:00Z'
+                    page: 0
+                    size: 20
+                    totalItems: 1
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Platform access token issued by `POST /auth/platform/login` (`tenancy.openapi.yaml`).
+  parameters:
+    ComplexId:
+      name: complexId
+      in: path
+      required: true
+      description: Complex id, which is its tenant id (not the subdomain).
+      schema:
+        type: string
+        format: uuid
+      example: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+    PlanId:
+      name: planId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+    FieldId:
+      name: fieldId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: 9f0a1b2c-3d4e-4f5a-8b6c-7d8e9f0a1b2c
+    Page:
+      name: page
+      in: query
+      description: Zero-based page index.
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      description: Page size.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+        default: 20
+  schemas:
+    PlatformRole:
+      type: string
+      description: Role of a Kuador team member. `PLATFORM_OWNER` of PLATODO-26 is migrated to `SUPER_ADMIN`.
+      enum: [SUPER_ADMIN, OPERATOR]
+    Capability:
+      type: string
+      description: Delegable capability. Defined in code; the SUPER_ADMIN enables it for operators.
+      enum: [COMPLEX_CREATE, SUBSCRIPTION_PAYMENT_RECORD, SUBSCRIPTION_STATUS_CHANGE, TENANT_DATA_ACCESS]
+    SubscriptionStatus:
+      type: string
+      description: Commercial status of the subscription. Changed only by hand (ADR-014).
+      enum: [ACTIVE, EXPIRING, SUSPENDED, CANCELLED]
+    TenantStatus:
+      type: string
+      description: |
+        Lifecycle status of the tenant (ADR-013 as adjusted by ADR-014). `PROVISIONING_FAILED`
+        waits for a provisioning retry; `PURGING` while the schema is being deleted; `PURGED` is final.
+      enum: [PROVISIONING, PROVISIONING_FAILED, ACTIVE, SUSPENDED, ARCHIVED, PURGING, PURGED]
+    PlanStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED]
+    Periodicity:
+      type: string
+      description: One of `GET /plan-options` `periodicities` ([POR DEFINIR] values).
+      minLength: 1
+      maxLength: 32
+      examples: [MONTHLY]
+    Currency:
+      type: string
+      description: ISO 4217 code, one of `GET /plan-options` `currencies`.
+      pattern: '^[A-Z]{3}$'
+      examples: [USD]
+    Money:
+      type: string
+      description: Decimal amount with up to 15 integer digits and 4 decimals.
+      pattern: '^\d{1,15}(\.\d{1,4})?$'
+      examples: ['100.00']
+    CustomFieldValues:
+      type: object
+      description: Values of custom fields by field `key`. Each value matches the field `type`.
+      additionalProperties:
+        type: [string, number, boolean]
+    UserRef:
+      type: object
+      additionalProperties: false
+      required: [id, displayName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+          description: Visible name of the platform user.
+    CurrentPlatformUser:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, role, capabilities]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        role:
+          $ref: '#/components/schemas/PlatformRole'
+        capabilities:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Capability'
+    PlanRef:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    LastPayment:
+      type: object
+      additionalProperties: false
+      required: [amount, currency, paidOn]
+      properties:
+        amount:
+          $ref: '#/components/schemas/Money'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        paidOn:
+          type: string
+          format: date
+    ComplexSummary:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, subdomain, plan, subscriptionStatus, tenantStatus, purgeDueAt, lastPayment]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        subdomain:
+          type: [string, 'null']
+          description: Null once purged.
+        plan:
+          $ref: '#/components/schemas/PlanRef'
+        subscriptionStatus:
+          $ref: '#/components/schemas/SubscriptionStatus'
+        tenantStatus:
+          $ref: '#/components/schemas/TenantStatus'
+        purgeDueAt:
+          type: [string, 'null']
+          format: date-time
+          description: Date from which the complex data is deleted. Only while `SUSPENDED` or `ARCHIVED`.
+        lastPayment:
+          oneOf:
+            - $ref: '#/components/schemas/LastPayment'
+            - type: 'null'
+    ComplexPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplexSummary'
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+        totalItems:
+          type: integer
+          format: int64
+          minimum: 0
+    PlanSnapshot:
+      type: object
+      additionalProperties: false
+      description: Conditions of the plan fixed when it was assigned (ADR-018).
+      required: [planId, name, price, currency, periodicity, courtLimit, userLimit, customFields, assignedAt]
+      properties:
+        planId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          $ref: '#/components/schemas/Money'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        periodicity:
+          $ref: '#/components/schemas/Periodicity'
+        courtLimit:
+          type: integer
+          format: int32
+          minimum: 0
+        userLimit:
+          type: integer
+          format: int32
+          minimum: 0
+        customFields:
+          $ref: '#/components/schemas/CustomFieldValues'
+        assignedAt:
+          type: string
+          format: date-time
+    Subscription:
+      type: object
+      additionalProperties: false
+      required: [status, statusSince, statusChangedBy, plan]
+      properties:
+        status:
+          $ref: '#/components/schemas/SubscriptionStatus'
+        statusSince:
+          type: string
+          format: date-time
+        statusChangedBy:
+          $ref: '#/components/schemas/UserRef'
+        plan:
+          $ref: '#/components/schemas/PlanSnapshot'
+    ComplexDetail:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, subdomain, ownerEmail, createdAt, tenantStatus, suspendedAt, archivedAt, retentionDays, purgeDueAt, purgedAt, subscription, allowedTransitions, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        subdomain:
+          type: [string, 'null']
+          description: Current subdomain. Null once purged (it stays retired, ADR-012).
+        ownerEmail:
+          type: [string, 'null']
+          format: email
+          description: E-mail of the owner account given at registration. Redacted (null) after the purge.
+        createdAt:
+          type: string
+          format: date-time
+        tenantStatus:
+          $ref: '#/components/schemas/TenantStatus'
+        suspendedAt:
+          type: [string, 'null']
+          format: date-time
+        archivedAt:
+          type: [string, 'null']
+          format: date-time
+        retentionDays:
+          type: [integer, 'null']
+          format: int32
+          minimum: 1
+          description: Retention period in days. Only while `SUSPENDED` or `ARCHIVED`.
+        purgeDueAt:
+          type: [string, 'null']
+          format: date-time
+          description: Date from which the purge job deletes the complex data. Only while `SUSPENDED` or `ARCHIVED`.
+        purgedAt:
+          type: [string, 'null']
+          format: date-time
+        subscription:
+          $ref: '#/components/schemas/Subscription'
+        allowedTransitions:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/SubscriptionStatus'
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Optimistic concurrency version. Send it back in every mutation.
+    RegisterComplexRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName, subdomain, ownerEmail, planId]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        subdomain:
+          type: string
+          maxLength: 255
+          description: Validated with the rules of ADR-012. Compared in lower case.
+        ownerEmail:
+          type: string
+          format: email
+          maxLength: 254
+        planId:
+          type: string
+          format: uuid
+    ChangePlanRequest:
+      type: object
+      additionalProperties: false
+      required: [planId, version]
+      properties:
+        planId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    ChangeStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [targetStatus, version]
+      properties:
+        targetStatus:
+          $ref: '#/components/schemas/SubscriptionStatus'
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    ChangeRetentionRequest:
+      type: object
+      additionalProperties: false
+      required: [retentionDays, version]
+      properties:
+        retentionDays:
+          type: integer
+          format: int32
+          minimum: 1
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    PaymentMethod:
+      type: string
+      enum: [TRANSFER, INVOICE]
+    RecordPaymentRequest:
+      type: object
+      additionalProperties: false
+      required: [amount, paidOn, method]
+      properties:
+        amount:
+          $ref: '#/components/schemas/Money'
+        paidOn:
+          type: string
+          format: date
+          description: Date the complex paid. Not in the future.
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+    Payment:
+      type: object
+      additionalProperties: false
+      required: [id, amount, currency, paidOn, method, recordedBy, recordedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        amount:
+          $ref: '#/components/schemas/Money'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        paidOn:
+          type: string
+          format: date
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        recordedBy:
+          $ref: '#/components/schemas/UserRef'
+        recordedAt:
+          type: string
+          format: date-time
+    PaymentPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payment'
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+        totalItems:
+          type: integer
+          format: int64
+          minimum: 0
+    HistoryEntry:
+      type: object
+      additionalProperties: false
+      required: [id, kind, before, after, changedBy, changedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [PLAN, STATUS]
+        before:
+          type: [string, 'null']
+          description: Plan name or subscription status before the change. Null for the first assignment.
+        after:
+          type: string
+          description: Plan name or subscription status after the change.
+        changedBy:
+          $ref: '#/components/schemas/UserRef'
+        changedAt:
+          type: string
+          format: date-time
+    HistoryPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryEntry'
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+        totalItems:
+          type: integer
+          format: int64
+          minimum: 0
+    AuditEntry:
+      type: object
+      additionalProperties: false
+      required: [id, sessionId, actor, reason, reasonRedacted, operationId, httpMethod, pathTemplate, result, denialCode, occurredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sessionId:
+          type: [string, 'null']
+          format: uuid
+          description: Null when the request was denied before a valid session was found.
+        actor:
+          $ref: '#/components/schemas/UserRef'
+        reason:
+          type: [string, 'null']
+          description: Reason of the session. Null when `reasonRedacted` is true.
+        reasonRedacted:
+          type: boolean
+        operationId:
+          type: [string, 'null']
+          description: operationId of the contract operation that was called. Null if the route is unknown.
+        httpMethod:
+          type: string
+          examples: [GET]
+        pathTemplate:
+          type: string
+          description: Route template, never the concrete path or query string.
+        result:
+          type: string
+          enum: [ALLOWED, DENIED]
+        denialCode:
+          type: [string, 'null']
+          description: Problem `code` answered when `result` is `DENIED`.
+        occurredAt:
+          type: string
+          format: date-time
+    AuditEntryPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEntry'
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+        totalItems:
+          type: integer
+          format: int64
+          minimum: 0
+    OpenSupportSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          description: Why Kuador needs to access the complex. Not only spaces; no personal data.
+    SupportSession:
+      type: object
+      additionalProperties: false
+      required: [sessionId, expiresAt, tenantHost, tenantStatus]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: Value of the `X-Support-Session` header on the tenant host.
+        expiresAt:
+          type: string
+          format: date-time
+        tenantHost:
+          type: string
+          description: Host of the complex where the session is valid.
+        tenantStatus:
+          $ref: '#/components/schemas/TenantStatus'
+    PlanFields:
+      type: object
+      description: Basic and custom fields of a plan. A draft needs only `name`.
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        price:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        currency:
+          oneOf:
+            - $ref: '#/components/schemas/Currency'
+            - type: 'null'
+        periodicity:
+          oneOf:
+            - $ref: '#/components/schemas/Periodicity'
+            - type: 'null'
+        courtLimit:
+          type: [integer, 'null']
+          format: int32
+          minimum: 0
+        userLimit:
+          type: [integer, 'null']
+          format: int32
+          minimum: 0
+        customFields:
+          $ref: '#/components/schemas/CustomFieldValues'
+    PlanInput:
+      description: Fields of a new plan.
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/PlanFields'
+    UpdatePlanRequest:
+      description: Same fields as `PlanInput` plus the `version` that was read.
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/PlanFields'
+        - type: object
+          required: [version]
+          properties:
+            version:
+              type: integer
+              format: int64
+              minimum: 0
+    Plan:
+      type: object
+      additionalProperties: false
+      required: [id, name, price, currency, periodicity, courtLimit, userLimit, customFields, status, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        currency:
+          oneOf:
+            - $ref: '#/components/schemas/Currency'
+            - type: 'null'
+        periodicity:
+          oneOf:
+            - $ref: '#/components/schemas/Periodicity'
+            - type: 'null'
+        courtLimit:
+          type: [integer, 'null']
+          format: int32
+          minimum: 0
+        userLimit:
+          type: [integer, 'null']
+          format: int32
+          minimum: 0
+        customFields:
+          $ref: '#/components/schemas/CustomFieldValues'
+        status:
+          $ref: '#/components/schemas/PlanStatus'
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    PlanPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Plan'
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+        totalItems:
+          type: integer
+          format: int64
+          minimum: 0
+    PlanOptions:
+      type: object
+      additionalProperties: false
+      required: [currencies, periodicities]
+      properties:
+        currencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Currency'
+        periodicities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Periodicity'
+    PlanFieldType:
+      type: string
+      description: Text, number or yes/no. Immutable after creation.
+      enum: [TEXT, NUMBER, BOOLEAN]
+    PlanField:
+      type: object
+      additionalProperties: false
+      required: [id, key, label, type, required, origin, retiredAt, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          description: Stable key used in `customFields`. Basic fields use the property names of `Plan`.
+        label:
+          type: string
+        type:
+          $ref: '#/components/schemas/PlanFieldType'
+        required:
+          type: boolean
+        origin:
+          type: string
+          enum: [BASIC, CUSTOM]
+          description: '`BASIC` fields are seeded by migration, read-only and never retired.'
+        retiredAt:
+          type: [string, 'null']
+          format: date-time
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    CreatePlanFieldRequest:
+      type: object
+      additionalProperties: false
+      required: [label, type, required]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+        type:
+          $ref: '#/components/schemas/PlanFieldType'
+        required:
+          type: boolean
+    UpdatePlanFieldRequest:
+      type: object
+      additionalProperties: false
+      required: [label, required, version]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+        required:
+          type: boolean
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    OperatorCapability:
+      type: object
+      additionalProperties: false
+      required: [key, description, enabled]
+      properties:
+        key:
+          $ref: '#/components/schemas/Capability'
+        description:
+          type: string
+          description: Developer-facing description; the backoffice shows its own Spanish text by `key`.
+        enabled:
+          type: boolean
+    OperatorCapabilities:
+      type: object
+      additionalProperties: false
+      required: [version, items]
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperatorCapability'
+    ChangeOperatorCapabilitiesRequest:
+      type: object
+      additionalProperties: false
+      required: [version, changes]
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        changes:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, enabled]
+            properties:
+              key:
+                $ref: '#/components/schemas/Capability'
+              enabled:
+                type: boolean
+    CapabilityChange:
+      type: object
+      additionalProperties: false
+      required: [id, key, enabled, changedBy, changedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          $ref: '#/components/schemas/Capability'
+        enabled:
+          type: boolean
+        changedBy:
+          $ref: '#/components/schemas/UserRef'
+        changedAt:
+          type: string
+          format: date-time
+    CapabilityChangePage:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, totalItems]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityChange'
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+        totalItems:
+          type: integer
+          format: int64
+          minimum: 0
+    ProblemCode:
+      type: string
+      description: |
+        Stable machine-readable error code. Clients map it to the user-facing text.
+        `SUPPORT_SESSION_INVALID` is answered on tenant hosts (see the contract description).
+      enum:
+        - INVALID_REQUEST
+        - VALIDATION_FAILED
+        - UNAUTHENTICATED
+        - FORBIDDEN
+        - CAPABILITY_REVOKED
+        - STALE_STATE
+        - COMPLEX_NOT_FOUND
+        - PLAN_NOT_FOUND
+        - PLAN_FIELD_NOT_FOUND
+        - SUPPORT_SESSION_NOT_FOUND
+        - SUBDOMAIN_TAKEN
+        - SUBDOMAIN_INVALID
+        - SUBDOMAIN_RESERVED
+        - PLAN_NOT_PUBLISHED
+        - NOT_PROVISIONING_FAILED
+        - SAME_PLAN
+        - SUBSCRIPTION_CANCELLED
+        - TRANSITION_NOT_ALLOWED
+        - RETENTION_EXPIRED
+        - RETENTION_DEADLINE_IN_PAST
+        - NOT_IN_RETENTION
+        - REASON_REQUIRED
+        - TENANT_NOT_ACCESSIBLE
+        - SUPPORT_SESSION_INVALID
+        - PLAN_NAME_TAKEN
+        - PLAN_INCOMPLETE
+        - FIELD_NAME_TAKEN
+        - BASIC_FIELD_READ_ONLY
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, code]
+      properties:
+        field:
+          type: string
+          description: Property path, for example `amount` or `customFields.support-hours`.
+        code:
+          type: string
+          description: Stable reason, for example `REQUIRED`, `TOO_LONG`, `NOT_POSITIVE`, `DATE_IN_FUTURE`, `WRONG_TYPE`, `NOT_ALLOWED`, `UNKNOWN_FIELD`.
+    Problem:
+      type: object
+      description: Problem Details (RFC 9457) with a stable `code` extension.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: URI identifying the problem type.
+        title:
+          type: string
+          description: Short developer-facing summary. Not shown to end users.
+        status:
+          type: integer
+          format: int32
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+          description: Developer-facing explanation of this occurrence. Never contains personal data.
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+        fieldErrors:
+          type: array
+          description: Present with `VALIDATION_FAILED` and `PLAN_INCOMPLETE`.
+          items:
+            $ref: '#/components/schemas/FieldError'
+  responses:
+    Unauthenticated:
+      description: '`UNAUTHENTICATED`: missing or invalid access token.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unauthenticated:
+              value:
+                type: https://playtodoo.com/problems/unauthenticated
+                title: Authentication required
+                status: 401
+                code: UNAUTHENTICATED
+    Forbidden:
+      description: '`FORBIDDEN`: not a platform token, or the role does not allow this operation.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            forbidden:
+              $ref: '#/components/examples/ForbiddenProblem'
+    CapabilityForbidden:
+      description: '`FORBIDDEN`: not a platform token. `CAPABILITY_REVOKED`: the operator does not have, or no longer has, the capability.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            capabilityRevoked:
+              $ref: '#/components/examples/CapabilityRevokedProblem'
+            forbidden:
+              $ref: '#/components/examples/ForbiddenProblem'
+    InvalidRequest:
+      description: '`INVALID_REQUEST`: malformed body or parameters.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            invalidRequest:
+              value:
+                type: https://playtodoo.com/problems/invalid-request
+                title: Invalid request
+                status: 400
+                detail: '`version` is required.'
+                code: INVALID_REQUEST
+    StaleState:
+      description: '`STALE_STATE`: `version` does not match the current state; reload and retry.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            staleState:
+              $ref: '#/components/examples/StaleStateProblem'
+    ComplexChanged:
+      description: Complex after the change.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ComplexDetail'
+          examples:
+            active:
+              $ref: '#/components/examples/ActiveComplex'
+    ComplexNotFound:
+      description: '`COMPLEX_NOT_FOUND`: no complex with this id.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            notFound:
+              value:
+                type: https://playtodoo.com/problems/complex-not-found
+                title: Complex not found
+                status: 404
+                code: COMPLEX_NOT_FOUND
+    PlanNotFound:
+      description: '`PLAN_NOT_FOUND`: no plan with this id (or a draft requested by an operator).'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            notFound:
+              value:
+                type: https://playtodoo.com/problems/plan-not-found
+                title: Plan not found
+                status: 404
+                code: PLAN_NOT_FOUND
+    PlanFieldNotFound:
+      description: '`PLAN_FIELD_NOT_FOUND`: no plan field with this id.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            notFound:
+              value:
+                type: https://playtodoo.com/problems/plan-field-not-found
+                title: Plan field not found
+                status: 404
+                code: PLAN_FIELD_NOT_FOUND
+    PlanNameTaken:
+      description: '`PLAN_NAME_TAKEN`: another plan has this name (case-insensitive).'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            nameTaken:
+              $ref: '#/components/examples/PlanNameTakenProblem'
+    PlanValidationFailed:
+      description: |
+        `VALIDATION_FAILED`: a basic field is invalid (currency or periodicity not allowed, negative
+        limit) or a custom field is unknown, retired or of the wrong type. When editing a published
+        plan, `PLAN_INCOMPLETE` if a required field is left empty.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            wrongType:
+              value:
+                type: https://playtodoo.com/problems/validation-failed
+                title: Validation failed
+                status: 422
+                code: VALIDATION_FAILED
+                fieldErrors:
+                  - field: customFields.tournaments-included
+                    code: WRONG_TYPE
+    FieldNameTaken:
+      description: '`FIELD_NAME_TAKEN`: another field has this label (case-insensitive).'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            nameTaken:
+              $ref: '#/components/examples/FieldNameTakenProblem'
+    PlanFieldValidationFailed:
+      description: '`BASIC_FIELD_READ_ONLY`: basic fields cannot be changed. `VALIDATION_FAILED`: blank or too long label.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            basicReadOnly:
+              $ref: '#/components/examples/BasicFieldReadOnlyProblem'
+            validationFailed:
+              $ref: '#/components/examples/ValidationFailedProblem'
+    BasicFieldReadOnly:
+      description: '`BASIC_FIELD_READ_ONLY`: basic fields cannot be retired.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            basicReadOnly:
+              $ref: '#/components/examples/BasicFieldReadOnlyProblem'
+  examples:
+    ActiveComplex:
+      summary: Active complex
+      value:
+        id: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+        displayName: Canchas El Sol
+        subdomain: canchas-el-sol
+        ownerEmail: owner@example.com
+        createdAt: '2026-12-01T14:00:00Z'
+        tenantStatus: ACTIVE
+        suspendedAt: null
+        archivedAt: null
+        retentionDays: null
+        purgeDueAt: null
+        purgedAt: null
+        subscription:
+          status: ACTIVE
+          statusSince: '2026-12-01T14:00:02Z'
+          statusChangedBy:
+            id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+            displayName: Sam Example
+          plan:
+            planId: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+            name: Premium
+            price: '120.00'
+            currency: USD
+            periodicity: MONTHLY
+            courtLimit: 10
+            userLimit: 25
+            customFields:
+              support-hours: Weekdays 9 to 18
+            assignedAt: '2026-12-01T14:00:00Z'
+        allowedTransitions: [EXPIRING, SUSPENDED, CANCELLED]
+        version: 3
+    ProvisioningFailedComplex:
+      summary: Registered complex whose schema could not be created
+      value:
+        id: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+        displayName: Canchas El Sol
+        subdomain: canchas-el-sol
+        ownerEmail: owner@example.com
+        createdAt: '2026-12-01T14:00:00Z'
+        tenantStatus: PROVISIONING_FAILED
+        suspendedAt: null
+        archivedAt: null
+        retentionDays: null
+        purgeDueAt: null
+        purgedAt: null
+        subscription:
+          status: ACTIVE
+          statusSince: '2026-12-01T14:00:00Z'
+          statusChangedBy:
+            id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+            displayName: Sam Example
+          plan:
+            planId: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+            name: Premium
+            price: '120.00'
+            currency: USD
+            periodicity: MONTHLY
+            courtLimit: 10
+            userLimit: 25
+            customFields: {}
+            assignedAt: '2026-12-01T14:00:00Z'
+        allowedTransitions: []
+        version: 1
+    ProvisioningComplex:
+      summary: Provisioning retry in progress
+      value:
+        id: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+        displayName: Canchas El Sol
+        subdomain: canchas-el-sol
+        ownerEmail: owner@example.com
+        createdAt: '2026-12-01T14:00:00Z'
+        tenantStatus: PROVISIONING
+        suspendedAt: null
+        archivedAt: null
+        retentionDays: null
+        purgeDueAt: null
+        purgedAt: null
+        subscription:
+          status: ACTIVE
+          statusSince: '2026-12-01T14:00:00Z'
+          statusChangedBy:
+            id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+            displayName: Sam Example
+          plan:
+            planId: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+            name: Premium
+            price: '120.00'
+            currency: USD
+            periodicity: MONTHLY
+            courtLimit: 10
+            userLimit: 25
+            customFields: {}
+            assignedAt: '2026-12-01T14:00:00Z'
+        allowedTransitions: []
+        version: 2
+    SuspendedComplex:
+      summary: Suspended complex with the default retention
+      value:
+        id: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+        displayName: Canchas El Sol
+        subdomain: canchas-el-sol
+        ownerEmail: owner@example.com
+        createdAt: '2026-12-01T14:00:00Z'
+        tenantStatus: SUSPENDED
+        suspendedAt: '2027-01-10T12:00:00Z'
+        archivedAt: null
+        retentionDays: 45
+        purgeDueAt: '2027-02-24T12:00:00Z'
+        purgedAt: null
+        subscription:
+          status: SUSPENDED
+          statusSince: '2027-01-10T12:00:00Z'
+          statusChangedBy:
+            id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+            displayName: Sam Example
+          plan:
+            planId: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+            name: Premium
+            price: '120.00'
+            currency: USD
+            periodicity: MONTHLY
+            courtLimit: 10
+            userLimit: 25
+            customFields:
+              support-hours: Weekdays 9 to 18
+            assignedAt: '2026-12-01T14:00:00Z'
+        allowedTransitions: [ACTIVE, CANCELLED]
+        version: 4
+    PurgedComplex:
+      summary: Purged complex (only Kuador records remain)
+      value:
+        id: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
+        displayName: Canchas El Sol
+        subdomain: null
+        ownerEmail: null
+        createdAt: '2026-12-01T14:00:00Z'
+        tenantStatus: PURGED
+        suspendedAt: '2027-01-10T12:00:00Z'
+        archivedAt: '2027-01-20T12:00:00Z'
+        retentionDays: null
+        purgeDueAt: null
+        purgedAt: '2027-02-25T03:00:00Z'
+        subscription:
+          status: CANCELLED
+          statusSince: '2027-01-20T12:00:00Z'
+          statusChangedBy:
+            id: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+            displayName: Sam Example
+          plan:
+            planId: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+            name: Premium
+            price: '120.00'
+            currency: USD
+            periodicity: MONTHLY
+            courtLimit: 10
+            userLimit: 25
+            customFields:
+              support-hours: Weekdays 9 to 18
+            assignedAt: '2026-12-01T14:00:00Z'
+        allowedTransitions: []
+        version: 7
+    RecordedPayment:
+      summary: Payment by bank transfer
+      value:
+        id: 6f7a8b9c-0d1e-4f2a-9b3c-4d5e6f7a8b9c
+        amount: '120.00'
+        currency: USD
+        paidOn: '2026-12-01'
+        method: TRANSFER
+        recordedBy:
+          id: 6a7b8c9d-0e1f-4a2b-8c3d-4e5f6a7b8c9d
+          displayName: Robin Example
+        recordedAt: '2026-12-02T10:15:00Z'
+    DraftPlan:
+      summary: Draft with only a name
+      value:
+        id: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+        name: Premium
+        price: null
+        currency: null
+        periodicity: null
+        courtLimit: null
+        userLimit: null
+        customFields: {}
+        status: DRAFT
+        version: 0
+    PublishedPlan:
+      summary: Published plan with a custom field
+      value:
+        id: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e
+        name: Premium
+        price: '120.00'
+        currency: USD
+        periodicity: MONTHLY
+        courtLimit: 10
+        userLimit: 25
+        customFields:
+          support-hours: Weekdays 9 to 18
+        status: PUBLISHED
+        version: 2
+    CustomPlanField:
+      summary: Custom text field
+      value:
+        id: 9f0a1b2c-3d4e-4f5a-8b6c-7d8e9f0a1b2c
+        key: support-hours
+        label: Support hours
+        type: TEXT
+        required: false
+        origin: CUSTOM
+        retiredAt: null
+        version: 0
+    OperatorCapabilitiesInitial:
+      summary: Initial state, every capability disabled
+      value:
+        version: 0
+        items:
+          - key: COMPLEX_CREATE
+            description: Register complexes and retry their provisioning.
+            enabled: false
+          - key: SUBSCRIPTION_PAYMENT_RECORD
+            description: Record subscription payments.
+            enabled: false
+          - key: SUBSCRIPTION_STATUS_CHANGE
+            description: Mark expiring, suspend, reactivate and cancel subscriptions.
+            enabled: false
+          - key: TENANT_DATA_ACCESS
+            description: Open support sessions with a reason on active complexes to read and edit their data.
+            enabled: false
+    ForbiddenProblem:
+      summary: Token type or role not allowed
+      value:
+        type: https://playtodoo.com/problems/forbidden
+        title: Not allowed
+        status: 403
+        code: FORBIDDEN
+    CapabilityRevokedProblem:
+      summary: Operator without the capability
+      value:
+        type: https://playtodoo.com/problems/capability-revoked
+        title: Capability not enabled
+        status: 403
+        code: CAPABILITY_REVOKED
+    StaleStateProblem:
+      summary: Version does not match
+      value:
+        type: https://playtodoo.com/problems/stale-state
+        title: Stale state
+        status: 409
+        detail: The resource changed since it was read.
+        code: STALE_STATE
+    SubdomainTakenProblem:
+      summary: Subdomain in use or retired
+      value:
+        type: https://playtodoo.com/problems/subdomain-taken
+        title: Subdomain taken
+        status: 409
+        code: SUBDOMAIN_TAKEN
+    SubdomainInvalidProblem:
+      summary: Subdomain breaks the format rules
+      value:
+        type: https://playtodoo.com/problems/subdomain-invalid
+        title: Invalid subdomain
+        status: 422
+        detail: Use 3 to 63 lower-case letters, digits or single hyphens, not at the ends.
+        code: SUBDOMAIN_INVALID
+    SubdomainReservedProblem:
+      summary: Reserved subdomain
+      value:
+        type: https://playtodoo.com/problems/subdomain-reserved
+        title: Reserved subdomain
+        status: 422
+        code: SUBDOMAIN_RESERVED
+    PlanNotPublishedProblem:
+      summary: Plan missing or draft
+      value:
+        type: https://playtodoo.com/problems/plan-not-published
+        title: Plan not published
+        status: 422
+        code: PLAN_NOT_PUBLISHED
+    ValidationFailedProblem:
+      summary: Field validation failed
+      value:
+        type: https://playtodoo.com/problems/validation-failed
+        title: Validation failed
+        status: 422
+        code: VALIDATION_FAILED
+        fieldErrors:
+          - field: displayName
+            code: TOO_LONG
+    PlanNameTakenProblem:
+      summary: Plan name in use
+      value:
+        type: https://playtodoo.com/problems/plan-name-taken
+        title: Plan name taken
+        status: 409
+        code: PLAN_NAME_TAKEN
+    FieldNameTakenProblem:
+      summary: Field label in use
+      value:
+        type: https://playtodoo.com/problems/field-name-taken
+        title: Field name taken
+        status: 409
+        code: FIELD_NAME_TAKEN
+    BasicFieldReadOnlyProblem:
+      summary: Basic field cannot change
+      value:
+        type: https://playtodoo.com/problems/basic-field-read-only
+        title: Basic field is read-only
+        status: 422
+        code: BASIC_FIELD_READ_ONLY
