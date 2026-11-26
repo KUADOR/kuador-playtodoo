@@ -10,6 +10,8 @@ class HomeScreen extends StatelessWidget {
 
   final bool showDesignCatalogLink;
 
+  static const String tenantEntryLabel = 'Entrar a un complejo por subdominio';
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,6 +50,13 @@ class HomeScreen extends StatelessWidget {
                     onPressed: () =>
                         Navigator.of(context)
                             .pushNamed(AppRoutes.tenantPreview),
+                  ),
+                  const SizedBox(height: AppTokens.space3),
+                  AppButton(
+                    label: tenantEntryLabel,
+                    variant: AppButtonVariant.secondary,
+                    onPressed: () =>
+                        Navigator.of(context).pushNamed(AppRoutes.tenantEntry),
                   ),
                 ],
               ],

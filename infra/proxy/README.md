@@ -20,7 +20,11 @@ only entry point from the internet in the deployed environments.
 | `<root>`, `www.<root>` | `404` until the root site exists |
 | `{sub}.<root>` with `/api` or `/api/**` | api, tenant context |
 | `{sub}.<root>`, any other path | app |
-| Malformed subdomain (ADR-012 format), nested labels, unknown domains | `404` from the proxy |
+| Nested labels, unknown domains | `404` from the proxy |
+
+`{sub}` is any single label, well-formed or not: the api validates the ADR-012 format before any
+lookup and answers `404 TENANT_NOT_FOUND`, so the app and movil show «Complejo no encontrado» for a
+malformed subdomain too (contract `tenancy.openapi.yaml`).
 
 ## Forwarded headers
 
