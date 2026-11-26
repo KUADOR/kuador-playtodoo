@@ -1,0 +1,17 @@
+<label class="checkbox" [class.checkbox--disabled]="disabled()" [for]="controlId">
+  <input
+    class="checkbox__control"
+    type="checkbox"
+    [id]="controlId"
+    [checked]="checked()"
+    [disabled]="disabled()"
+    [attr.aria-describedby]="description() ? descriptionId : null"
+    (change)="toggle($event)"
+  />
+  <span class="checkbox__text">
+    <span class="checkbox__label">{{ label() }}</span>
+    @if (description()) {
+      <span class="checkbox__description" [id]="descriptionId">{{ description() }}</span>
+    }
+  </span>
+</label>

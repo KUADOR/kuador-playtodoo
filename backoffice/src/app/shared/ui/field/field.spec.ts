@@ -30,6 +30,32 @@ describe('Field', () => {
   }
 
   describe('text kind', () => {
+    it('defaults to a plain text input without autocomplete or required hints', async () => {
+      await render();
+
+      expect(control().getAttribute('type')).toBe('text');
+      expect(control().hasAttribute('autocomplete')).toBe(false);
+      expect(control().hasAttribute('aria-required')).toBe(false);
+    });
+
+    it('renders e-mail and password inputs with their autocomplete and required hints', async () => {
+      await render({ inputType: 'password', autocomplete: 'current-password', required: true });
+
+      expect(control().getAttribute('type')).toBe('password');
+      expect(control().getAttribute('autocomplete')).toBe('current-password');
+      expect(control().getAttribute('aria-required')).toBe('true');
+    });
+
+    it('moves the focus to its control on request', async () => {
+      await render();
+      document.body.appendChild(fixture.nativeElement);
+
+      fixture.componentInstance.focus();
+
+      expect(document.activeElement).toBe(control());
+      fixture.nativeElement.remove();
+    });
+
     it('labels the input with a visible label', async () => {
       await render();
 

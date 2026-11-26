@@ -1,0 +1,85 @@
+/*
+ * Table of «Identidad visual» v3, shared by every backoffice list. Markup:
+ * <table class="data-table"> with <caption>, <th scope="col"> and <td data-label="…">.
+ * Under 720 px each row becomes a card of «label: value» pairs (no horizontal scroll).
+ */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+.data-table caption {
+  padding-bottom: var(--space-3);
+  color: var(--color-brand-navy);
+  font-family: var(--font-family-heading);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-extrabold);
+  text-align: left;
+}
+
+.data-table th,
+.data-table td {
+  height: var(--size-touch-min);
+  padding: var(--space-3);
+  border-bottom: var(--border-width-sm) solid var(--color-border);
+  text-align: left;
+}
+
+.data-table th {
+  background: var(--color-surface-alt);
+  font-weight: var(--font-weight-semibold);
+}
+
+.data-table tbody tr:hover,
+.data-table tbody tr:focus-within {
+  background: var(--color-primary-tint);
+}
+
+.data-table .data-table__number {
+  text-align: right;
+}
+
+@media (max-width: 719px) {
+  .data-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .data-table,
+  .data-table tbody,
+  .data-table tr,
+  .data-table td {
+    display: block;
+  }
+
+  .data-table tr {
+    margin-bottom: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border: var(--border-width-sm) solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
+
+  .data-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    height: auto;
+    padding: var(--space-2) 0;
+  }
+
+  .data-table tr td:last-child {
+    border-bottom: 0;
+  }
+
+  .data-table td::before {
+    content: attr(data-label);
+    color: var(--color-fg-muted);
+    font-weight: var(--font-weight-semibold);
+  }
+}

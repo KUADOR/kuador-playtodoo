@@ -1,0 +1,65 @@
+:host {
+  /* Width of the login card on wide screens: a layout choice of P1, not an identity token. */
+  --login-card-max-width: 420px;
+
+  display: block;
+}
+
+.login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: var(--space-7) var(--space-4);
+}
+
+/* Wordmark while the official logo file is [POR DEFINIR] (Identidad visual, «Logo»). */
+.login__brand {
+  margin: 0;
+  color: var(--color-brand-navy);
+  font-family: var(--font-family-heading);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-extrabold);
+  line-height: var(--line-height-heading);
+}
+
+.login__card {
+  box-sizing: border-box;
+  padding: var(--space-5);
+  border: var(--border-width-sm) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: var(--login-card-max-width);
+}
+
+.login__title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+}
+
+.login__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.login__submit {
+  align-self: flex-end;
+}
+
+@media (max-width: 599px) {
+  .login {
+    padding-top: var(--space-5);
+  }
+
+  .login__submit {
+    align-self: stretch;
+  }
+}

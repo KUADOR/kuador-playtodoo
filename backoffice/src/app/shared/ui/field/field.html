@@ -2,6 +2,7 @@
 
 @if (kind() === 'select') {
   <select
+    #control
     class="field__control"
     [class.field__control--error]="hasError()"
     [id]="controlId"
@@ -21,13 +22,16 @@
   </select>
 } @else {
   <input
+    #control
     class="field__control"
     [class.field__control--error]="hasError()"
-    type="text"
+    [type]="inputType()"
     [id]="controlId"
     [disabled]="disabled()"
     [value]="value()"
     [attr.placeholder]="placeholder() || null"
+    [attr.autocomplete]="autocomplete() || null"
+    [attr.aria-required]="required() || null"
     [attr.aria-invalid]="hasError() || null"
     [attr.aria-describedby]="describedBy()"
     (input)="updateValue($event)"

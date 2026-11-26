@@ -1,0 +1,35 @@
+<span class="alert__icon">
+  @switch (tone()) {
+    @case ('success') {
+      <svg lucideCircleCheck [size]="iconSize"></svg>
+    }
+    @case ('warning') {
+      <svg lucideTriangleAlert [size]="iconSize"></svg>
+    }
+    @case ('error') {
+      <svg lucideCircleAlert [size]="iconSize"></svg>
+    }
+    @default {
+      <svg lucideInfo [size]="iconSize"></svg>
+    }
+  }
+</span>
+
+<div class="alert__body">
+  @if (heading()) {
+    <p class="alert__heading">{{ heading() }}</p>
+  }
+  <div class="alert__text"><ng-content /></div>
+  <div class="alert__actions"><ng-content select="[alertActions]" /></div>
+</div>
+
+@if (dismissible()) {
+  <button
+    type="button"
+    class="alert__dismiss"
+    [attr.aria-label]="dismissLabel"
+    (click)="dismiss.emit()"
+  >
+    <svg lucideX [size]="iconSize"></svg>
+  </button>
+}

@@ -1,0 +1,92 @@
+<a class="shell__skip-link" href="#main-content" (click)="skipToContent($event)"
+  >Saltar al contenido</a
+>
+
+<header class="shell__top-bar" [attr.inert]="menuOpen() || null">
+  <span class="shell__brand">Playtodoo Kuador</span>
+  <button
+    #menuButton
+    type="button"
+    class="shell__menu-button"
+    aria-controls="shell-navigation"
+    [attr.aria-expanded]="menuOpen()"
+    (click)="openMenu()"
+  >
+    <svg lucideMenu [size]="iconSize"></svg>
+    <span>Menú</span>
+  </button>
+</header>
+
+@if (menuOpen()) {
+  <div class="shell__backdrop" (click)="closeMenu()"></div>
+}
+
+<div
+  #navigationPanel
+  id="shell-navigation"
+  class="shell__navigation"
+  [class.shell__navigation--open]="menuOpen()"
+  [attr.role]="menuOpen() ? 'dialog' : null"
+  [attr.aria-modal]="menuOpen() || null"
+  [attr.aria-label]="menuOpen() ? 'Menú' : null"
+  (keydown)="handlePanelKeydown($event)"
+>
+  <div class="shell__navigation-header">
+    <span class="shell__brand">Playtodoo Kuador</span>
+    @if (menuOpen()) {
+      <button
+        type="button"
+        class="shell__close-button"
+        aria-label="Cerrar menú"
+        (click)="closeMenu()"
+      >
+        <svg lucideX [size]="iconSize"></svg>
+      </button>
+    }
+  </div>
+
+  <nav class="shell__nav" aria-label="Secciones">
+    <ul class="shell__nav-list">
+      @for (item of items(); track item.url) {
+        <li>
+          <a
+            class="shell__nav-link"
+            [routerLink]="item.url"
+            routerLinkActive="shell__nav-link--active"
+            ariaCurrentWhenActive="page"
+          >
+            @switch (item.icon) {
+              @case ('complexes') {
+                <svg lucideBuilding2 [size]="iconSize"></svg>
+              }
+              @case ('plans') {
+                <svg lucideLayers [size]="iconSize"></svg>
+              }
+              @case ('permissions') {
+                <svg lucideUserCog [size]="iconSize"></svg>
+              }
+            }
+            <span>{{ item.label }}</span>
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+
+  <div class="shell__account">
+    @if (user(); as signedIn) {
+      <p class="shell__user">
+        <span class="shell__user-name">{{ signedIn.displayName }}</span>
+        <span class="shell__user-role">{{ roleLabel() }}</span>
+      </p>
+    }
+    <button type="button" class="shell__sign-out" (click)="signOut()">
+      <svg lucideLogOut [size]="iconSize"></svg>
+      <span>Cerrar sesión</span>
+    </button>
+  </div>
+</div>
+
+<main #main id="main-content" class="shell__main" [attr.inert]="menuOpen() || null">
+  <router-outlet />
+</main>

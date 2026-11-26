@@ -1,0 +1,19 @@
+@if (pageCount() > 1) {
+  <nav class="pagination" [attr.aria-label]="label()">
+    <p class="pagination__summary">{{ summary() }}</p>
+    <div class="pagination__actions">
+      <app-button
+        label="Anterior"
+        variant="secondary"
+        [disabled]="disabled() || isFirst()"
+        (press)="pageChange.emit(page() - 1)"
+      />
+      <app-button
+        label="Siguiente"
+        variant="secondary"
+        [disabled]="disabled() || isLast()"
+        (press)="pageChange.emit(page() + 1)"
+      />
+    </div>
+  </nav>
+}

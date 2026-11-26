@@ -1,0 +1,19 @@
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-sm);
+}
+
+.pagination__summary {
+  margin: 0;
+  color: var(--color-fg-muted);
+}
+
+.pagination__actions {
+  display: flex;
+  gap: var(--space-2);
+}

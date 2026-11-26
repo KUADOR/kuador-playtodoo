@@ -17,6 +17,11 @@ h3 {
   line-height: var(--line-height-heading);
 }
 
+/* Page headings receive the focus programmatically after each navigation (not interactive). */
+h1[tabindex='-1']:focus {
+  outline: none;
+}
+
 /* Hides text visually while keeping it available to screen readers. */
 .visually-hidden {
   position: absolute;

@@ -1,0 +1,49 @@
+@let current = state();
+<section
+  aria-labelledby="capability-changes-heading"
+  [attr.aria-busy]="current.status === 'loading'"
+>
+  <h2 id="capability-changes-heading">Cambios de permisos</h2>
+
+  @if (current.status === 'loading') {
+    <app-skeleton [rows]="skeletonRows" />
+  } @else if (current.status === 'error') {
+    <app-alert tone="error">
+      {{ current.message }}
+      <app-button alertActions label="Reintentar" variant="secondary" (press)="load(0)" />
+    </app-alert>
+  } @else if (current.page.totalItems === 0) {
+    <p>Todavía no hay cambios.</p>
+  } @else {
+    <table class="data-table">
+      <caption class="visually-hidden">
+        Cambios de permisos del operador
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Fecha</th>
+          <th scope="col">Responsable</th>
+          <th scope="col">Función</th>
+          <th scope="col">Cambio</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (change of current.page.items; track change.id) {
+          <tr>
+            <td data-label="Fecha">{{ formatDateTime(change.changedAt) }}</td>
+            <td data-label="Responsable">{{ change.changedBy.displayName }}</td>
+            <td data-label="Función">{{ label(change) }}</td>
+            <td data-label="Cambio">{{ change.enabled ? 'Activada' : 'Desactivada' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <app-pagination
+      label="Paginación de cambios de permisos"
+      [page]="current.page.page"
+      [size]="current.page.size"
+      [totalItems]="current.page.totalItems"
+      (pageChange)="load($event)"
+    />
+  }
+</section>

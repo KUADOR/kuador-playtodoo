@@ -1,0 +1,77 @@
+:host {
+  /* Measures of «Diálogo» (Identidad visual v3): component layout, not shared tokens. */
+  --dialog-max-width: 480px;
+  --dialog-backdrop: rgba(17, 24, 39, 0.5);
+  --dialog-layer: 100;
+}
+
+.dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--dialog-layer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--dialog-backdrop);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--dialog-max-width);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-fg);
+  font-family: var(--font-family-body);
+  line-height: var(--line-height-body);
+}
+
+.dialog:focus-visible {
+  outline: var(--border-focus-ring) solid var(--color-focus);
+  outline-offset: var(--border-focus-offset);
+}
+
+.dialog__heading {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (max-width: 599px) {
+  .dialog__backdrop {
+    padding: 0;
+  }
+
+  .dialog {
+    max-width: none;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  /* Stacked actions; the stretched app-button hosts make their buttons full width. */
+  .dialog__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    margin-top: auto;
+  }
+}
