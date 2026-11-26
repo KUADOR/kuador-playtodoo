@@ -1,0 +1,115 @@
+@let current = state();
+<a class="text-link" [routerLink]="complexesUrl">‹ Complejos</a>
+
+@if (current.status === 'loading') {
+  <h1>Detalle del complejo</h1>
+  <div aria-busy="true"><app-skeleton [rows]="skeletonRows" /></div>
+} @else if (current.status === 'error') {
+  <h1>Detalle del complejo</h1>
+  <app-alert tone="error">
+    {{ current.message }}
+    <app-button alertActions label="Reintentar" variant="secondary" (press)="reload()" />
+  </app-alert>
+} @else if (current.status === 'not-found') {
+  <h1>Detalle del complejo</h1>
+  <app-alert tone="error">
+    No encontramos este complejo.
+    <a alertActions class="text-link" [routerLink]="complexesUrl">Ir a Complejos</a>
+  </app-alert>
+} @else {
+  @let complex = current.complex;
+  <header class="detail__header">
+    <div class="detail__title">
+      <h1>{{ complex.displayName }}</h1>
+      @if (statusLook(); as look) {
+        <app-status-tag [look]="look" />
+      }
+    </div>
+    <p class="detail__host">{{ host() }}</p>
+  </header>
+
+  @if (resultNotice(); as notice) {
+    <app-alert tone="success" [dismissible]="true" (dismiss)="resultNotice.set(null)">{{
+      notice
+    }}</app-alert>
+  }
+  @if (pageError(); as message) {
+    <app-alert tone="error">{{ message }}</app-alert>
+  }
+
+  @for (notice of notices(); track notice.kind) {
+    <app-alert [tone]="notice.tone">
+      {{ notice.text }}
+      @if (notice.kind === 'provisioning-failed' && actions()?.retryRegistration) {
+        <app-button
+          alertActions
+          label="Reintentar alta"
+          variant="secondary"
+          loadingLabel="Reintentando…"
+          [loading]="retrying()"
+          (press)="retryRegistration()"
+        />
+      }
+      @if (notice.kind === 'purge-scheduled' && actions()?.changeRetention) {
+        <app-button
+          alertActions
+          label="Cambiar plazo de conservación"
+          variant="secondary"
+          (press)="open('retention')"
+        />
+      }
+    </app-alert>
+  }
+
+  @if (hasActions()) {
+    <div class="detail__actions">
+      @if (actions()?.recordPayment) {
+        <app-button label="Registrar pago" (press)="open('payment')" />
+      }
+      @if (actions()?.changeStatus) {
+        <app-button label="Cambiar estado" variant="secondary" (press)="open('status')" />
+      }
+      @if (actions()?.changePlan) {
+        <app-button label="Cambiar plan" variant="secondary" (press)="open('plan')" />
+      }
+    </div>
+  }
+
+  <app-tab-nav [label]="'Información de ' + complex.displayName" [tabs]="tabs()">
+    <router-outlet />
+  </app-tab-nav>
+
+  @switch (openDialog()) {
+    @case ('payment') {
+      <app-record-payment-dialog
+        [complex]="complex"
+        (recorded)="paymentRecorded($event)"
+        (closeRequest)="closeDialog()"
+      />
+    }
+    @case ('status') {
+      <app-change-status-dialog
+        [complex]="complex"
+        (changed)="statusChanged($event)"
+        (stale)="staleState()"
+        (closeRequest)="closeDialog()"
+      />
+    }
+    @case ('plan') {
+      <app-change-plan-dialog
+        [complex]="complex"
+        (changed)="planChanged($event)"
+        (stale)="staleState()"
+        (closeRequest)="closeDialog()"
+      />
+    }
+    @case ('retention') {
+      <app-change-retention-dialog
+        [complex]="complex"
+        (changed)="retentionChanged($event)"
+        (stale)="staleState()"
+        (closeRequest)="closeDialog()"
+      />
+    }
+  }
+}

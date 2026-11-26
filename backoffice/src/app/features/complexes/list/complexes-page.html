@@ -1,0 +1,67 @@
+@let current = complexes.state();
+<div class="complexes__header">
+  <h1>Complejos</h1>
+  @if (canRegister()) {
+    <a class="link-button" [routerLink]="registerUrl">Dar de alta complejo</a>
+  }
+</div>
+
+<section aria-labelledby="complexes-heading" [attr.aria-busy]="current.status === 'loading'">
+  <h2 id="complexes-heading" class="visually-hidden">Lista de complejos</h2>
+  @if (current.status === 'loading') {
+    <app-skeleton [rows]="skeletonRows" />
+  } @else if (current.status === 'error') {
+    <app-alert tone="error">
+      {{ current.message }}
+      <app-button alertActions label="Reintentar" variant="secondary" (press)="complexes.load(0)" />
+    </app-alert>
+  } @else if (current.page.totalItems === 0) {
+    <div class="complexes__empty">
+      <p>Todavía no hay complejos.</p>
+    </div>
+  } @else {
+    <table class="data-table">
+      <caption class="visually-hidden">
+        Complejos con su plan, estado y último pago
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Complejo</th>
+          <th scope="col">Subdominio</th>
+          <th scope="col">Plan</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Último pago</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (complex of current.page.items; track complex.id) {
+          <tr>
+            <td data-label="Complejo">
+              <a class="complexes__link" [routerLink]="detailUrl(complex.id)">{{
+                complex.displayName
+              }}</a>
+            </td>
+            <td data-label="Subdominio">{{ complex.subdomain ?? emptyValue }}</td>
+            <td data-label="Plan">{{ complex.plan.name }}</td>
+            <td data-label="Estado">
+              <span class="complexes__status">
+                <app-status-tag [look]="statusLook(complex)" />
+                @if (purgeText(complex); as purge) {
+                  <span class="complexes__purge">{{ purge }}</span>
+                }
+              </span>
+            </td>
+            <td data-label="Último pago">{{ lastPaymentText(complex) }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <app-pagination
+      label="Paginación de complejos"
+      [page]="current.page.page"
+      [size]="current.page.size"
+      [totalItems]="current.page.totalItems"
+      (pageChange)="complexes.load($event)"
+    />
+  }
+</section>
