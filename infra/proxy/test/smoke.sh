@@ -60,15 +60,18 @@ echo "Global hosts:"
 expect_routed api.localhost /api/v1/auth/players/login api
 expect_routed admin.localhost / backoffice
 
+echo "Malformed single-label hosts reach the api and the app, which answer TENANT_NOT_FOUND:"
+expect_routed ab.localhost /api/v1/tenant api
+expect_routed ab.localhost / app
+expect_routed -club.localhost /api/v1/tenant api
+expect_routed club-.localhost /api/v1/tenant api
+expect_routed club--norte.localhost /api/v1/tenant api
+expect_routed xn--club.localhost /api/v1/tenant api
+expect_routed "$(printf 'a%.0s' {1..64}).localhost" /api/v1/tenant api
+
 echo "Hosts that must not reach any upstream:"
 expect_not_found localhost /
 expect_not_found www.localhost /
-expect_not_found ab.localhost /api/v1/tenant
-expect_not_found -club.localhost /api/v1/tenant
-expect_not_found club-.localhost /api/v1/tenant
-expect_not_found club--norte.localhost /api/v1/tenant
-expect_not_found xn--club.localhost /api/v1/tenant
-expect_not_found "$(printf 'a%.0s' {1..64}).localhost" /api/v1/tenant
 expect_not_found nested.club.localhost /api/v1/tenant
 expect_not_found canchaselsol.example.com /api/v1/tenant
 

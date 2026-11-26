@@ -10,10 +10,10 @@ host layout as the deployed environments (ADR-002):
 | `http://{sub}.localhost:8000/**` | app (`:5173`) | Web of the complex |
 | `http://api.localhost:8000` | api (`:8080`) | Global (no tenant) |
 | `http://admin.localhost:8000` | backoffice (`:4200`) | Kuador team |
-| `localhost`, `www`, malformed or nested subdomains | proxy | `404` |
+| `localhost`, `www`, nested subdomains | proxy | `404` |
 
 Browsers and curl resolve `*.localhost` to the loopback address: no hosts file is needed.
-Whether a well-formed subdomain belongs to a complex is decided by the api (`404 TENANT_NOT_FOUND`).
+Whether a subdomain is well formed and belongs to a complex is decided by the api (`404 TENANT_NOT_FOUND`).
 
 ## Start
 

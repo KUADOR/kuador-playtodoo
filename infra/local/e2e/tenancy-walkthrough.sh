@@ -168,7 +168,8 @@ request GET "$(tenant_api "$SUBDOMAIN_UNKNOWN")/tenant"
 check "Subdominio inexistente" "GET $SUBDOMAIN_UNKNOWN/tenant" "404 TENANT_NOT_FOUND" "$status $(field .code)"
 on_state inexistente "$SUBDOMAIN_UNKNOWN" not-found
 request GET "$(tenant_api "$SUBDOMAIN_MALFORMED")/tenant"
-check "Subdominio mal formado (lo rechaza el proxy)" "GET $SUBDOMAIN_MALFORMED/tenant" 404 "$status"
+check "Subdominio mal formado" "GET $SUBDOMAIN_MALFORMED/tenant" "404 TENANT_NOT_FOUND" "$status $(field .code)"
+on_state mal-formado "$SUBDOMAIN_MALFORMED" not-found
 
 # --- Cambio de subdominio ---------------------------------------------------------------------------
 request PUT "$(tenant_api "$SUBDOMAIN_A")/tenant/subdomain" "$staff_a_token" "{\"subdomain\":\"$SUBDOMAIN_A_NEW\"}"
