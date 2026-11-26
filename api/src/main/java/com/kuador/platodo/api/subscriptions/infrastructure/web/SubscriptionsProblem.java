@@ -10,8 +10,10 @@ import org.springframework.http.ProblemDetail;
 import com.kuador.platodo.api.subscriptions.domain.FieldError;
 
 /**
- * Problem Details of the plan and complex operations ({@code contracts/platform-backoffice.openapi.yaml}). Title and detail are
- * developer-facing; the backoffice maps {@code code} and each field error code to the text shown to people.
+ * Problem Details of the plan and complex operations ({@code contracts/platform-backoffice.openapi.yaml}). Titles are
+ * developer-facing; the backoffice maps {@code code} and each field error code to the text shown to people. The
+ * subdomain rejections of a registration (PLATODO-27 CA2) also carry their Spanish message in {@code detail}, so any
+ * client can show it as is.
  */
 enum SubscriptionsProblem {
 
@@ -32,11 +34,12 @@ enum SubscriptionsProblem {
             "No plan field with this id."),
     COMPLEX_NOT_FOUND(HttpStatus.NOT_FOUND, "complex-not-found", "Complex not found", "No complex with this id."),
     SUBDOMAIN_TAKEN(HttpStatus.CONFLICT, "subdomain-taken", "Subdomain taken",
-            "The subdomain is used, or was used, by a complex."),
+            "El subdominio ya está en uso o lo usó otro complejo; elige otro."),
     SUBDOMAIN_INVALID(HttpStatus.UNPROCESSABLE_CONTENT, "subdomain-invalid", "Invalid subdomain",
-            "The subdomain breaks the format rules."),
+            "El subdominio no es válido: usa de 3 a 63 letras minúsculas, números o guiones simples, sin guion al"
+                    + " inicio ni al final."),
     SUBDOMAIN_RESERVED(HttpStatus.UNPROCESSABLE_CONTENT, "subdomain-reserved", "Reserved subdomain",
-            "The subdomain is reserved."),
+            "El subdominio está reservado por Playtodoo; elige otro."),
     PLAN_NOT_PUBLISHED(HttpStatus.UNPROCESSABLE_CONTENT, "plan-not-published", "Plan not published",
             "The plan does not exist or is a draft."),
     NOT_PROVISIONING_FAILED(HttpStatus.CONFLICT, "not-provisioning-failed", "Provisioning did not fail",

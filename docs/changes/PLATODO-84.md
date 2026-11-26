@@ -52,3 +52,4 @@ Para que lo revise el arquitecto (en esta tarea no se cambió el contrato):
 4. **Orden de validación del alta:** campos → plan (`PLAN_NOT_PUBLISHED`) → subdominio (`SUBDOMAIN_*`).
 5. **`retentionDays` y `purgeDueAt`** se devuelven solo en `SUSPENDED` y `ARCHIVED`, como dice el contrato. Después de la purga son `null`, aunque el registro conserve los datos del archivo.
 6. **`statusChangedBy` al dar de alta:** es quien registró el complejo, y `statusSince` es la fecha del alta.
+7. **Mensaje en español en los rechazos de subdominio (CA2, observación de QA).** `SUBDOMAIN_TAKEN`, `SUBDOMAIN_INVALID` y `SUBDOMAIN_RESERVED` llevan en `detail` el mensaje en español; `title` sigue en inglés, como en los ejemplos. Propuesta: en la descripción de errores del contrato, decir que en esos tres `detail` es el texto para personas, y actualizar los ejemplos.

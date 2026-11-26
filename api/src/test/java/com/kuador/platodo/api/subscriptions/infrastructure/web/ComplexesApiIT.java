@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -54,6 +55,8 @@ import tools.jackson.databind.JsonNode;
 class ComplexesApiIT {
 
     private static final String COMPLEX_CREATE = "COMPLEX_CREATE";
+    /** CA2: the rejection carries its message in Spanish. */
+    private static final String TAKEN_MESSAGE = "El subdominio ya está en uso o lo usó otro complejo; elige otro.";
 
     @Autowired
     private MockMvc mvc;
@@ -165,7 +168,8 @@ class ComplexesApiIT {
         String secondName = "Second " + UUID.randomUUID();
 
         expectProblem(api.register(superAdminToken, secondName, subdomain.toUpperCase(),
-                TestAccounts.uniqueEmail("owner"), planId), 409, "SUBDOMAIN_TAKEN");
+                TestAccounts.uniqueEmail("owner"), planId), 409, "SUBDOMAIN_TAKEN")
+                .andExpect(jsonPath("$.detail").value(TAKEN_MESSAGE));
 
         assertThat(tenantsNamed(secondName)).isZero();
     }
@@ -176,9 +180,11 @@ class ComplexesApiIT {
         String name = "Rejected " + UUID.randomUUID();
 
         expectProblem(api.register(superAdminToken, name, "Admin", TestAccounts.uniqueEmail("owner"), planId),
-                422, "SUBDOMAIN_RESERVED");
+                422, "SUBDOMAIN_RESERVED")
+                .andExpect(jsonPath("$.detail").value("El subdominio está reservado por Playtodoo; elige otro."));
         expectProblem(api.register(superAdminToken, name, "a--b", TestAccounts.uniqueEmail("owner"), planId),
-                422, "SUBDOMAIN_INVALID");
+                422, "SUBDOMAIN_INVALID")
+                .andExpect(jsonPath("$.detail").value(startsWith("El subdominio no es válido")));
 
         assertThat(tenantsNamed(name)).isZero();
     }
