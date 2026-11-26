@@ -27,6 +27,19 @@ info:
     **Times.** Request instants are ISO-8601 date-times with an offset. Responses are always in UTC
     (`Z`). Converting to the complex's local time is the client's job.
 
+    **Kuador support (ADR-020, PLATODO-27).** The staff operations also accept a Kuador platform
+    token together with the header `X-Support-Session` (a session opened with a reason through
+    `platform-backoffice.openapi.yaml`). The session must belong to the caller and to the resolved
+    tenant and be valid for its current status; otherwise `403 SUPPORT_SESSION_INVALID`. Every such
+    request is audited before it runs. On a `SUSPENDED` or `ARCHIVED` complex only a `SUPER_ADMIN`
+    session passes (everyone else gets `403 TENANT_UNAVAILABLE`), the same rules of this contract
+    apply, and every returned entry carries `inactive: true` (ADR-019): it is kept but has no effect
+    until the complex is reactivated. No booking row is rewritten to mark it.
+
+    **Courts.** There is no operation to list the courts of a complex or their valid slots yet: the
+    Courts and Availability modules do not exist, so creating bookings or blocks answers
+    `404 COURT_NOT_FOUND` until they do (verified in PLATODO-81).
+
     **Errors.** Every error uses Problem Details (RFC 9457) with a stable machine-readable `code`.
     Clients map `code` to the user-facing text; `title` and `detail` are for developers and logs.
   contact:
@@ -42,7 +55,7 @@ tags:
   - name: Player bookings
     description: Used by `movil`. Requires an authenticated player.
   - name: Staff bookings
-    description: Used by `app`. Requires a staff role of the resolved tenant.
+    description: Used by `app`. Requires a staff role of the resolved tenant, or a Kuador platform token with `X-Support-Session`.
 security:
   - bearerAuth: []
 paths:
@@ -254,6 +267,7 @@ paths:
         ordered by `start`. `holderName` is null for pending bookings, so personal data is not
         exposed during a 5-minute hold.
       parameters:
+        - $ref: '#/components/parameters/SupportSession'
         - $ref: '#/components/parameters/From'
         - $ref: '#/components/parameters/To'
         - name: courtId
@@ -284,6 +298,7 @@ paths:
                       end: '2026-12-05T00:00:00Z'
                       holderName: null
                       blockReason: null
+                      inactive: false
                     - id: 5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d
                       courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
                       kind: RESERVATION
@@ -292,6 +307,7 @@ paths:
                       end: '2026-12-05T01:00:00Z'
                       holderName: Alex Example
                       blockReason: null
+                      inactive: false
                     - id: 9c8b7a6f-5e4d-4c3b-8a2f-1e0d9c8b7a6f
                       courtId: 7b9e2d14-5c3a-4f6e-8a1b-2c3d4e5f6a7b
                       kind: BLOCK
@@ -300,6 +316,19 @@ paths:
                       end: '2026-12-05T14:30:00Z'
                       holderName: null
                       blockReason: Maintenance
+                      inactive: false
+                suspendedSupport:
+                  summary: Seen by Kuador support on a suspended complex
+                  value:
+                    - id: 5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d
+                      courtId: 3f0c6a52-6a0e-4c1e-9d2b-1f7d1c2b9a01
+                      kind: RESERVATION
+                      status: CONFIRMED
+                      start: '2026-12-05T00:00:00Z'
+                      end: '2026-12-05T01:00:00Z'
+                      holderName: Alex Example
+                      blockReason: null
+                      inactive: true
         '400':
           $ref: '#/components/responses/InvalidRequest'
         '401':
@@ -313,6 +342,8 @@ paths:
       description: |
         Manual bookings (for example, taken by phone) are created directly as `CONFIRMED`, with no
         pending hold. The same conflict rule as for players applies.
+      parameters:
+        - $ref: '#/components/parameters/SupportSession'
       requestBody:
         required: true
         content:
@@ -369,6 +400,8 @@ paths:
         range overlaps an active booking the request is rejected with `SLOT_HAS_BOOKING`, and the
         staff must cancel that booking first. If it overlaps another block, the response is
         `SLOT_UNAVAILABLE`.
+      parameters:
+        - $ref: '#/components/parameters/SupportSession'
       requestBody:
         required: true
         content:
@@ -426,6 +459,7 @@ paths:
       operationId: getStaffBooking
       summary: Get a booking or block of the complex.
       parameters:
+        - $ref: '#/components/parameters/SupportSession'
         - $ref: '#/components/parameters/BookingId'
       responses:
         '200':
@@ -452,6 +486,7 @@ paths:
         Cancels a pending or confirmed booking, or removes a block, and releases the slot.
         Idempotent: if the entry is already `CANCELLED` or `EXPIRED` it is returned unchanged.
       parameters:
+        - $ref: '#/components/parameters/SupportSession'
         - $ref: '#/components/parameters/BookingId'
       responses:
         '200':
@@ -479,6 +514,17 @@ components:
         Access token of a player (player endpoints) or of a staff member of the resolved tenant
         (staff endpoints). The identity provider is defined by the Identity and Access module.
   parameters:
+    SupportSession:
+      name: X-Support-Session
+      in: header
+      required: false
+      description: |
+        Only for Kuador support: id of a support session opened with a reason for this complex
+        (`platform-backoffice.openapi.yaml`), sent with a platform token. Staff never send it.
+      schema:
+        type: string
+        format: uuid
+      example: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
     CourtId:
       name: courtId
       in: path
@@ -642,7 +688,7 @@ components:
     StaffBooking:
       type: object
       additionalProperties: false
-      required: [id, courtId, kind, status, start, end, holderName, blockReason]
+      required: [id, courtId, kind, status, start, end, holderName, blockReason, inactive]
       properties:
         id:
           type: string
@@ -668,6 +714,12 @@ components:
         blockReason:
           type: [string, 'null']
           description: Reason of a block. Null for reservations.
+        inactive:
+          type: boolean
+          description: |
+            `true` when the complex is `SUSPENDED` or `ARCHIVED` (only visible to Kuador support):
+            the entry is kept but has no effect until the complex is reactivated. Derived from the
+            tenant status, not stored (ADR-019). Always `false` on an active complex.
     ProblemCode:
       type: string
       description: Stable machine-readable error code. Clients map it to the user-facing text.
@@ -683,6 +735,7 @@ components:
         - INVALID_REQUEST
         - UNAUTHENTICATED
         - FORBIDDEN
+        - SUPPORT_SESSION_INVALID
     Problem:
       type: object
       description: Problem Details (RFC 9457) with a stable `code` extension.
@@ -756,7 +809,10 @@ components:
                 status: 401
                 code: UNAUTHENTICATED
     Forbidden:
-      description: '`FORBIDDEN`: the caller is not staff of the resolved tenant.'
+      description: |
+        `FORBIDDEN`: the caller is not staff of the resolved tenant.
+        `SUPPORT_SESSION_INVALID`: a platform token whose `X-Support-Session` is missing, expired,
+        closed, of another user or tenant, or not allowed for the current tenant status.
       content:
         application/problem+json:
           schema:
@@ -768,6 +824,12 @@ components:
                 title: Not allowed for this complex
                 status: 403
                 code: FORBIDDEN
+            supportSessionInvalid:
+              value:
+                type: https://playtodoo.com/problems/support-session-invalid
+                title: Support session not valid
+                status: 403
+                code: SUPPORT_SESSION_INVALID
     CourtNotFound:
       description: '`COURT_NOT_FOUND`: the court does not exist in the resolved tenant.'
       content:
@@ -868,6 +930,7 @@ components:
         end: '2026-12-05T01:00:00Z'
         holderName: Alex Example
         blockReason: null
+        inactive: false
     StaffBlock:
       summary: Block created by staff
       value:
@@ -879,6 +942,7 @@ components:
         end: '2026-12-05T14:30:00Z'
         holderName: null
         blockReason: Maintenance
+        inactive: false
     StaffCancelledBooking:
       summary: Booking cancelled by staff
       value:
@@ -890,6 +954,7 @@ components:
         end: '2026-12-05T01:00:00Z'
         holderName: Alex Example
         blockReason: null
+        inactive: false
     SlotUnavailable:
       summary: The slot was taken by another booking or block
       value:

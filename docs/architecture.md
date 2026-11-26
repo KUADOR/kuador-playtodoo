@@ -96,12 +96,51 @@ Eventos de dominio publicados con Spring Events. El publicador los emite dentro 
 | `TenantArchived` | Tenancy | Baja: el complejo pasa a `ARCHIVED` con su plazo de retención | `tenantId`, `purgeDueAt`, `occurredAt` |
 | `TenantSubdomainChanged` | Tenancy | El propietario cambia el subdominio; el anterior queda retirado | `tenantId`, `previousSubdomain`, `subdomain`, `occurredAt` |
 | `TenantPurged` | Tenancy | Baja definitiva: el esquema del complejo se eliminó | `tenantId`, `purgedAt` |
+| `TenantStatusChanged` | Tenancy | Cambia el estado del tenant (PLATODO-27) | `tenantId`, `status`, `purgeDueAt` |
+| `SubscriptionStatusChanged` | Planes y suscripciones | Kuador cambia a mano el estado de la suscripción | `tenantId`, `from`, `to`, `changedBy`, `occurredAt` |
+| `SubscriptionPlanChanged` | Planes y suscripciones | Kuador cambia el plan de un complejo | `tenantId`, `planId`, `changedBy`, `occurredAt` |
+| `OperatorCapabilitiesChanged` | Identidad y acceso | El `SUPER_ADMIN` habilita o deshabilita capacidades del `OPERATOR` | `capabilities`, `changedBy`, `occurredAt` |
+| `SupportSessionOpened`, `SupportSessionClosed` | Acceso de soporte | Se abre o cierra una sesión de soporte | `sessionId`, `tenantId`, `platformUserId`, `occurredAt` |
 
 En la épica PLATODO-25 no hay consumidores obligatorios; notificaciones y métricas los usarán en otras tarjetas. Contrato REST de Reservas: `contracts/bookings.openapi.yaml`.
 
 Eventos `Tenant*` (épica PLATODO-26, ADR-013): llevan el `tenantId` para que un consumidor que toque datos del complejo abra su propio ámbito de tenant (ADR-010); el ámbito no se hereda entre hilos. **Excepción a `AFTER_COMMIT`:** `TenantPurged` se escucha de forma **síncrona dentro de la transacción de purga**. Sus consumidores obligatorios son Auditoría (anonimiza los motivos de acceso) y Planes y suscripciones (quita los datos personales y conserva suscripción y pagos); si uno falla, el complejo no queda `PURGED`. Contrato REST de Tenancy: `contracts/tenancy.openapi.yaml`.
 
+Eventos de la épica PLATODO-27 (ADR-014 a ADR-020). **Excepciones síncronas, en la misma transacción:** `SubscriptionStatusChanged` (Tenancy aplica el efecto en el tenant: bloqueo, plazo de conservación) y `TenantStatusChanged` (Complejos y canchas oculta o muestra el complejo en el catálogo; Acceso de soporte invalida las sesiones al pasar a `PURGING`). Así el estado comercial, el acceso y el catálogo nunca quedan desalineados; si un consumidor falla, se revierte todo. `SubscriptionPlanChanged`, `OperatorCapabilitiesChanged` y `SupportSession*` se escuchan `AFTER_COMMIT` y hoy solo los usa el registro propio. Contrato REST del backoffice: `contracts/platform-backoffice.openapi.yaml`.
+
 **D4 · Ocupación sin copia en Disponibilidad:** la fuente única de verdad de la ocupación es la tabla `booking` de Reservas. El calendario (jugador y personal) lee la ocupación del puerto de entrada de Reservas (`GET /courts/{courtId}/occupancy`, `GET /staff/bookings`). Disponibilidad no mantiene una copia actualizada por eventos. Se descartó la copia porque la consistencia eventual mostraría como libres franjas ya tomadas. Disponibilidad sigue siendo dueña de la configuración de la cancha (duración y franjas válidas), que Reservas consume por el puerto `CourtSlotRules`.
+
+## Ciclo de vida del tenant y suscripción
+
+El estado comercial de la suscripción y el ciclo de vida del tenant son modelos distintos (ADR-014). Kuador solo cambia la suscripción, siempre a mano; Tenancy aplica el efecto. Detalle de transiciones en `contracts/platform-backoffice.openapi.yaml`.
+
+```mermaid
+stateDiagram-v2
+  [*] --> PROVISIONING: alta
+  PROVISIONING --> ACTIVE: esquema creado y migrado
+  PROVISIONING --> PROVISIONING_FAILED: falla al crear
+  PROVISIONING_FAILED --> PROVISIONING: reintentar alta
+  ACTIVE --> SUSPENDED: suscripción suspendida
+  SUSPENDED --> ACTIVE: reactivar antes del plazo
+  ACTIVE --> ARCHIVED: suscripción cancelada
+  SUSPENDED --> ARCHIVED: suscripción cancelada, conserva la fecha
+  SUSPENDED --> PURGING: vence el plazo
+  ARCHIVED --> PURGING: vence el plazo
+  PURGING --> PURGED: esquema borrado
+  PURGED --> [*]
+```
+
+| Estado del tenant | Personal y jugadores | Soporte de Kuador (con sesión y motivo, ADR-020) | Catálogo |
+|---|---|---|---|
+| `PROVISIONING`, `PROVISIONING_FAILED` | No disponible | No | Oculto |
+| `ACTIVE` | Como siempre | `SUPER_ADMIN` u `OPERATOR` con `TENANT_DATA_ACCESS`; lectura y edición | Visible |
+| `SUSPENDED` (suscripción suspendida) | `403 TENANT_UNAVAILABLE` | Solo `SUPER_ADMIN`; lectura y edición, lo creado queda inactivo (ADR-019) | Oculto |
+| `ARCHIVED` (suscripción cancelada, terminal) | `403 TENANT_UNAVAILABLE` | Solo `SUPER_ADMIN`; igual que suspendido | Oculto |
+| `PURGING`, `PURGED` | `404 TENANT_NOT_FOUND` | No; sesiones invalidadas | Borrado |
+
+- **Plazo de conservación:** 45 días por defecto (`retention.default-days`), desde la suspensión o la cancelación; ajustable por complejo por el `SUPER_ADMIN`. Al vencer, la purga borra el esquema de forma automática (ADR-015).
+- **Qué queda tras la purga:** lápida del tenant, suscripción, pagos, historial y auditoría (estos dos, 365 días); se borran el esquema y la fila del catálogo y se redactan los datos personales del global (ADR-016).
+- **Reservas inactivas:** derivadas del estado del tenant, sin escribir en `booking` (ADR-019).
 
 ## Arquitectura del frontend
 
@@ -134,7 +173,7 @@ La carpeta se llama igual que el módulo `Reservas` del backend. Si cambia la fo
 ## Datos
 
 - **Base de datos:** PostgreSQL con estrategia Schema per Tenant: cada complejo tiene su propio esquema.
-- **Esquema global** (propuesta): tenants, planes, suscripciones, pagos de suscripción, usuarios globales, parámetros de plataforma, auditoría y catálogo de complejos (ver abajo). Tablas de la épica PLATODO-26 y su módulo dueño: `tenant` y `tenant_domain` (Tenancy), `player_account` y `platform_user` (Identidad y acceso), `access_session` y `access_audit_event` (Auditoría), `notification_outbox` (Notificaciones).
+- **Esquema global** (propuesta): tenants, planes, suscripciones, pagos de suscripción, usuarios globales, parámetros de plataforma, auditoría y catálogo de complejos (ver abajo). Tablas de la épica PLATODO-26 y su módulo dueño: `tenant` y `tenant_domain` (Tenancy), `player_account` y `platform_user` (Identidad y acceso), `access_session` y `access_audit_event` (Auditoría), `notification_outbox` (Notificaciones). Tablas de la épica PLATODO-27: `plan`, `plan_field_definition`, `subscription`, `subscription_history` y `subscription_payment` (Planes y suscripciones); `platform_capability`, `operator_capability` y `capability_change` (Identidad y acceso); `platform_parameter` (parámetros de plataforma: plazo de conservación, retenciones, duración de sesión, monedas y periodicidades). `tenant` suma `PROVISIONING_FAILED`, `retention_days` y `purge_due_at` también al suspender, `owner_email` y `version`; `access_session` y `access_audit_event` se amplían para la sesión de soporte (ADR-020).
 - **Esquema de cada complejo:** `t_<uuid sin guiones>`, inmutable y separado del subdominio (ADR-010). Contiene `staff_user` (el personal vive en su complejo) y las tablas operativas (reservas, canchas, etc.).
 - **Esquema `no_tenant`:** vacío. Es el `search_path` de toda conexión devuelta al pool, para que una conexión reutilizada sin tenant no vea datos de ningún complejo (ADR-010).
 - **Selección del esquema:** dos unidades de persistencia, global y de tenant. La de tenant usa el `TenantScope` (`ScopedValue`) y falla si no hay tenant activo; nunca usa un esquema por defecto (ADR-010).
@@ -190,15 +229,15 @@ Propuesta inicial del backend `api`, a confirmar al diseñar. Cada módulo expon
 
 | Módulo | Responsabilidad | API pública |
 |---|---|---|
-| Tenancy | Resolver el complejo por subdominio, `TenantScope`, `PlatformAccessGuard`, ciclo de vida (alta, suspensión, archivado, reactivación y purga) y subdominios | `contracts/tenancy.openapi.yaml`; `TenantScope`, `TenantDirectory`; eventos `Tenant*` |
-| Identidad y acceso | Registro e inicio de sesión de jugadores, usuarios del complejo y usuarios globales; roles y permisos | Login por tipo de cuenta en `contracts/tenancy.openapi.yaml`; `AuthenticatedPrincipal`; resto [POR DEFINIR] |
+| Tenancy | Resolver el complejo por subdominio, `TenantScope`, filtro de acceso por estado y validación de la sesión de soporte, ciclo de vida (alta con reintento, efecto de la suscripción, plazo de conservación y purga automática) y subdominios | `contracts/tenancy.openapi.yaml`; `TenantScope`, `TenantDirectory` (consulta por lote); eventos `Tenant*`; escucha `SubscriptionStatusChanged` |
+| Identidad y acceso | Registro e inicio de sesión de jugadores, usuarios del complejo y usuarios globales; roles `SUPER_ADMIN` y `OPERATOR` con capacidades habilitables (ADR-017) | Login en `contracts/tenancy.openapi.yaml`; `GET /me` y capacidades en `contracts/platform-backoffice.openapi.yaml`; `AuthenticatedPrincipal`, `CapabilityGuard` |
 | Complejos y canchas | Información comercial, ubicación, contacto y canchas; publicar los datos públicos al catálogo global de complejos y atender la búsqueda de cercanos | [POR DEFINIR] |
 | Disponibilidad | Horarios, duración y franjas válidas por cancha (no guarda la ocupación, ver D4) | Configuración de la cancha consumida por Reservas mediante el puerto `CourtSlotRules`; resto [POR DEFINIR] |
 | Reservas | Crear, consultar y cancelar reservas y bloqueos, pendiente de 5 minutos y ocupación de cada cancha, sin duplicados ni conflictos | `contracts/bookings.openapi.yaml`; eventos del «Catálogo de eventos» |
 | Novedades | Publicación y consulta de novedades | [POR DEFINIR] |
 | Torneos | Publicación y administración de torneos | [POR DEFINIR] |
-| Planes y suscripciones | Planes, precios, características y seguimiento de suscripciones y pagos externos | [POR DEFINIR] |
-| Auditoría | Registrar accesos de Kuador a datos de complejos, con motivo | `OpenAccessSession`, `RecordAccess` (síncrono) y consulta de auditoría (`contracts/tenancy.openapi.yaml`); listener de `TenantPurged` (ADR-011) |
+| Planes y suscripciones | Planes con campos básicos y adicionales (ADR-018), suscripción con instantánea del plan, transiciones manuales, pagos registrados a mano, historial de 365 días y modelo de lectura del listado y detalle de complejos | `contracts/platform-backoffice.openapi.yaml`; eventos `Subscription*`; listener síncrono de `TenantPurged` |
+| Acceso de soporte y Auditoría | Sesiones de soporte con motivo ligadas a una persona y a un complejo (ADR-020) y registro síncrono de cada solicitud bajo sesión, permitida o denegada, con retención de 365 días | `contracts/platform-backoffice.openapi.yaml` («Support access»); `RecordAccess` (síncrono); listener síncrono de `TenantPurged` (redacta motivos) |
 | Métricas | Indicadores globales para Kuador | [POR DEFINIR] |
 
 Ejemplo de qué módulos participan al crear una reserva (ilustrativo):
@@ -224,7 +263,7 @@ Ejemplo: si se decide enviar correos de confirmación de reserva, el módulo Res
 
   | Host | Contexto | Quién lo usa |
   |---|---|---|
-  | `{subdominio}.playtodoo.com` | Web `app`; `/api/**` va a la `api` en **contexto de tenant** | `app`, `movil` (datos del complejo), `backoffice` (con sesión de acceso, ADR-011) |
+  | `{subdominio}.playtodoo.com` | Web `app`; `/api/**` va a la `api` en **contexto de tenant** | `app`, `movil` (datos del complejo), `backoffice` (con sesión de soporte y `X-Support-Session`, ADR-020) |
   | `api.playtodoo.com` | `api` en **contexto global** (sin tenant) | `movil` (cuenta de jugador), `backoffice` (plataforma) |
   | `admin.playtodoo.com` | Web `backoffice` | Equipo Kuador |
   | `playtodoo.com`, `www` | Sitio raíz; destino de «Ir a Playtodoo» en `app` (en `movil` vuelve al inicio de la propia app) | Público |
@@ -238,6 +277,13 @@ Ejemplo: si se decide enviar correos de confirmación de reserva, el módulo Res
 - **ADR-008 · Catálogo global de complejos para la búsqueda de cercanos** ({date}): propuesta a confirmar. La búsqueda por ubicación se resuelve en el esquema global con datos públicos de los complejos, sincronizados mediante eventos desde cada tenant. Los datos operativos (canchas, horarios, reservas) se consultan solo en el esquema del tenant elegido, sin consultas entre esquemas.
 - **ADR-009 · Migraciones con Flyway** (2026-11-25, propuesto): migraciones SQL versionadas con Flyway, un conjunto para el esquema global y otro aplicado a cada esquema de tenant (al crearlo y en cada despliegue), con historial propio por esquema. Detalle y alternativas: `docs/adr/ADR-009-migraciones-con-flyway.md`.
 - **ADR-010 · Persistencia multi-tenant por esquema con falla cerrada** (2026-11-25, propuesto): dos unidades de persistencia (global y de tenant), ámbito de tenant con `ScopedValue` que falla si no hay tenant, `search_path` por conexión desde un pool único con reinicio a `no_tenant` al liberarla, y esquemas `t_<uuid>` separados del subdominio. Ejemplo: un job que olvida abrir el ámbito de «Canchas El Sol» falla en vez de leer otro complejo. Detalle: `docs/adr/ADR-010-persistencia-multi-tenant.md`.
-- **ADR-011 · Sesiones de acceso de Kuador y auditoría síncrona** (2026-11-25, propuesto): solo el dueño de Kuador abre una sesión con motivo, limitada a un complejo y a 30 minutos; accede por el host del complejo con `X-Platform-Access-Session` y cada solicitud se audita antes de ejecutarse (si la auditoría falla, se deniega). Detalle: `docs/adr/ADR-011-sesiones-de-acceso-de-kuador-y-auditoria.md`.
+- **ADR-011 · Sesiones de acceso de Kuador y auditoría síncrona** (2026-11-25, propuesto; ajustado por ADR-017 y ADR-020): solo el dueño de Kuador abre una sesión con motivo, limitada a un complejo y a 30 minutos; accede por el host del complejo con `X-Platform-Access-Session` y cada solicitud se audita antes de ejecutarse (si la auditoría falla, se deniega). Detalle: `docs/adr/ADR-011-sesiones-de-acceso-de-kuador-y-auditoria.md`.
 - **ADR-012 · Reglas de subdominio** (2026-11-25, propuesto): formato, reservados, sugerencia desde el nombre, cambio por el propietario y subdominios anteriores retirados para siempre. Detalle: `docs/adr/ADR-012-reglas-de-subdominio.md`.
-- **ADR-013 · Ciclo de vida del complejo y baja definitiva** (2026-11-25, propuesto): suspensión, archivado de 45 días modificable, reactivación y purga diaria que elimina el esquema y conserva sin datos personales el tenant, la auditoría, la suscripción y sus pagos. Detalle: `docs/adr/ADR-013-ciclo-de-vida-y-baja-definitiva.md`.
+- **ADR-013 · Ciclo de vida del complejo y baja definitiva** (2026-11-25, propuesto; ajustado por ADR-014 a ADR-016): suspensión, archivado de 45 días modificable, reactivación y purga diaria que elimina el esquema y conserva sin datos personales el tenant, la auditoría, la suscripción y sus pagos. Detalle: `docs/adr/ADR-013-ciclo-de-vida-y-baja-definitiva.md`.
+- **ADR-014 · Estado de la suscripción y ciclo de vida del tenant separados** (2026-11-26, propuesto): Kuador cambia a mano la suscripción y Tenancy aplica el efecto por un evento síncrono; Suspendida lleva a `SUSPENDED`, Cancelada a `ARCHIVED` (terminal) y ambas bloquean e inician el plazo. Ejemplo: al suspender «Canchas El Sol» su web responde «no disponible» en el mismo commit. Detalle: `docs/adr/ADR-014-suscripcion-y-ciclo-de-vida-del-tenant.md`.
+- **ADR-015 · Purga automática al vencer el plazo** (2026-11-26, propuesto): al vencer el plazo desde la suspensión o la cancelación, una tarea diaria borra el esquema sin confirmación; antes se avisa y se puede ampliar. Detalle: `docs/adr/ADR-015-purga-automatica-al-vencer-el-plazo.md`.
+- **ADR-016 · Alcance de «borrar todo»** (2026-11-26, propuesto): se borran el esquema y la fila del catálogo y se redactan los datos personales del global; quedan suscripción, pagos, historial y auditoría (365 días). Detalle: `docs/adr/ADR-016-alcance-de-borrar-todo.md`.
+- **ADR-017 · Permisos por capacidades** (2026-11-26, propuesto): roles `SUPER_ADMIN` y `OPERATOR`; capacidades definidas en código que el `SUPER_ADMIN` habilita para el operador, evaluadas en cada solicitud. Detalle: `docs/adr/ADR-017-permisos-por-capacidades.md`.
+- **ADR-018 · Planes con campos dinámicos** (2026-11-26, propuesto): básicos tipados, adicionales en JSONB validados contra sus definiciones e instantánea del plan en la suscripción. Detalle: `docs/adr/ADR-018-planes-con-campos-dinamicos.md`.
+- **ADR-019 · Reservas inactivas derivadas** (2026-11-26, propuesto): «inactiva» se calcula del estado del tenant, sin escribir en las reservas. Detalle: `docs/adr/ADR-019-reservas-inactivas-derivadas.md`.
+- **ADR-020 · Soporte en el host del complejo** (2026-11-26, propuesto): sesión con motivo ligada a persona y complejo, usada con `X-Support-Session` en el subdominio; en suspendidos y cancelados solo entra el `SUPER_ADMIN`, con edición. Detalle: `docs/adr/ADR-020-soporte-en-el-host-del-complejo.md`.

@@ -48,6 +48,12 @@ info:
     `403 ACCESS_SESSION_INVALID`. CORS on tenant hosts allows only the `backoffice` origin besides
     the host itself.
 
+    **Superseded by PLATODO-27.** The platform tenant and access operations marked `deprecated`
+    are replaced by `platform-backoffice.openapi.yaml` (ADR-014 to ADR-020): the tenant lifecycle
+    now follows the subscription status, `PLATFORM_OWNER` becomes `SUPER_ADMIN` (plus `OPERATOR`),
+    and the access session becomes a support session sent with `X-Support-Session` instead of
+    `X-Platform-Access-Session`. They stay until the `api` tasks of PLATODO-27 remove them.
+
     **Errors.** Every error uses Problem Details (RFC 9457) with a stable machine-readable `code`.
     Clients map `code` to the user-facing text; `title` and `detail` are for developers and logs
     and never contain personal data.
@@ -343,6 +349,8 @@ paths:
     post:
       tags: [Platform tenants]
       operationId: registerTenant
+      deprecated: true
+      x-replaced-by: 'POST /complexes (platform-backoffice.openapi.yaml)'
       summary: Register a complex and provision its schema.
       description: |
         Creates the tenant, reserves its subdomain, creates its schema `t_<uuid>`, runs the tenant
@@ -394,6 +402,8 @@ paths:
     post:
       tags: [Platform tenants]
       operationId: suspendTenant
+      deprecated: true
+      x-replaced-by: 'POST /complexes/{complexId}/status-changes (platform-backoffice.openapi.yaml)'
       summary: Suspend an active complex.
       description: |
         `ACTIVE → SUSPENDED`. From then on its host answers `403 TENANT_UNAVAILABLE` to everyone.
@@ -415,6 +425,8 @@ paths:
     post:
       tags: [Platform tenants]
       operationId: activateTenant
+      deprecated: true
+      x-replaced-by: 'POST /complexes/{complexId}/status-changes and POST /complexes/{complexId}/provisioning-retries (platform-backoffice.openapi.yaml)'
       summary: Activate a suspended complex, or retry a failed provisioning.
       description: |
         `SUSPENDED → ACTIVE`, or `PROVISIONING → ACTIVE` re-running the idempotent provisioning.
@@ -436,6 +448,8 @@ paths:
     post:
       tags: [Platform tenants]
       operationId: archiveTenant
+      deprecated: true
+      x-replaced-by: 'POST /complexes/{complexId}/status-changes (platform-backoffice.openapi.yaml)'
       summary: Archive a complex (cancellation with a retention period).
       description: |
         `ACTIVE | SUSPENDED → ARCHIVED`. Sets `retentionDays` from the configured default
@@ -466,6 +480,8 @@ paths:
     post:
       tags: [Platform tenants]
       operationId: reactivateTenant
+      deprecated: true
+      x-replaced-by: 'POST /complexes/{complexId}/status-changes (platform-backoffice.openapi.yaml)'
       summary: Reactivate an archived complex before its purge date.
       description: |
         `ARCHIVED → ACTIVE` while `now < purgeDueAt`; the complex recovers all its data. Clears the
@@ -498,6 +514,8 @@ paths:
     put:
       tags: [Platform tenants]
       operationId: changeTenantRetention
+      deprecated: true
+      x-replaced-by: 'PUT /complexes/{complexId}/retention (platform-backoffice.openapi.yaml)'
       summary: Change the retention period of an archived complex.
       description: |
         Only while `ARCHIVED`. Recomputes `purgeDueAt = archivedAt + days`. The resulting
@@ -546,6 +564,8 @@ paths:
     post:
       tags: [Platform access]
       operationId: openAccessSession
+      deprecated: true
+      x-replaced-by: 'POST /complexes/{complexId}/support-sessions (platform-backoffice.openapi.yaml)'
       summary: Open an audited access session to a complex.
       description: |
         Only role `PLATFORM_OWNER`. The reason is mandatory (non-blank) and is stored in the audit.
@@ -602,6 +622,8 @@ paths:
     delete:
       tags: [Platform access]
       operationId: closeAccessSession
+      deprecated: true
+      x-replaced-by: 'DELETE /support-sessions/{sessionId} (platform-backoffice.openapi.yaml)'
       summary: Close an access session before it expires.
       description: Only the platform user who opened it. Closing an already closed or expired session is a no-op.
       parameters:
@@ -636,6 +658,8 @@ paths:
     get:
       tags: [Platform access]
       operationId: listAccessAudit
+      deprecated: true
+      x-replaced-by: 'GET /complexes/{complexId}/audit-entries (platform-backoffice.openapi.yaml)'
       summary: List the audited Kuador accesses to a complex.
       description: |
         Only role `PLATFORM_OWNER`. Newest first. Also available for purged complexes: their
