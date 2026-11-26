@@ -1,0 +1,104 @@
+@let current = state();
+<h1>Permisos del operador</h1>
+<p class="permissions__intro">
+  Elige qué puede hacer el rol Operador. Se aplica a todas las personas con ese rol.
+</p>
+
+@if (savedNotice(); as notice) {
+  <app-alert tone="success" [dismissible]="true" (dismiss)="savedNotice.set(null)">{{
+    notice
+  }}</app-alert>
+}
+@if (pageError(); as message) {
+  <app-alert tone="error">{{ message }}</app-alert>
+}
+
+<section
+  class="permissions__functions"
+  aria-labelledby="operator-functions-heading"
+  [attr.aria-busy]="current.status === 'loading'"
+>
+  <h2 id="operator-functions-heading">Funciones</h2>
+
+  @if (current.status === 'loading') {
+    <app-skeleton [rows]="skeletonRows" />
+  } @else if (current.status === 'error') {
+    <app-alert tone="error">
+      {{ current.message }}
+      <app-button alertActions label="Reintentar" variant="secondary" (press)="load()" />
+    </app-alert>
+  } @else if (items().length === 0) {
+    <p>No hay funciones para configurar.</p>
+  } @else {
+    <fieldset class="permissions__list">
+      <legend class="visually-hidden">Funciones del operador</legend>
+      @for (item of items(); track item.key) {
+        <app-checkbox
+          [label]="item.text.label"
+          [description]="item.text.description"
+          [disabled]="saving()"
+          [checked]="item.enabled"
+          (checkedChange)="toggle(item.key, $event)"
+        />
+      }
+    </fieldset>
+    <div class="permissions__actions">
+      <app-button
+        label="Descartar"
+        variant="secondary"
+        [disabled]="changes().length === 0 || saving()"
+        (press)="discard()"
+      />
+      <app-button
+        label="Guardar cambios"
+        [disabled]="changes().length === 0"
+        [loading]="saving()"
+        (press)="askConfirmation()"
+      />
+    </div>
+  }
+</section>
+
+<app-capability-changes-table [refreshKey]="historyRefreshKey()" />
+
+@if (confirming()) {
+  <app-dialog
+    heading="Guardar permisos del operador"
+    [busy]="saving()"
+    (closeRequest)="closeConfirmation()"
+  >
+    @if (toEnable().length > 0) {
+      <div>
+        <p class="permissions__summary-title">Se activarán:</p>
+        <ul class="permissions__summary-list">
+          @for (label of toEnable(); track label) {
+            <li>{{ label }}</li>
+          }
+        </ul>
+      </div>
+    }
+    @if (toDisable().length > 0) {
+      <div>
+        <p class="permissions__summary-title">Se desactivarán:</p>
+        <ul class="permissions__summary-list">
+          @for (label of toDisable(); track label) {
+            <li>{{ label }}</li>
+          }
+        </ul>
+      </div>
+    }
+    <p>Los cambios se aplican en la siguiente acción de cada operador.</p>
+    @if (dialogError(); as message) {
+      <app-alert tone="error">{{ message }}</app-alert>
+    }
+    <app-button
+      dialogActions
+      data-dialog-initial-focus
+      label="Cancelar"
+      variant="secondary"
+      [disabled]="saving()"
+      (press)="closeConfirmation()"
+    />
+    <app-button dialogActions label="Guardar cambios" [loading]="saving()" (press)="save()" />
+  </app-dialog>
+}

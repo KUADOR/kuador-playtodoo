@@ -1,0 +1,44 @@
+<main class="login" id="main-content">
+  <p class="login__brand">Playtodoo Kuador</p>
+
+  <section class="login__card" aria-labelledby="login-title">
+    <h1 id="login-title" class="login__title">Backoffice de Kuador</h1>
+
+    @if (sessionNotice(); as notice) {
+      <app-alert tone="warning">{{ notice }}</app-alert>
+    }
+    @if (failure(); as message) {
+      <app-alert tone="error">{{ message }}</app-alert>
+    }
+
+    <form class="login__form" novalidate (submit)="submit($event)">
+      <app-field
+        #emailField
+        label="Correo"
+        inputType="email"
+        autocomplete="username"
+        [required]="true"
+        [disabled]="submitting()"
+        [error]="fieldErrors().email"
+        [(value)]="email"
+      />
+      <app-field
+        #passwordField
+        label="Contraseña"
+        inputType="password"
+        autocomplete="current-password"
+        [required]="true"
+        [disabled]="submitting()"
+        [error]="fieldErrors().password"
+        [(value)]="password"
+      />
+      <app-button
+        class="login__submit"
+        label="Iniciar sesión"
+        loadingLabel="Iniciando sesión…"
+        type="submit"
+        [loading]="submitting()"
+      />
+    </form>
+  </section>
+</main>

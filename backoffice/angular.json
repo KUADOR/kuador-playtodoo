@@ -24,7 +24,12 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles/tokens.css", "src/styles/fonts.css", "src/styles.css"]
+            "styles": [
+              "src/styles/tokens.css",
+              "src/styles/fonts.css",
+              "src/styles.css",
+              "src/styles/table.css"
+            ]
           },
           "configurations": {
             "production": {
@@ -50,6 +55,21 @@
                 {
                   "replace": "src/app/dev-routes.ts",
                   "with": "src/app/dev-routes.development.ts"
+                },
+                {
+                  "replace": "src/app/mock-backend.ts",
+                  "with": "src/app/mock-backend.development.ts"
+                }
+              ]
+            },
+            "local-api": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/app/dev-routes.ts",
+                  "with": "src/app/dev-routes.development.ts"
                 }
               ]
             }
@@ -64,6 +84,9 @@
             },
             "development": {
               "buildTarget": "backoffice:build:development"
+            },
+            "local-api": {
+              "buildTarget": "backoffice:build:local-api"
             }
           },
           "defaultConfiguration": "development"

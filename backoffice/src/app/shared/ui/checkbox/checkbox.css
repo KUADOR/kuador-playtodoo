@@ -1,0 +1,58 @@
+:host {
+  /* Box size of «Casilla» (Identidad visual v3): a component measure, not a shared token. */
+  --checkbox-box-size: 20px;
+
+  display: block;
+}
+
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--size-touch-min);
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+  color: var(--color-fg);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+  cursor: pointer;
+}
+
+.checkbox:hover:not(.checkbox--disabled) {
+  background: var(--color-primary-tint);
+}
+
+.checkbox--disabled {
+  background: var(--color-surface-alt);
+  cursor: not-allowed;
+}
+
+.checkbox__control {
+  flex-shrink: 0;
+  width: var(--checkbox-box-size);
+  height: var(--checkbox-box-size);
+  margin: 0;
+  accent-color: var(--color-primary);
+  cursor: inherit;
+}
+
+.checkbox__control:focus-visible {
+  outline: var(--border-focus-ring) solid var(--color-focus);
+  outline-offset: var(--border-focus-offset);
+}
+
+.checkbox__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.checkbox__label {
+  font-weight: var(--font-weight-semibold);
+}
+
+.checkbox__description {
+  color: var(--color-fg-muted);
+}

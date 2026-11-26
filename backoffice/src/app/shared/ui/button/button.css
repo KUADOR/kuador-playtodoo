@@ -6,6 +6,9 @@
 }
 
 .button {
+  /* Fills its host only when a layout stretches it (stacked actions on mobile). */
+  box-sizing: border-box;
+  width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;

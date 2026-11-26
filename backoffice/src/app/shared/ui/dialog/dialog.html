@@ -1,0 +1,16 @@
+<div class="dialog__backdrop">
+  <section
+    #panel
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+    [attr.aria-labelledby]="headingId"
+    [attr.aria-busy]="busy() || null"
+    (keydown)="handleKeydown($event)"
+  >
+    <h2 class="dialog__heading" [id]="headingId">{{ heading() }}</h2>
+    <div class="dialog__body"><ng-content /></div>
+    <div class="dialog__actions"><ng-content select="[dialogActions]" /></div>
+  </section>
+</div>

@@ -1,7 +1,10 @@
-import { Component, computed, input, model } from '@angular/core';
+import { Component, ElementRef, computed, input, model, viewChild } from '@angular/core';
 import { LucideCircleAlert } from '@lucide/angular';
 
 export type FieldKind = 'text' | 'select';
+
+/** `type` of the native input when `kind` is `text`. */
+export type TextInputType = 'text' | 'email' | 'password';
 
 export interface FieldOption {
   readonly value: string;
@@ -26,6 +29,10 @@ let nextFieldId = 0;
 export class Field {
   readonly label = input.required<string>();
   readonly kind = input<FieldKind>('text');
+  readonly inputType = input<TextInputType>('text');
+  /** Native `autocomplete` hint, for example `username` or `current-password`. */
+  readonly autocomplete = input<string>();
+  readonly required = input(false);
   readonly help = input<string>();
   readonly error = input<string>();
   readonly disabled = input(false);
@@ -43,6 +50,14 @@ export class Field {
     const ids = [this.help() ? this.helpId : null, this.hasError() ? this.errorId : null];
     return ids.filter((id) => id !== null).join(' ') || null;
   });
+
+  private readonly control =
+    viewChild.required<ElementRef<HTMLInputElement | HTMLSelectElement>>('control');
+
+  /** Moves the focus to the control, for example to the first field with an error. */
+  focus(): void {
+    this.control().nativeElement.focus();
+  }
 
   protected updateValue(event: Event): void {
     this.value.set((event.target as HTMLInputElement | HTMLSelectElement).value);
