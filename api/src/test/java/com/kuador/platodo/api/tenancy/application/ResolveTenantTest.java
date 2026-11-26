@@ -41,7 +41,7 @@ class ResolveTenantTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = TenantStatus.class, names = {"PROVISIONING", "PURGING", "PURGED"})
+    @EnumSource(value = TenantStatus.class, names = {"PROVISIONING", "PROVISIONING_FAILED", "PURGING", "PURGED"})
     void aComplexThatIsNotOperatingIsNotFound(TenantStatus status) {
         domains.add("elsol", status);
 

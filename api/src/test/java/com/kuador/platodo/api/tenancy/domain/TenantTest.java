@@ -39,6 +39,30 @@ class TenantTest {
         assertThat(active.activatedAt()).isEqualTo(T1);
     }
 
+    /** ADR-014: a failed provisioning waits in PROVISIONING_FAILED and a retry goes back to PROVISIONING. */
+    @Test
+    void aFailedProvisioningIsRetriedUntilTheComplexIsActive() {
+        Tenant failed = provisioning().failProvisioning();
+        Tenant retrying = failed.retryProvisioning();
+
+        assertThat(failed.status()).isEqualTo(TenantStatus.PROVISIONING_FAILED);
+        assertThat(failed.createdAt()).isEqualTo(T0);
+        assertThat(retrying.status()).isEqualTo(TenantStatus.PROVISIONING);
+        assertThat(retrying.activate(T1).status()).isEqualTo(TenantStatus.ACTIVE);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TenantStatus.class, names = "PROVISIONING", mode = EnumSource.Mode.EXCLUDE)
+    void onlyAProvisioningComplexCanFailItsProvisioning(TenantStatus status) {
+        assertInvalid(status, Tenant::failProvisioning);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TenantStatus.class, names = "PROVISIONING_FAILED", mode = EnumSource.Mode.EXCLUDE)
+    void onlyAFailedProvisioningCanBeRetried(TenantStatus status) {
+        assertInvalid(status, Tenant::retryProvisioning);
+    }
+
     @Test
     void anActiveComplexIsSuspendedAndActivatedAgain() {
         Tenant suspended = active().suspend(T1);
@@ -115,7 +139,7 @@ class TenantTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = TenantStatus.class, names = {"ACTIVE", "ARCHIVED", "PURGING", "PURGED"})
+    @EnumSource(value = TenantStatus.class, names = {"PROVISIONING_FAILED", "ACTIVE", "ARCHIVED", "PURGING", "PURGED"})
     void onlyProvisioningAndSuspendedComplexesCanBeActivated(TenantStatus status) {
         assertInvalid(status, tenant -> tenant.activate(T1));
     }
@@ -127,7 +151,8 @@ class TenantTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = TenantStatus.class, names = {"PROVISIONING", "ARCHIVED", "PURGING", "PURGED"})
+    @EnumSource(value = TenantStatus.class,
+            names = {"PROVISIONING", "PROVISIONING_FAILED", "ARCHIVED", "PURGING", "PURGED"})
     void onlyActiveAndSuspendedComplexesCanBeArchived(TenantStatus status) {
         assertInvalid(status, tenant -> tenant.archive(T1, RETENTION));
     }

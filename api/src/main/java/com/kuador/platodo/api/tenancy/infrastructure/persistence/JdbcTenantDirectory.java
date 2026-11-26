@@ -1,5 +1,11 @@
 package com.kuador.platodo.api.tenancy.infrastructure.persistence;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,6 +46,45 @@ public final class JdbcTenantDirectory implements TenantDirectory {
                         TenantStatus.valueOf(row.getString("status")),
                         Optional.ofNullable(row.getString("subdomain")).map(hosts::tenantHost)))
                 .optional();
+    }
+
+    @Override
+    public List<TenantProfile> profiles(Collection<TenantId> tenants) {
+        List<UUID> ids = tenants.stream().map(JdbcTenantDirectory::uuidOf).flatMap(Optional::stream).distinct().toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return global.sql("""
+                        SELECT t.id::text AS id, t.display_name, t.status, d.subdomain, t.owner_email, t.created_at,
+                               t.suspended_at, t.archived_at, t.retention_days, t.purge_due_at, t.purged_at, t.version
+                        FROM global.tenant t
+                        LEFT JOIN global.tenant_domain d ON d.tenant_id = t.id AND d.is_current
+                        WHERE t.id IN (:ids)
+                        """)
+                .param("ids", ids)
+                .query((row, number) -> profileOf(row))
+                .list();
+    }
+
+    private static TenantProfile profileOf(ResultSet row) throws SQLException {
+        return new TenantProfile(
+                new TenantId(row.getString("id")),
+                row.getString("display_name"),
+                TenantStatus.valueOf(row.getString("status")),
+                row.getString("subdomain"),
+                row.getString("owner_email"),
+                instant(row, "created_at"),
+                instant(row, "suspended_at"),
+                instant(row, "archived_at"),
+                row.getObject("retention_days", Integer.class),
+                instant(row, "purge_due_at"),
+                instant(row, "purged_at"),
+                row.getLong("version"));
+    }
+
+    private static Instant instant(ResultSet row, String column) throws SQLException {
+        OffsetDateTime value = row.getObject(column, OffsetDateTime.class);
+        return value == null ? null : value.toInstant();
     }
 
     /** Tenant ids are UUIDs in the global schema; any other value names no complex. */

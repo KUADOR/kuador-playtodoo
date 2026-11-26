@@ -3,6 +3,7 @@ package com.kuador.platodo.api.tenancy.application;
 import java.time.Clock;
 import java.time.Duration;
 
+import com.kuador.platodo.api.tenancy.application.port.in.TenantOnboarding;
 import com.kuador.platodo.api.tenancy.application.port.out.Callers;
 import com.kuador.platodo.api.tenancy.application.port.out.GlobalTransaction;
 import com.kuador.platodo.api.tenancy.application.port.out.SubdomainUsage;
@@ -21,7 +22,8 @@ public record TenancyUseCases(
         TenantLifecycle lifecycle,
         ChangeSubdomain changeSubdomain,
         SuggestSubdomain suggestSubdomain,
-        CheckSubdomainAvailability checkSubdomainAvailability) {
+        CheckSubdomainAvailability checkSubdomainAvailability,
+        TenantOnboarding onboarding) {
 
     /** The adapters the use cases need. */
     public record Ports(
@@ -62,6 +64,8 @@ public record TenancyUseCases(
                 new ChangeSubdomain(ports.callers(), rules, ports.registry(), ports.transaction(), ports.events(),
                         clock),
                 new SuggestSubdomain(rules, ports.subdomainUsage()),
-                new CheckSubdomainAvailability(rules, ports.subdomainUsage()));
+                new CheckSubdomainAvailability(rules, ports.subdomainUsage()),
+                new OnboardTenant(rules, ports.registry(), ports.transaction(), provisioning, transitions, lifecycle,
+                        clock));
     }
 }

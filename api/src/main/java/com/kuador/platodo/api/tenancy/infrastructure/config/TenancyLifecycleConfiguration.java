@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import com.kuador.platodo.api.tenancy.application.PurgeDueTenants;
 import com.kuador.platodo.api.tenancy.application.RequestHosts;
 import com.kuador.platodo.api.tenancy.application.TenancyUseCases;
+import com.kuador.platodo.api.tenancy.application.port.in.TenantOnboarding;
 import com.kuador.platodo.api.tenancy.application.port.out.GlobalTransaction;
 import com.kuador.platodo.api.tenancy.application.port.out.SubdomainUsage;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantOwnerAccounts;
@@ -47,6 +48,12 @@ class TenancyLifecycleConfiguration {
                 schemas, owners, new SpringTenantEventPublisher(publisher), transaction);
         return TenancyUseCases.create(ports, rules, clock.getIfAvailable(Clock::systemUTC),
                 properties.archive().defaultRetentionDays());
+    }
+
+    /** Registration of complexes for Plans and subscriptions (ADR-014). */
+    @Bean
+    TenantOnboarding tenantOnboarding(TenancyUseCases useCases) {
+        return useCases.onboarding();
     }
 
     @Bean
