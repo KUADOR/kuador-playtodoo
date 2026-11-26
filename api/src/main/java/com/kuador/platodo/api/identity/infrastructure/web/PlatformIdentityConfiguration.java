@@ -16,6 +16,7 @@ import com.kuador.platodo.api.identity.application.GetCurrentPlatformUser;
 import com.kuador.platodo.api.identity.application.ListCapabilityChanges;
 import com.kuador.platodo.api.identity.application.ListOperatorCapabilities;
 import com.kuador.platodo.api.identity.application.port.in.CapabilityGuard;
+import com.kuador.platodo.api.identity.application.port.in.PlatformUserNames;
 import com.kuador.platodo.api.identity.application.port.out.CapabilityChangeLog;
 import com.kuador.platodo.api.identity.infrastructure.events.SpringOperatorCapabilityEvents;
 import com.kuador.platodo.api.identity.infrastructure.persistence.global.JpaCapabilityChangeLog;
@@ -60,8 +61,18 @@ class PlatformIdentityConfiguration {
     }
 
     @Bean
-    GetCurrentPlatformUser getCurrentPlatformUser(CapabilityGuard guard) {
-        return new GetCurrentPlatformUser(guard, new JpaPlatformUserProfiles(global));
+    JpaPlatformUserProfiles platformUserProfiles() {
+        return new JpaPlatformUserProfiles(global);
+    }
+
+    @Bean
+    PlatformUserNames platformUserNames(JpaPlatformUserProfiles profiles) {
+        return profiles::displayNameOf;
+    }
+
+    @Bean
+    GetCurrentPlatformUser getCurrentPlatformUser(CapabilityGuard guard, JpaPlatformUserProfiles profiles) {
+        return new GetCurrentPlatformUser(guard, profiles);
     }
 
     @Bean

@@ -54,7 +54,7 @@ class PlanController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
-            throw new InvalidPlansRequestException(
+            throw new InvalidSubscriptionsRequestException(
                     "`page` must be >= 0 and `size` between 1 and %d.".formatted(MAX_PAGE_SIZE));
         }
         PageRequest pageRequest = new PageRequest(page, size);

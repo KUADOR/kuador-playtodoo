@@ -55,18 +55,34 @@ public final class JdbcTenantRegistry implements TenantRegistry {
     }
 
     @Override
-    public void register(Tenant tenant, Subdomain subdomain) {
+    public void register(Tenant tenant, Subdomain subdomain, String ownerEmail) {
         global.sql("""
-                        INSERT INTO global.tenant (id, schema_name, display_name, status, created_at)
-                        VALUES (:id::uuid, :schema, :displayName, :status, :createdAt)
+                        INSERT INTO global.tenant (id, schema_name, display_name, status, created_at, owner_email)
+                        VALUES (:id::uuid, :schema, :displayName, :status, :createdAt, :ownerEmail)
                         """)
                 .param("id", tenant.id().value())
                 .param("schema", TenantSchemaName.of(tenant.id()).value())
                 .param("displayName", tenant.displayName())
                 .param("status", tenant.status().name())
                 .param("createdAt", toTimestamp(tenant.createdAt()))
+                .param("ownerEmail", ownerEmail)
                 .update();
         insertCurrentSubdomain(tenant.id(), subdomain, tenant.createdAt());
+    }
+
+    @Override
+    public Optional<String> ownerEmailOf(TenantId id) {
+        return global.sql("SELECT owner_email FROM global.tenant WHERE id = :id::uuid AND owner_email IS NOT NULL")
+                .param("id", id.value())
+                .query(String.class)
+                .optional();
+    }
+
+    @Override
+    public void redactOwnerEmail(TenantId id) {
+        global.sql("UPDATE global.tenant SET owner_email = NULL WHERE id = :id::uuid")
+                .param("id", id.value())
+                .update();
     }
 
     @Override

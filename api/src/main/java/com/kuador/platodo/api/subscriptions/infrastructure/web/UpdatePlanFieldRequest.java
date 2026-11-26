@@ -5,14 +5,14 @@ record UpdatePlanFieldRequest(String label, Boolean required, Long version) {
 
     boolean requiredFlag() {
         if (required == null) {
-            throw new InvalidPlansRequestException("`required` is required.");
+            throw new InvalidSubscriptionsRequestException("`required` is required.");
         }
         return required;
     }
 
     long requiredVersion() {
         if (version == null || version < 0) {
-            throw new InvalidPlansRequestException("`version` is required and must not be negative.");
+            throw new InvalidSubscriptionsRequestException("`version` is required and must not be negative.");
         }
         return version;
     }

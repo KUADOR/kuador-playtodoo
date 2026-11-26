@@ -27,6 +27,7 @@ public final class JdbcSubdomainUsage implements SubdomainUsage {
         return global.sql("SELECT subdomain FROM global.tenant_domain WHERE subdomain IN (:candidates)")
                 .param("candidates", candidates.stream().map(Subdomain::value).toList())
                 .query(String.class)
+                .list()
                 .stream()
                 .map(Subdomain::new)
                 .collect(Collectors.toUnmodifiableSet());

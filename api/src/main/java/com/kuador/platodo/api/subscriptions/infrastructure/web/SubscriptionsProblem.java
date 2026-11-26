@@ -10,10 +10,10 @@ import org.springframework.http.ProblemDetail;
 import com.kuador.platodo.api.subscriptions.domain.FieldError;
 
 /**
- * Problem Details of the plan operations ({@code contracts/platform-backoffice.openapi.yaml}). Title and detail are
+ * Problem Details of the plan and complex operations ({@code contracts/platform-backoffice.openapi.yaml}). Title and detail are
  * developer-facing; the backoffice maps {@code code} and each field error code to the text shown to people.
  */
-enum PlansProblem {
+enum SubscriptionsProblem {
 
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "invalid-request", "Invalid request", "Malformed body or parameters."),
     VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "validation-failed", "Validation failed",
@@ -29,7 +29,18 @@ enum PlansProblem {
             "Another plan field has this label."),
     PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "plan-not-found", "Plan not found", "No plan with this id."),
     PLAN_FIELD_NOT_FOUND(HttpStatus.NOT_FOUND, "plan-field-not-found", "Plan field not found",
-            "No plan field with this id.");
+            "No plan field with this id."),
+    COMPLEX_NOT_FOUND(HttpStatus.NOT_FOUND, "complex-not-found", "Complex not found", "No complex with this id."),
+    SUBDOMAIN_TAKEN(HttpStatus.CONFLICT, "subdomain-taken", "Subdomain taken",
+            "The subdomain is used, or was used, by a complex."),
+    SUBDOMAIN_INVALID(HttpStatus.UNPROCESSABLE_CONTENT, "subdomain-invalid", "Invalid subdomain",
+            "The subdomain breaks the format rules."),
+    SUBDOMAIN_RESERVED(HttpStatus.UNPROCESSABLE_CONTENT, "subdomain-reserved", "Reserved subdomain",
+            "The subdomain is reserved."),
+    PLAN_NOT_PUBLISHED(HttpStatus.UNPROCESSABLE_CONTENT, "plan-not-published", "Plan not published",
+            "The plan does not exist or is a draft."),
+    NOT_PROVISIONING_FAILED(HttpStatus.CONFLICT, "not-provisioning-failed", "Provisioning did not fail",
+            "The complex is not waiting for a provisioning retry.");
 
     private static final String TYPE_BASE = "https://playtodoo.com/problems/";
     private static final String CODE = "code";
@@ -41,7 +52,7 @@ enum PlansProblem {
     private final String title;
     private final String detail;
 
-    PlansProblem(HttpStatus status, String slug, String title, String detail) {
+    SubscriptionsProblem(HttpStatus status, String slug, String title, String detail) {
         this.status = status;
         this.type = URI.create(TYPE_BASE + slug);
         this.title = title;

@@ -87,6 +87,7 @@ class TenantPurgeIT {
         assertThat(tenantRow(purged)).containsEntry("status", "PURGED")
                 .containsEntry("display_name", "Complex " + subdomain);
         assertThat(tenantRow(purged).get("purged_at")).isNotNull();
+        assertThat(tenantRow(purged).get("owner_email")).isNull();
         assertThat(schemaExists(purged)).isFalse();
         assertThat(domainRow(subdomain)).containsEntry("is_current", false);
         assertThat(domainRow(subdomain).get("retired_at")).isNotNull();
@@ -117,6 +118,7 @@ class TenantPurgeIT {
         runJob();
 
         assertThat(tenantRow(kept)).containsEntry("status", "ACTIVE");
+        assertThat(tenantRow(kept).get("owner_email")).isNotNull();
         assertThat(schemaExists(kept)).isTrue();
         api.tenantState(keptSubdomain).andExpect(status().isOk());
         assertThat(sessionReasonsOf(kept)).containsExactly(ACCESS_REASON);
@@ -310,8 +312,9 @@ class TenantPurgeIT {
     }
 
     private static Map<String, Object> tenantRow(TenantId tenant) {
-        return TenantDatabase.admin().sql(
-                        "SELECT status, display_name, purged_at FROM global.tenant WHERE id = :id::uuid")
+        return TenantDatabase.admin().sql("""
+                        SELECT status, display_name, purged_at, owner_email FROM global.tenant WHERE id = :id::uuid
+                        """)
                 .param("id", tenant.value())
                 .query().singleRow();
     }

@@ -15,12 +15,18 @@ import com.kuador.platodo.api.tenancy.domain.Tenant;
 public interface TenantRegistry {
 
     /**
-     * Records a new complex with {@code subdomain} as its current subdomain.
+     * Records a new complex with {@code subdomain} as its current subdomain and the e-mail of its owner account.
      *
      * @throws com.kuador.platodo.api.tenancy.application.SubdomainTakenException if the subdomain is used, or was
      *         used, by a complex
      */
-    void register(Tenant tenant, Subdomain subdomain);
+    void register(Tenant tenant, Subdomain subdomain, String ownerEmail);
+
+    /** The owner e-mail given at registration; empty for complexes registered without one and once redacted. */
+    Optional<String> ownerEmailOf(TenantId id);
+
+    /** Redacts the owner e-mail of a locked complex, which is personal data (ADR-016). */
+    void redactOwnerEmail(TenantId id);
 
     /** The complex with its current subdomain, without locking it. */
     Optional<RegisteredTenant> find(TenantId id);

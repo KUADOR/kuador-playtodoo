@@ -30,7 +30,7 @@ public final class ResolveTenant {
         return switch (owner.status()) {
             case ACTIVE -> new TenantResolution.Active(owner.tenantId(), owner.displayName());
             case SUSPENDED, ARCHIVED -> UNAVAILABLE;
-            case PROVISIONING, PURGING, PURGED -> NOT_FOUND;
+            case PROVISIONING, PROVISIONING_FAILED, PURGING, PURGED -> NOT_FOUND;
         };
     }
 }

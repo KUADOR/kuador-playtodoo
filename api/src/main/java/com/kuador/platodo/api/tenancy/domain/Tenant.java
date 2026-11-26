@@ -9,7 +9,7 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 
 /**
  * A sports complex as Tenancy keeps it in {@code global.tenant}, with its lifecycle (ADR-013):
- * {@code PROVISIONING → ACTIVE ⇄ SUSPENDED}, {@code ACTIVE | SUSPENDED → ARCHIVED}, {@code ARCHIVED → ACTIVE}
+ * {@code PROVISIONING → ACTIVE ⇄ SUSPENDED}, {@code PROVISIONING ⇄ PROVISIONING_FAILED} (ADR-014), {@code ACTIVE | SUSPENDED → ARCHIVED}, {@code ARCHIVED → ACTIVE}
  * before {@code purgeDueAt} and, for the purge job, {@code ARCHIVED → PURGING → PURGED} from {@code purgeDueAt} on. Every transition returns a new value; a
  * transition the current state does not allow throws {@link InvalidTransitionException}.
  *
@@ -51,6 +51,18 @@ public record Tenant(
     /** A complex just registered: its schema and owner are still to be provisioned. */
     public static Tenant provisioning(TenantId id, String displayName, Instant now) {
         return new Tenant(id, displayName, TenantStatus.PROVISIONING, now, null, null, null, null, null, null);
+    }
+
+    /** {@code PROVISIONING → PROVISIONING_FAILED}: its schema or owner could not be created; it waits for a retry. */
+    public Tenant failProvisioning() {
+        requireStatusIn(Set.of(TenantStatus.PROVISIONING));
+        return withStatus(TenantStatus.PROVISIONING_FAILED, purgedAt);
+    }
+
+    /** {@code PROVISIONING_FAILED → PROVISIONING}: a retry of the provisioning starts. */
+    public Tenant retryProvisioning() {
+        requireStatusIn(Set.of(TenantStatus.PROVISIONING_FAILED));
+        return withStatus(TenantStatus.PROVISIONING, purgedAt);
     }
 
     /** {@code PROVISIONING | SUSPENDED → ACTIVE}. */
