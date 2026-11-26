@@ -16,10 +16,16 @@ En la sección de la pieza `backoffice`, agregar:
 
 Componentes de la v3 implementados en `backoffice/src/app/shared/ui` solo con tokens existentes: «Etiqueta de estado» (`status-tag`) y «Pestañas» con dirección propia (`tab-nav`). El campo admite sufijo fijo (p. ej. `.playtodoo.com`), fecha nativa y `inputmode`. Se agregó `.link-button` (enlace con aspecto de botón primario) y `.text-link` en `src/styles.css`.
 
+## docs/screens/platodo-27-suscripciones-y-backoffice-de-kuador.md («Pantallas» P5)
+
+En «Cambiar estado», viñeta «A **Suspendida**», reemplazar «Si inicia el plazo de borrado, debe decirlo aquí con los días y la fecha.» por:
+
+> Avisa que empieza el plazo de conservación y que, si no se reactiva antes de que venza, todos sus datos se borrarán. La fecha exacta se muestra en el detalle (P4) al confirmar, porque la `api` solo la calcula al suspender (decisión del equipo en PLATODO-90, opción b).
+
 ## contracts/platform-backoffice.openapi.yaml (para Arquitectura; no se cambió)
 
 Huecos encontrados al construir las pantallas. No bloquean; la pantalla hace lo indicado mientras tanto:
 
 1. `PlanSnapshot.customFields` no trae la etiqueta de cada campo y `GET /plan-fields` es solo del SUPER_ADMIN: el Resumen y la comparación de planes muestran la clave (`support-hours`).
-2. Antes de suspender no se conoce el plazo de conservación por defecto (`retentionDays`): el diálogo «Suspender complejo» avisa que empieza el plazo, sin días ni fecha; la fecha exacta aparece en el detalle al confirmar. «Pantallas» pide mostrarlos antes.
+2. Antes de suspender no se conoce el plazo de conservación por defecto (`retentionDays`): el diálogo «Suspender complejo» avisa que empieza el plazo, sin días ni fecha; la fecha exacta aparece en el detalle al confirmar. **Decidido por el equipo (opción b, 26/11/2026): se acepta así y no se cambia el contrato.**
 3. `ComplexDetail` no trae el último pago: el Resumen lo pide con `GET /payments?size=1`.
