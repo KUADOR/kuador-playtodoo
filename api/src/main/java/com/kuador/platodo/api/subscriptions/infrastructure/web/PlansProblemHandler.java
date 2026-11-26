@@ -24,52 +24,52 @@ class PlansProblemHandler {
 
     @ExceptionHandler(InvalidPlanFieldsException.class)
     ProblemDetail validationFailed(InvalidPlanFieldsException invalid) {
-        return PlansProblem.VALIDATION_FAILED.toProblem(invalid.fieldErrors());
+        return SubscriptionsProblem.VALIDATION_FAILED.toProblem(invalid.fieldErrors());
     }
 
     @ExceptionHandler(PlanIncompleteException.class)
     ProblemDetail planIncomplete(PlanIncompleteException incomplete) {
-        return PlansProblem.PLAN_INCOMPLETE.toProblem(incomplete.missingFields());
+        return SubscriptionsProblem.PLAN_INCOMPLETE.toProblem(incomplete.missingFields());
     }
 
     @ExceptionHandler(BasicFieldReadOnlyException.class)
     ProblemDetail basicFieldReadOnly() {
-        return PlansProblem.BASIC_FIELD_READ_ONLY.toProblem();
+        return SubscriptionsProblem.BASIC_FIELD_READ_ONLY.toProblem();
     }
 
     @ExceptionHandler(StaleVersionException.class)
     ProblemDetail staleState() {
-        return PlansProblem.STALE_STATE.toProblem();
+        return SubscriptionsProblem.STALE_STATE.toProblem();
     }
 
     @ExceptionHandler(PlanNameTakenException.class)
     ProblemDetail planNameTaken() {
-        return PlansProblem.PLAN_NAME_TAKEN.toProblem();
+        return SubscriptionsProblem.PLAN_NAME_TAKEN.toProblem();
     }
 
     @ExceptionHandler(FieldNameTakenException.class)
     ProblemDetail fieldNameTaken() {
-        return PlansProblem.FIELD_NAME_TAKEN.toProblem();
+        return SubscriptionsProblem.FIELD_NAME_TAKEN.toProblem();
     }
 
     @ExceptionHandler(PlanNotFoundException.class)
     ProblemDetail planNotFound() {
-        return PlansProblem.PLAN_NOT_FOUND.toProblem();
+        return SubscriptionsProblem.PLAN_NOT_FOUND.toProblem();
     }
 
     @ExceptionHandler(PlanFieldNotFoundException.class)
     ProblemDetail planFieldNotFound() {
-        return PlansProblem.PLAN_FIELD_NOT_FOUND.toProblem();
+        return SubscriptionsProblem.PLAN_FIELD_NOT_FOUND.toProblem();
     }
 
-    @ExceptionHandler(InvalidPlansRequestException.class)
-    ProblemDetail invalidRequest(InvalidPlansRequestException invalid) {
-        return PlansProblem.INVALID_REQUEST.toProblem(invalid.getMessage());
+    @ExceptionHandler(InvalidSubscriptionsRequestException.class)
+    ProblemDetail invalidRequest(InvalidSubscriptionsRequestException invalid) {
+        return SubscriptionsProblem.INVALID_REQUEST.toProblem(invalid.getMessage());
     }
 
     /** Malformed JSON, an unknown enum value, or a path or query parameter of the wrong type. */
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
     ProblemDetail malformed() {
-        return PlansProblem.INVALID_REQUEST.toProblem();
+        return SubscriptionsProblem.INVALID_REQUEST.toProblem();
     }
 }

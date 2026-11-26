@@ -47,7 +47,7 @@ public final class RegisterTenant {
         Subdomain accepted = rules.accept(subdomain);
         Tenant tenant = Tenant.provisioning(new TenantId(UUID.randomUUID().toString()), displayName, clock.instant());
         transaction.run(() -> {
-            registry.register(tenant, accepted);
+            registry.register(tenant, accepted, ownerEmail);
             return tenant;
         });
         provisioning.provision(tenant.id(), ownerEmail);

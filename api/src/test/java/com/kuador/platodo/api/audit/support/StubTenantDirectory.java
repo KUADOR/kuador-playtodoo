@@ -1,5 +1,7 @@
 package com.kuador.platodo.api.audit.support;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,5 +22,11 @@ public final class StubTenantDirectory implements TenantDirectory {
     @Override
     public Optional<TenantEntry> find(TenantId tenant) {
         return Optional.ofNullable(entries.get(tenant));
+    }
+
+    /** Audit never reads profiles. */
+    @Override
+    public List<TenantProfile> profiles(Collection<TenantId> tenants) {
+        throw new UnsupportedOperationException("Not used by the audit tests");
     }
 }
