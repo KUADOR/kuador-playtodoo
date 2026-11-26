@@ -1,0 +1,122 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+h1,
+h2 {
+  margin: 0;
+}
+
+h2 {
+  font-size: var(--font-size-lg);
+}
+
+.editor__back,
+.editor__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--size-touch-min);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.editor__back {
+  align-self: flex-start;
+  text-decoration: none;
+}
+
+.editor__back:focus-visible,
+.editor__link:focus-visible,
+.editor__summary:focus-visible {
+  outline: var(--border-focus-ring) solid var(--color-focus);
+  outline-offset: var(--border-focus-offset);
+}
+
+.editor__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.editor__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-fg-muted);
+}
+
+.editor__summary {
+  border-radius: var(--radius-md);
+}
+
+.editor__summary-list {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.editor__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.editor__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.editor__section legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+}
+
+.editor__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  clear: both;
+}
+
+.editor__empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  clear: both;
+}
+
+.editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* One column where the table turns into cards («Identidad visual» v3, «Tabla»). */
+@media (max-width: 719px) {
+  .editor__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 599px) {
+  .editor__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}

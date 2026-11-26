@@ -2,10 +2,15 @@ import { Routes } from '@angular/router';
 import { APP_PATHS } from './core/app-paths';
 import { SUPER_ADMIN_ONLY } from './core/auth/access';
 import { accessGuard, signedInGuard, signedOutGuard } from './core/auth/guards';
+import { unsavedChangesGuard } from './core/navigation/unsaved-changes-guard';
+import { PLAN_ID_PARAM } from './features/plans/plan-paths';
 import { SECTION_HEADING_KEY } from './features/upcoming-section/section-heading';
 import { devRoutes } from './dev-routes';
 
 const TITLE_SUFFIX = ' · Backoffice de Kuador';
+
+const loadPlanEditor = () =>
+  import('./features/plans/plan-editor-page/plan-editor-page').then((m) => m.PlanEditorPage);
 
 const loadUpcomingSection = () =>
   import('./features/upcoming-section/upcoming-section-page').then((m) => m.UpcomingSectionPage);
@@ -32,12 +37,34 @@ export const routes: Routes = [
         loadComponent: loadUpcomingSection,
       },
       {
-        // Replaced by P10 «Planes» in PLATODO-91.
         path: APP_PATHS.plans,
         title: `Planes${TITLE_SUFFIX}`,
         canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
-        data: { [SECTION_HEADING_KEY]: 'Planes' },
-        loadComponent: loadUpcomingSection,
+        loadComponent: () =>
+          import('./features/plans/plans-page/plans-page').then((m) => m.PlansPage),
+      },
+      {
+        path: APP_PATHS.planFields,
+        title: `Campos de plan${TITLE_SUFFIX}`,
+        canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
+        loadComponent: () =>
+          import('./features/plans/plan-fields-page/plan-fields-page').then(
+            (m) => m.PlanFieldsPage,
+          ),
+      },
+      {
+        path: APP_PATHS.newPlan,
+        title: `Crear plan${TITLE_SUFFIX}`,
+        canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: loadPlanEditor,
+      },
+      {
+        path: `${APP_PATHS.plans}/:${PLAN_ID_PARAM}`,
+        title: `Editar plan${TITLE_SUFFIX}`,
+        canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: loadPlanEditor,
       },
       {
         path: APP_PATHS.operatorPermissions,

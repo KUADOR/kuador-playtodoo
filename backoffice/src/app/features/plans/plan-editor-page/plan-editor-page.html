@@ -1,0 +1,190 @@
+@let current = state();
+<a class="editor__back" [routerLink]="plansUrl">
+  <svg lucideChevronLeft [size]="backIconSize" aria-hidden="true"></svg>
+  <span>Planes</span>
+</a>
+
+@switch (current.status) {
+  @case ('loading') {
+    <h1>{{ isNew ? 'Crear plan' : 'Editar plan' }}</h1>
+    <div aria-busy="true"><app-skeleton [rows]="skeletonRows" /></div>
+  }
+  @case ('error') {
+    <h1>{{ isNew ? 'Crear plan' : 'Editar plan' }}</h1>
+    <app-alert tone="error">
+      {{ current.message }}
+      <app-button alertActions label="Reintentar" variant="secondary" (press)="load()" />
+    </app-alert>
+  }
+  @case ('not-found') {
+    <h1>Plan no encontrado</h1>
+    <app-alert tone="error">
+      No encontramos este plan.
+      <a alertActions class="editor__link" [routerLink]="plansUrl">Ir a Planes</a>
+    </app-alert>
+  }
+  @case ('ready') {
+    <div class="editor__header">
+      <h1>{{ heading() }}</h1>
+      <p class="editor__status">
+        <span>Estado:</span>
+        <app-status-badge [status]="statusBadge()" />
+      </p>
+    </div>
+
+    @if (summary().length > 0) {
+      <div #errorSummary class="editor__summary" tabindex="-1">
+        <app-alert tone="error" heading="Revisa los campos marcados">
+          <ul class="editor__summary-list">
+            @for (entry of summary(); track entry.field.path) {
+              <li>
+                <a
+                  class="editor__link"
+                  [attr.href]="'#' + controlIdOf(entry.index)"
+                  (click)="focusField($event, entry.index)"
+                  >{{ entry.field.label }}: {{ entry.message }}</a
+                >
+              </li>
+            }
+          </ul>
+        </app-alert>
+      </div>
+    }
+
+    @if (isPublished()) {
+      <app-alert tone="info" heading="Plan publicado">
+        Los cambios solo se aplican a las nuevas asignaciones: los complejos que ya tienen este plan
+        conservan sus condiciones.
+      </app-alert>
+    }
+
+    @if (formError(); as message) {
+      <app-alert tone="error">{{ message }}</app-alert>
+    }
+
+    <form class="editor__form" novalidate (submit)="$event.preventDefault()">
+      <fieldset class="editor__section">
+        <legend><h2>Datos básicos</h2></legend>
+        <div class="editor__grid">
+          @for (field of current.basic; track field.path) {
+            <ng-container
+              *ngTemplateOutlet="control; context: { $implicit: field, index: $index }"
+            />
+          }
+        </div>
+      </fieldset>
+
+      <fieldset class="editor__section">
+        <legend><h2>Otros campos</h2></legend>
+        @if (current.custom.length === 0) {
+          <p class="editor__empty">
+            No hay campos adicionales.
+            <a class="editor__link" [routerLink]="planFieldsUrl">Ir a Campos de plan</a>
+          </p>
+        } @else {
+          <div class="editor__grid">
+            @for (field of current.custom; track field.path) {
+              <ng-container
+                *ngTemplateOutlet="
+                  control;
+                  context: { $implicit: field, index: current.basic.length + $index }
+                "
+              />
+            }
+          </div>
+        }
+      </fieldset>
+
+      <div class="editor__actions">
+        <app-button
+          label="Cancelar"
+          variant="secondary"
+          [disabled]="saving() !== null"
+          (press)="cancel()"
+        />
+        @if (isPublished()) {
+          <app-button
+            label="Guardar cambios"
+            [loading]="saving() === 'changes'"
+            [disabled]="saving() !== null"
+            (press)="saveChanges()"
+          />
+        } @else {
+          <app-button
+            label="Guardar borrador"
+            variant="secondary"
+            [loading]="saving() === 'draft'"
+            [disabled]="saving() !== null"
+            (press)="saveDraft()"
+          />
+          <app-button label="Publicar" [disabled]="saving() !== null" (press)="askToPublish()" />
+        }
+      </div>
+    </form>
+
+    <ng-template #control let-field let-index="index">
+      <app-field
+        [label]="field.label"
+        [kind]="field.kind === 'choice' || field.kind === 'yes-no' ? 'select' : 'text'"
+        [inputMode]="inputModeOf(field)"
+        [options]="field.options"
+        [placeholder]="
+          field.kind === 'choice' || field.kind === 'yes-no' ? choicePlaceholder : undefined
+        "
+        [required]="field.path === 'name'"
+        [help]="helpOf(field)"
+        [error]="errors()[field.path]"
+        [disabled]="saving() !== null"
+        [value]="values()[field.path] ?? ''"
+        (valueChange)="update(field.path, $event)"
+      />
+    </ng-template>
+  }
+}
+
+@if (confirmingPublish()) {
+  <app-dialog
+    [heading]="publishDialogHeading(values()['name'] ?? '')"
+    [busy]="saving() !== null"
+    (closeRequest)="closePublish()"
+  >
+    <p>{{ publishTexts.confirmation }}</p>
+    @if (publishError(); as message) {
+      <app-alert tone="error">{{ message }}</app-alert>
+    }
+    <app-button
+      dialogActions
+      data-dialog-initial-focus
+      label="Cancelar"
+      variant="secondary"
+      [disabled]="saving() !== null"
+      (press)="closePublish()"
+    />
+    <app-button
+      dialogActions
+      label="Publicar"
+      loadingLabel="Publicando…"
+      [loading]="saving() !== null"
+      (press)="publish()"
+    />
+  </app-dialog>
+}
+
+@if (leaving()) {
+  <app-dialog heading="Salir sin guardar" (closeRequest)="answerLeave(false)">
+    <p>Los cambios que hiciste en el plan se perderán.</p>
+    <app-button
+      dialogActions
+      data-dialog-initial-focus
+      label="Seguir editando"
+      variant="secondary"
+      (press)="answerLeave(false)"
+    />
+    <app-button
+      dialogActions
+      label="Salir sin guardar"
+      variant="danger"
+      (press)="answerLeave(true)"
+    />
+  </app-dialog>
+}

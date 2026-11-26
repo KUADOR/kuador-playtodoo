@@ -1,30 +1,19 @@
-import { Page } from '../../core/api/page';
 import { Capability, CurrentPlatformUser } from '../../core/auth/platform-user';
 import {
   CapabilityChange,
   ChangeOperatorCapabilitiesRequest,
   OperatorCapabilities,
 } from '../../features/operator-permissions/operator-capabilities-api';
+import { MockPlansBackend } from './mock-plans-backend';
+import { MockRequest, MockResponse, ok, pageOf, problem } from './mock-responses';
+
+export type { MockRequest, MockResponse } from './mock-responses';
 
 /**
  * In-memory stand-in of the platform operations this backoffice uses, built from the examples of
  * contracts/platform-backoffice.openapi.yaml and contracts/tenancy.openapi.yaml. Development
  * builds only (see mock-backend.development.ts). Every password is accepted: there are no secrets.
  */
-export interface MockRequest {
-  readonly method: string;
-  /** Path after the api base URL, for example `/platform/me`. */
-  readonly path: string;
-  readonly query: URLSearchParams;
-  readonly bearerToken: string | null;
-  readonly body: unknown;
-}
-
-export interface MockResponse {
-  readonly status: number;
-  readonly body: unknown;
-}
-
 /** Sign in with one of these e-mails (any password) to try each role. */
 export const MOCK_ACCOUNTS = {
   superAdmin: 'superadmin@kuador.test',
@@ -32,7 +21,6 @@ export const MOCK_ACCOUNTS = {
 } as const;
 
 const TOKEN_LIFETIME_SECONDS = 3600;
-const DEFAULT_PAGE_SIZE = 20;
 
 const CAPABILITY_DESCRIPTIONS: Record<Capability, string> = {
   COMPLEX_CREATE: 'Register complexes and retry their provisioning.',
@@ -71,6 +59,7 @@ export class MockPlatformBackend {
   );
   private readonly changes: CapabilityChange[] = [];
   private nextChangeId = 1;
+  private readonly plans = new MockPlansBackend();
 
   handle(request: MockRequest): MockResponse {
     const route = `${request.method} ${request.path}`;
@@ -91,9 +80,11 @@ export class MockPlatformBackend {
           this.changeCapabilities(user, request.body as ChangeOperatorCapabilitiesRequest),
         );
       case 'GET /platform/operator-capabilities/changes':
-        return this.onlySuperAdmin(user, () => ok(this.changesPage(request.query)));
+        return this.onlySuperAdmin(user, () => ok(pageOf(this.changes, request.query)));
       default:
-        return { status: 404, body: null };
+        return (
+          this.plans.handle(request, user.role === 'SUPER_ADMIN') ?? { status: 404, body: null }
+        );
     }
   }
 
@@ -164,31 +155,4 @@ export class MockPlatformBackend {
     this.capabilitiesVersion++;
     return ok(this.capabilities());
   }
-
-  private changesPage(query: URLSearchParams): Page<CapabilityChange> {
-    const page = Number(query.get('page') ?? 0);
-    const size = Number(query.get('size') ?? DEFAULT_PAGE_SIZE);
-    return {
-      items: this.changes.slice(page * size, (page + 1) * size),
-      page,
-      size,
-      totalItems: this.changes.length,
-    };
-  }
-}
-
-function ok(body: unknown): MockResponse {
-  return { status: 200, body };
-}
-
-function problem(status: number, code: string): MockResponse {
-  return {
-    status,
-    body: {
-      type: `https://playtodoo.com/problems/${code.toLowerCase()}`,
-      title: code,
-      status,
-      code,
-    },
-  };
 }

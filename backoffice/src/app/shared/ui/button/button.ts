@@ -24,6 +24,11 @@ export class Button {
   readonly loading = input(false);
   readonly disabled = input(false);
   readonly loadingLabel = input(DEFAULT_LOADING_LABEL);
+  /**
+   * Full accessible name when the visible label repeats on a page, for example «Publicar plan
+   * Premium» for a «Publicar» button in a table row.
+   */
+  readonly accessibleLabel = input<string>();
 
   readonly press = output<void>();
 

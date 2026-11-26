@@ -6,6 +6,9 @@ export type FieldKind = 'text' | 'select';
 /** `type` of the native input when `kind` is `text`. */
 export type TextInputType = 'text' | 'email' | 'password';
 
+/** Native `inputmode`: which on-screen keyboard a phone shows for a text input. */
+export type TextInputMode = 'text' | 'decimal' | 'numeric' | 'email';
+
 export interface FieldOption {
   readonly value: string;
   readonly label: string;
@@ -30,6 +33,7 @@ export class Field {
   readonly label = input.required<string>();
   readonly kind = input<FieldKind>('text');
   readonly inputType = input<TextInputType>('text');
+  readonly inputMode = input<TextInputMode>();
   /** Native `autocomplete` hint, for example `username` or `current-password`. */
   readonly autocomplete = input<string>();
   readonly required = input(false);
@@ -41,7 +45,8 @@ export class Field {
   readonly value = model('');
 
   protected readonly errorIconSize = ERROR_ICON_SIZE_PX;
-  protected readonly controlId = `app-field-${nextFieldId++}`;
+  /** Id of the native control, for example to link it from an error summary. */
+  readonly controlId = `app-field-${nextFieldId++}`;
   protected readonly helpId = `${this.controlId}-help`;
   protected readonly errorId = `${this.controlId}-error`;
 
