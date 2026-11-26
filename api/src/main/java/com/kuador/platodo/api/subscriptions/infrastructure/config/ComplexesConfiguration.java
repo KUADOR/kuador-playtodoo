@@ -19,6 +19,7 @@ import com.kuador.platodo.api.subscriptions.application.RegisterComplex;
 import com.kuador.platodo.api.subscriptions.application.RetryComplexProvisioning;
 import com.kuador.platodo.api.subscriptions.application.port.out.LastPayments;
 import com.kuador.platodo.api.subscriptions.application.port.out.Plans;
+import com.kuador.platodo.api.subscriptions.application.port.out.SubscriptionHistory;
 import com.kuador.platodo.api.subscriptions.application.port.out.Subscriptions;
 import com.kuador.platodo.api.subscriptions.infrastructure.persistence.global.JpaLastPayments;
 import com.kuador.platodo.api.subscriptions.infrastructure.persistence.global.JpaSubscriptions;
@@ -68,8 +69,9 @@ class ComplexesConfiguration {
 
     @Bean
     RegisterComplex registerComplex(CapabilityGuard guard, Plans plans, Subscriptions subscriptions,
-            TenantOnboarding onboarding, ComplexDetails details) {
-        return new RegisterComplex(guard, plans, subscriptions, onboarding, details, globalTransaction, clock);
+            SubscriptionHistory history, TenantOnboarding onboarding, ComplexDetails details) {
+        return new RegisterComplex(guard, plans, subscriptions, history, onboarding, details, globalTransaction,
+                clock);
     }
 
     @Bean

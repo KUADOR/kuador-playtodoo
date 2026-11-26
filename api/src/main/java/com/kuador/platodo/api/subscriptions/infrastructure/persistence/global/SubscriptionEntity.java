@@ -51,6 +51,16 @@ class SubscriptionEntity {
         this.version = version;
     }
 
+    void apply(UUID newPlanId, String newPlanSnapshot, String newStatus, Instant newStatusSince,
+            UUID newStatusChangedBy, long newVersion) {
+        this.planId = newPlanId;
+        this.planSnapshot = newPlanSnapshot;
+        this.status = newStatus;
+        this.statusSince = newStatusSince;
+        this.statusChangedBy = newStatusChangedBy;
+        this.version = newVersion;
+    }
+
     UUID id() {
         return id;
     }

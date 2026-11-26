@@ -15,7 +15,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -129,9 +128,9 @@ class ComplexesApiIT {
     void theListShowsPlanStatusAndLastPayment() throws Exception {
         String olderId = registeredComplex(uniqueSubdomain("older"));
         String newerId = registeredComplex(uniqueSubdomain("newer"));
-        recordPayment(olderId, "80.5", LocalDate.parse("2026-11-01"));
-        recordPayment(olderId, "120.00", LocalDate.parse("2026-12-01"));
-        recordPayment(olderId, "99.00", LocalDate.parse("2026-10-01"));
+        api.recordPayment(superAdminToken, olderId, "80.5", "2026-11-01", "TRANSFER").andExpect(status().isCreated());
+        api.recordPayment(superAdminToken, olderId, "120.00", "2026-11-20", "INVOICE").andExpect(status().isCreated());
+        api.recordPayment(superAdminToken, olderId, "99.00", "2026-10-01", "TRANSFER").andExpect(status().isCreated());
 
         JsonNode page = json(api.list(superAdminToken, 0, 100)
                 .andExpect(status().isOk())
@@ -151,7 +150,7 @@ class ComplexesApiIT {
         assertThat(older.get("purgeDueAt").isNull()).isTrue();
         assertThat(older.get("lastPayment").get("amount").asString()).isEqualTo("120.00");
         assertThat(older.get("lastPayment").get("currency").asString()).isEqualTo("USD");
-        assertThat(older.get("lastPayment").get("paidOn").asString()).isEqualTo("2026-12-01");
+        assertThat(older.get("lastPayment").get("paidOn").asString()).isEqualTo("2026-11-20");
         assertThat(newer.get("lastPayment").isNull()).isTrue();
 
         api.list(superAdminToken, 0, 1)
@@ -326,21 +325,6 @@ class ComplexesApiIT {
             }
         }
         throw new AssertionError("Complex " + complexId + " is not in the page");
-    }
-
-    /** A payment as PLATODO-85 will record it; recording payments is not part of this task. */
-    private static void recordPayment(String complexId, String amount, LocalDate paidOn) {
-        TenantDatabase.admin().sql("""
-                        INSERT INTO global.subscription_payment
-                            (id, tenant_id, amount, currency, paid_on, method, recorded_by, recorded_at)
-                        SELECT gen_random_uuid(), s.tenant_id, CAST(:amount AS numeric), 'USD', :paidOn, 'TRANSFER',
-                               s.status_changed_by, now()
-                        FROM global.subscription s WHERE s.tenant_id = CAST(:tenantId AS uuid)
-                        """)
-                .param("amount", amount)
-                .param("paidOn", paidOn)
-                .param("tenantId", complexId)
-                .update();
     }
 
     private static long tenantsNamed(String displayName) {

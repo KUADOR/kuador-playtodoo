@@ -18,7 +18,6 @@ import com.kuador.platodo.api.subscriptions.application.GetComplex;
 import com.kuador.platodo.api.subscriptions.application.ListComplexes;
 import com.kuador.platodo.api.subscriptions.application.RegisterComplex;
 import com.kuador.platodo.api.subscriptions.application.RetryComplexProvisioning;
-import com.kuador.platodo.api.subscriptions.application.port.out.Plans.PageRequest;
 
 /** Tag «Complexes» of {@code contracts/platform-backoffice.openapi.yaml}; global host. */
 @RestController
@@ -28,9 +27,6 @@ class ComplexController {
     static final String COMPLEXES = "/complexes";
     static final String COMPLEX = COMPLEXES + "/{complexId}";
     static final String PROVISIONING_RETRIES = COMPLEX + "/provisioning-retries";
-
-    private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int MAX_PAGE_SIZE = 100;
 
     private final ListComplexes listComplexes;
     private final GetComplex getComplex;
@@ -46,13 +42,9 @@ class ComplexController {
     }
 
     @GetMapping(COMPLEXES)
-    ComplexResponses.Page list(@RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size) {
-        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
-            throw new InvalidSubscriptionsRequestException(
-                    "`page` must be >= 0 and `size` between 1 and %d.".formatted(MAX_PAGE_SIZE));
-        }
-        return ComplexResponses.Page.of(listComplexes.list(new PageRequest(page, size)), page, size);
+    ComplexResponses.Page list(@RequestParam(defaultValue = PageParameters.FIRST_PAGE) int page,
+            @RequestParam(defaultValue = PageParameters.DEFAULT_SIZE) int size) {
+        return ComplexResponses.Page.of(listComplexes.list(PageParameters.of(page, size)), page, size);
     }
 
     /** {@code 201} whether provisioning ended {@code ACTIVE} or {@code PROVISIONING_FAILED}. */

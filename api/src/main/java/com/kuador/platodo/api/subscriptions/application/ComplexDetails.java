@@ -59,7 +59,11 @@ public final class ComplexDetails {
         }
     }
 
-    private static boolean acceptsCommercialChanges(TenantProfile tenant, Instant now) {
+    /**
+     * Whether the lifecycle of the complex allows commercial changes at {@code now}: it is provisioned, not being
+     * purged, and its retention, if any, has not expired.
+     */
+    static boolean acceptsCommercialChanges(TenantProfile tenant, Instant now) {
         boolean retentionExpired = tenant.purgeDueAt() != null && !now.isBefore(tenant.purgeDueAt());
         return OPEN_TO_COMMERCIAL_CHANGES.contains(tenant.status()) && !retentionExpired;
     }

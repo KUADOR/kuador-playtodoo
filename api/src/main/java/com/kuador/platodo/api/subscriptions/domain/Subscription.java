@@ -33,6 +33,36 @@ public record Subscription(UUID id, UUID tenantId, PlanSnapshot plan, Subscripti
     }
 
     /**
+     * The subscription moved by hand to {@code target} by {@code changedBy} at {@code now} (ADR-014). The plan stays.
+     *
+     * @param complexAcceptsChanges see {@link #allowedTransitions(boolean)}
+     * @throws TransitionNotAllowedException if {@code target} is not among the allowed transitions
+     */
+    public Subscription changeStatus(SubscriptionStatus target, UUID changedBy, Instant now,
+            boolean complexAcceptsChanges) {
+        if (!allowedTransitions(complexAcceptsChanges).contains(target)) {
+            throw new TransitionNotAllowedException(status, target);
+        }
+        return new Subscription(id, tenantId, plan, target, now, changedBy, createdAt, version + 1);
+    }
+
+    /**
+     * The subscription with the conditions of another plan (ADR-018). The status stays.
+     *
+     * @throws SubscriptionCancelledException if the subscription is cancelled
+     * @throws SamePlanException              if {@code newPlan} comes from the plan it already has
+     */
+    public Subscription changePlan(PlanSnapshot newPlan) {
+        if (status == SubscriptionStatus.CANCELLED) {
+            throw new SubscriptionCancelledException();
+        }
+        if (newPlan.planId().equals(plan.planId())) {
+            throw new SamePlanException();
+        }
+        return new Subscription(id, tenantId, newPlan, status, statusSince, statusChangedBy, createdAt, version + 1);
+    }
+
+    /**
      * The statuses the subscription can move to now.
      *
      * @param complexAcceptsChanges whether the lifecycle of the complex allows commercial changes: it is provisioned,
