@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.kuador.platodo.api.identity.domain.AccountType;
+import com.kuador.platodo.api.identity.domain.PlatformRole;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 
 /**
@@ -16,9 +17,6 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
  * @param role      role of the account (claim {@code role})
  */
 public record AuthenticatedPrincipal(UUID accountId, AccountType type, TenantId tenant, String role) {
-
-    /** The only Kuador role that may reach the data of a complex (ADR-003). */
-    public static final String PLATFORM_OWNER_ROLE = "PLATFORM_OWNER";
 
     public AuthenticatedPrincipal {
         Objects.requireNonNull(accountId, "accountId");
@@ -46,8 +44,11 @@ public record AuthenticatedPrincipal(UUID accountId, AccountType type, TenantId 
         return type == expected;
     }
 
-    /** Whether this is a Kuador account with the {@value #PLATFORM_OWNER_ROLE} role. */
-    public boolean isPlatformOwner() {
-        return type == AccountType.PLATFORM && PLATFORM_OWNER_ROLE.equals(role);
+    /**
+     * Whether this is a Kuador account with the {@link PlatformRole#SUPER_ADMIN} role, the owner of Kuador that
+     * PLATODO-26 called {@code PLATFORM_OWNER} (ADR-017).
+     */
+    public boolean isSuperAdmin() {
+        return type == AccountType.PLATFORM && PlatformRole.SUPER_ADMIN.name().equals(role);
     }
 }
