@@ -9,7 +9,7 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
  */
 public interface Callers {
 
-    /** The caller is a Kuador platform user with role {@code PLATFORM_OWNER}. */
+    /** The caller is the Kuador owner: a platform user with role {@code SUPER_ADMIN} (ADR-017). */
     void requirePlatformOwner();
 
     /** The caller is the owner (staff role {@code OWNER}) of the complex in {@code TenantScope}; returns it. */

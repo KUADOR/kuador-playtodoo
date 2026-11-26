@@ -16,7 +16,12 @@ public final class TestAccounts {
     public static final String PASSWORD = "test-password";
 
     private static final PasswordEncoder PASSWORDS = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    /** Visible name of every platform user created here. */
+    public static final String PLATFORM_USER_NAME = "Test platform user";
+
     private static final String ACTIVE = "ACTIVE";
+    private static final String SUPER_ADMIN = "SUPER_ADMIN";
+    private static final String OPERATOR = "OPERATOR";
 
     private TestAccounts() {
     }
@@ -53,17 +58,29 @@ public final class TestAccounts {
         return id;
     }
 
-    /** An active Kuador platform owner with {@link #PASSWORD}. */
+    /** An active Kuador owner (role {@code SUPER_ADMIN}, formerly {@code PLATFORM_OWNER}) with {@link #PASSWORD}. */
     public static UUID platformOwner(String email) {
+        return platformUser(email, SUPER_ADMIN);
+    }
+
+    /** An active Kuador operator (role {@code OPERATOR}) with {@link #PASSWORD}. */
+    public static UUID operator(String email) {
+        return platformUser(email, OPERATOR);
+    }
+
+    private static UUID platformUser(String email, String role) {
         UUID id = UUID.randomUUID();
         TenantDatabase.admin().sql("""
-                        INSERT INTO global.platform_user (id, email, password_hash, role, status, created_at)
-                        VALUES (:id, :email, :hash, 'PLATFORM_OWNER', :status, now())
+                        INSERT INTO global.platform_user (id, email, password_hash, role, status, display_name,
+                                                          created_at)
+                        VALUES (:id, :email, :hash, :role, :status, :name, now())
                         """)
                 .param("id", id)
                 .param("email", email)
                 .param("hash", PASSWORDS.encode(PASSWORD))
+                .param("role", role)
                 .param("status", ACTIVE)
+                .param("name", PLATFORM_USER_NAME)
                 .update();
         return id;
     }

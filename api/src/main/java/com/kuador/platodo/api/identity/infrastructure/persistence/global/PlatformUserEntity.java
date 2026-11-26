@@ -7,7 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Row of {@code global.platform_user} (migration V3), read-only here. */
+/** Row of {@code global.platform_user} (migrations V3 and V6), read-only here. */
 @Entity
 @Table(name = "platform_user")
 class PlatformUserEntity {
@@ -22,6 +22,8 @@ class PlatformUserEntity {
     private String role;
     @Column(nullable = false)
     private String status;
+    @Column(name = "display_name", nullable = false)
+    private String displayName;
 
     protected PlatformUserEntity() {
     }
@@ -36,5 +38,9 @@ class PlatformUserEntity {
 
     String role() {
         return role;
+    }
+
+    String displayName() {
+        return displayName;
     }
 }

@@ -16,13 +16,12 @@ import com.kuador.platodo.api.tenancy.application.port.out.Callers;
  */
 public final class PrincipalCallers implements Callers {
 
-    static final String PLATFORM_OWNER = "PLATFORM_OWNER";
     static final String COMPLEX_OWNER = "OWNER";
 
     @Override
     public void requirePlatformOwner() {
         AuthenticatedPrincipal principal = authenticated();
-        if (!principal.is(AccountType.PLATFORM) || !PLATFORM_OWNER.equals(principal.role())) {
+        if (!principal.isSuperAdmin()) {
             throw new CallerNotAllowedException();
         }
     }

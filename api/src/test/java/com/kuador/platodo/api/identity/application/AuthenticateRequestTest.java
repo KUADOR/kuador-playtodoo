@@ -87,7 +87,7 @@ class AuthenticateRequestTest {
     @Test
     void platformTokenIsAcceptedOnEveryHostWhileTheAccountIsActive() {
         AuthenticatedPrincipal owner = AuthenticatedPrincipal.global(
-                platformUsers.add("o@example.com", "x", "PLATFORM_OWNER"), AccountType.PLATFORM, "PLATFORM_OWNER");
+                platformUsers.add("o@example.com", "x", "SUPER_ADMIN"), AccountType.PLATFORM, "SUPER_ADMIN");
         String token = tokens.issue(owner).value();
 
         assertThat(authenticateRequest.authenticate(token)).isEqualTo(new Authenticated(owner));
@@ -96,8 +96,8 @@ class AuthenticateRequestTest {
 
     @Test
     void platformTokenOfADisabledAccountIsRejectedOnTheHostOfAComplex() {
-        UUID ownerId = platformUsers.add("d@example.com", "x", "PLATFORM_OWNER");
-        String token = tokens.issue(AuthenticatedPrincipal.global(ownerId, AccountType.PLATFORM, "PLATFORM_OWNER"))
+        UUID ownerId = platformUsers.add("d@example.com", "x", "SUPER_ADMIN");
+        String token = tokens.issue(AuthenticatedPrincipal.global(ownerId, AccountType.PLATFORM, "SUPER_ADMIN"))
                 .value();
         platformUsers.disable(ownerId);
 

@@ -55,7 +55,7 @@ final class PlatformAccessGuard implements HandlerInterceptor {
             HttpServletRequest request) {
         return new PlatformAccessAttempt(
                 platformUser.accountId(),
-                platformUser.isPlatformOwner(),
+                platformUser.isSuperAdmin(),
                 tenant,
                 Optional.ofNullable(request.getHeader(ACCESS_SESSION_HEADER)),
                 request.getMethod(),
