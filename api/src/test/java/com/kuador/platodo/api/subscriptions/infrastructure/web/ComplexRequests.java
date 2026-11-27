@@ -50,7 +50,7 @@ final class ComplexRequests {
     }
 
     static void allowTestPlanOptions() {
-        setPlanOption("plan.currencies", "[\"USD\"]");
+        setPlanOption("plan.currencies", "[\"USD\", \"EUR\"]");
         setPlanOption("plan.periodicities", "[\"MONTHLY\"]");
     }
 
@@ -111,6 +111,42 @@ final class ComplexRequests {
 
     ResultActions retry(String token, String complexId) throws Exception {
         return as(token, post(COMPLEXES + "/" + complexId + "/provisioning-retries"), null);
+    }
+
+    ResultActions changePlan(String token, String complexId, String planId, long version) throws Exception {
+        return as(token, put(COMPLEXES + "/" + complexId + "/plan"), """
+                {"planId": "%s", "version": %d}
+                """.formatted(planId, version));
+    }
+
+    ResultActions changeStatus(String token, String complexId, String targetStatus, long version) throws Exception {
+        return as(token, post(COMPLEXES + "/" + complexId + "/status-changes"), """
+                {"targetStatus": "%s", "version": %d}
+                """.formatted(targetStatus, version));
+    }
+
+    ResultActions recordPayment(String token, String complexId, String amount, String paidOn, String method)
+            throws Exception {
+        return as(token, post(COMPLEXES + "/" + complexId + "/payments"), """
+                {"amount": "%s", "paidOn": "%s", "method": "%s"}
+                """.formatted(amount, paidOn, method));
+    }
+
+    ResultActions payments(String token, String complexId) throws Exception {
+        return as(token, get(COMPLEXES + "/" + complexId + "/payments"), null);
+    }
+
+    ResultActions history(String token, String complexId) throws Exception {
+        return as(token, get(COMPLEXES + "/" + complexId + "/history"), null);
+    }
+
+    /** Replaces the fields of a published plan, as {@code PUT /plans/{planId}} does. */
+    void revisePlan(String superAdminToken, String planId, String name, String currency, long version)
+            throws Exception {
+        as(superAdminToken, put(PLANS + "/" + planId), """
+                {"name": "%s", "price": "120.00", "currency": "%s", "periodicity": "MONTHLY",
+                 "courtLimit": 10, "userLimit": 25, "version": %d}
+                """.formatted(name, currency, version)).andExpect(status().isOk());
     }
 
     ResultActions availability(String subdomain) throws Exception {
