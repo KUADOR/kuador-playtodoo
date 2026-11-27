@@ -2,8 +2,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 /**
  * `code` of the Problem Details (RFC 9457) answered by the api: `ProblemCode` of
- * contracts/platform-backoffice.openapi.yaml plus `INVALID_CREDENTIALS` of the platform login
- * (contracts/tenancy.openapi.yaml).
+ * contracts/platform-backoffice.openapi.yaml, `INVALID_CREDENTIALS` of the platform login
+ * (contracts/tenancy.openapi.yaml) and the staff booking codes of contracts/bookings.openapi.yaml
+ * that Kuador support receives on the complex host.
  */
 export type ProblemCode =
   | 'INVALID_REQUEST'
@@ -34,7 +35,13 @@ export type ProblemCode =
   | 'PLAN_NAME_TAKEN'
   | 'PLAN_INCOMPLETE'
   | 'FIELD_NAME_TAKEN'
-  | 'BASIC_FIELD_READ_ONLY';
+  | 'BASIC_FIELD_READ_ONLY'
+  | 'TENANT_UNAVAILABLE'
+  | 'SLOT_UNAVAILABLE'
+  | 'SLOT_HAS_BOOKING'
+  | 'INVALID_SLOT'
+  | 'COURT_NOT_FOUND'
+  | 'BOOKING_NOT_FOUND';
 
 /** Failures that do not come with a Problem Details body. */
 export type TransportErrorCode = 'NETWORK_ERROR' | 'UNEXPECTED_RESPONSE';

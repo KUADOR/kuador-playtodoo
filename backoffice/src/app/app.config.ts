@@ -3,7 +3,7 @@ import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/
 import { provideRouter } from '@angular/router';
 import { accessTokenInterceptor, apiErrorInterceptor } from './core/api/api-interceptors';
 import { routes } from './app.routes';
-import { mockBackendInterceptors } from './mock-backend';
+import { mockBackendInterceptors, mockBackendProviders } from './mock-backend';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -15,5 +15,6 @@ export const appConfig: ApplicationConfig = {
       withFetch(),
       withInterceptors([accessTokenInterceptor, apiErrorInterceptor, ...mockBackendInterceptors]),
     ),
+    ...mockBackendProviders,
   ],
 };

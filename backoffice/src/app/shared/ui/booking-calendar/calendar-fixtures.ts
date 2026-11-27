@@ -6,7 +6,13 @@ import dayEmpty from './fixtures/day-empty.json';
 import monthMixed from './fixtures/month-mixed.json';
 import weekMixed from './fixtures/week-mixed.json';
 import weekReadonly from './fixtures/week-readonly.json';
-import { CalendarDay, CalendarView, IsoDate } from './booking-calendar.types';
+import {
+  CalendarDay,
+  CalendarMode,
+  CalendarView,
+  IsoDate,
+  SlotSelection,
+} from './booking-calendar.types';
 
 /** Shared fixture (design-system/fixtures/calendar), typed for the backoffice tests and catalog. */
 export interface CalendarFixture {
@@ -16,6 +22,8 @@ export interface CalendarFixture {
     readonly view: CalendarView;
     readonly today: IsoDate;
     readonly days: readonly CalendarDay[];
+    readonly mode?: CalendarMode;
+    readonly selected?: SlotSelection | null;
   };
   // The expected output is compared structurally, so its shape is not repeated here.
   readonly expected: Record<string, unknown>;

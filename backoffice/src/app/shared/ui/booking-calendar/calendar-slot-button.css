@@ -1,0 +1,22 @@
+/* Editable mode: each slot is a toggle button around the slot, which keeps its look. */
+.calendar__slot-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.calendar__slot-button[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.calendar__slot-button:focus-visible {
+  outline: var(--border-focus-ring) solid var(--color-focus);
+  outline-offset: var(--border-focus-offset);
+  box-shadow: 0 0 0 calc(var(--border-focus-ring) + var(--border-focus-offset))
+    var(--color-focus-halo);
+}

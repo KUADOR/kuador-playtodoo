@@ -2,7 +2,12 @@ import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { expectNoAxeViolations } from '../../../../testing/axe';
 import { BookingCalendar } from './booking-calendar';
-import { CalendarRange, CalendarStatus, CalendarView } from './booking-calendar.types';
+import {
+  CalendarRange,
+  CalendarStatus,
+  CalendarView,
+  SlotSelection,
+} from './booking-calendar.types';
 import { CalendarFixture, CALENDAR_FIXTURES } from './calendar-fixtures';
 
 describe('BookingCalendar (read-only)', () => {
@@ -97,11 +102,16 @@ describe('BookingCalendar (read-only)', () => {
       expect(ranges).toEqual([]);
     });
 
-    it('exposes no selection output (decision D6: no editable mode)', async () => {
+    it('is read-only by default: no slot is a button and nothing can be selected', async () => {
       await render(CALENDAR_FIXTURES.day60);
+      const emitted: unknown[] = [];
+      fixture.componentInstance.selectionChange.subscribe((selection) => emitted.push(selection));
 
-      expect('selectionChange' in fixture.componentInstance).toBe(false);
-      expect('selected' in fixture.componentInstance).toBe(false);
+      all('app-calendar-slot').forEach((slot) => slot.click());
+      await fixture.whenStable();
+
+      expect(all('.calendar__slot-button')).toEqual([]);
+      expect(emitted).toEqual([]);
     });
   });
 
@@ -385,5 +395,102 @@ describe('BookingCalendar (read-only)', () => {
 
       await expectNoAxeViolations(element());
     });
+  });
+});
+
+describe('BookingCalendar (editable)', () => {
+  let fixture: ComponentFixture<BookingCalendar>;
+  let selections: (SlotSelection | null)[];
+
+  /** Mounts `source` in editable mode with its selection; a new selection is fed back. */
+  async function render(source: CalendarFixture, view: CalendarView = source.input.view) {
+    fixture = TestBed.createComponent(BookingCalendar);
+    const { componentRef } = fixture;
+    componentRef.setInput('slotDurationMinutes', source.input.slotDurationMinutes);
+    componentRef.setInput('today', source.input.today);
+    componentRef.setInput('days', source.input.days);
+    componentRef.setInput('initialView', view);
+    componentRef.setInput('mode', 'editable');
+    componentRef.setInput('selected', source.input.selected ?? null);
+    selections = [];
+    fixture.componentInstance.selectionChange.subscribe((selection) => {
+      selections.push(selection);
+      componentRef.setInput('selected', selection);
+    });
+    await fixture.whenStable();
+  }
+
+  const element = (): HTMLElement => fixture.nativeElement;
+  const slotButtons = () =>
+    Array.from(element().querySelectorAll<HTMLButtonElement>('.calendar__slot-button'));
+  const slotButton = (label: string) =>
+    slotButtons().find((button) => button.textContent?.includes(label)) as HTMLButtonElement;
+  const tabbable = () => slotButtons().filter((button) => button.tabIndex === 0);
+
+  async function press(target: HTMLElement, key: string) {
+    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    await fixture.whenStable();
+  }
+
+  it('hides the read-only notice and shows the selection with its state and label', async () => {
+    await render(CALENDAR_FIXTURES.day60);
+
+    expect(element().querySelector('.calendar__readonly')).toBeNull();
+    const selected = slotButton('19:00–20:00');
+    expect(selected.getAttribute('aria-pressed')).toBe('true');
+    expect(selected.textContent).toContain('19:00 a 20:00, Seleccionado');
+    expect(selected.querySelector('svg')).not.toBeNull();
+    expect(slotButton('18:00–19:00').getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('selects a free slot, clears it when activated again and ignores occupied ones', async () => {
+    await render(CALENDAR_FIXTURES.day60);
+
+    slotButton('20:00–21:00').click();
+    await fixture.whenStable();
+    slotButton('20:00–21:00').click();
+    await fixture.whenStable();
+    slotButton('18:00–19:00').click();
+    await fixture.whenStable();
+
+    expect(selections).toEqual([{ date: '2026-12-04', start: '20:00' }, null]);
+  });
+
+  it('keeps a single slot in the tab order and moves it with the arrow keys', async () => {
+    await render(CALENDAR_FIXTURES.day60);
+    expect(tabbable().map((button) => button.textContent?.includes('19:00–20:00'))).toEqual([true]);
+
+    await press(tabbable()[0], 'ArrowRight');
+    expect(document.activeElement?.textContent).toContain('20:00–21:00');
+    await press(document.activeElement as HTMLElement, 'End');
+    expect(document.activeElement?.textContent).toContain('21:00–22:00');
+    await press(document.activeElement as HTMLElement, 'Home');
+
+    expect(document.activeElement?.textContent).toContain('18:00–19:00');
+    expect(tabbable()).toEqual([document.activeElement]);
+  });
+
+  it('selects in the week view too', async () => {
+    await render(CALENDAR_FIXTURES.weekMixed);
+
+    const free = slotButtons().find(
+      (button) => button.getAttribute('aria-pressed') === 'false' && !button.ariaDisabled,
+    ) as HTMLButtonElement;
+    free.click();
+    await fixture.whenStable();
+
+    expect(selections).toHaveLength(1);
+    expect(
+      slotButtons().filter((button) => button.getAttribute('aria-pressed') === 'true'),
+    ).toEqual([free]);
+  });
+
+  it.each([
+    ['day', CALENDAR_FIXTURES.day60],
+    ['week', CALENDAR_FIXTURES.weekMixed],
+  ] as const)('has no axe violations in the editable %s view', async (_view, source) => {
+    await render(source);
+
+    await expectNoAxeViolations(element());
   });
 });

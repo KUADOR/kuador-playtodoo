@@ -72,6 +72,13 @@
       @if (actions()?.changePlan) {
         <app-button label="Cambiar plan" variant="secondary" (press)="open('plan')" />
       }
+      @if (actions()?.accessData) {
+        <app-button
+          label="Acceder a datos del complejo"
+          variant="secondary"
+          (press)="open('access')"
+        />
+      }
     </div>
   }
 
@@ -100,6 +107,13 @@
         [complex]="complex"
         (changed)="planChanged($event)"
         (stale)="staleState()"
+        (closeRequest)="closeDialog()"
+      />
+    }
+    @case ('access') {
+      <app-support-access-dialog
+        [complex]="complex"
+        (opened)="supportOpened($event)"
         (closeRequest)="closeDialog()"
       />
     }

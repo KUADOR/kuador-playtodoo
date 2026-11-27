@@ -42,6 +42,13 @@ describe('Button', () => {
     },
   );
 
+  it('uses the full accessible name when the visible label repeats', async () => {
+    await render({ label: 'Cancelar reserva', accessibleLabel: 'Cancelar reserva de las 18:00' });
+
+    expect(nativeButton().getAttribute('aria-label')).toBe('Cancelar reserva de las 18:00');
+    expect(nativeButton().textContent?.trim()).toBe('Cancelar reserva');
+  });
+
   it('uses the full accessible name when the visible label repeats on the page', async () => {
     await render({ label: 'Publicar', accessibleLabel: 'Publicar plan Premium' });
 

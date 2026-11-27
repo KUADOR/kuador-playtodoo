@@ -3,6 +3,8 @@ import {
   buildDayView,
   buildMonthView,
   buildWeekView,
+  CalendarData,
+  effectiveSelection,
   periodTitle,
   shiftAnchor,
   visibleRange,
@@ -21,20 +23,33 @@ interface ExpectedSlot {
 }
 
 /**
- * The backoffice is always read-only (decision D6): a slot the editable fixture shows as
- * selected keeps the status it received, which is always available.
+ * In `readonly` mode a slot the editable fixture shows as selected keeps the status it received,
+ * which is always available, and nothing is selectable.
  */
 function withoutSelection(status: string | null): string | null {
   return status === SELECTED ? AVAILABLE : status;
 }
 
-function readonlySlot({ selectable: _ignored, ...slot }: ExpectedSlot) {
+function readonlySlot(slot: ExpectedSlot) {
   return {
     ...slot,
     status: withoutSelection(slot.status),
     accessibleLabel: slot.accessibleLabel.replace(', Seleccionado', ', Libre'),
+    selectable: false,
   };
 }
+
+function readonlyData(fixture: CalendarFixture): CalendarData {
+  return { ...fixture.input, mode: 'readonly' };
+}
+
+function editableData(fixture: CalendarFixture): CalendarData {
+  return { ...fixture.input, mode: 'editable' };
+}
+
+const DAY_FIXTURES = ALL_CALENDAR_FIXTURES.filter((fixture) => fixture.input.view === 'day').map(
+  (fixture) => [fixture.name, fixture] as const,
+);
 
 function render(fixture: CalendarFixture) {
   const range = visibleRange(fixture.input.view, fixture.input.today);
@@ -52,24 +67,23 @@ describe('calendar model (read-only)', () => {
     },
   );
 
-  it.each(
-    ALL_CALENDAR_FIXTURES.filter((fixture) => fixture.input.view === 'day').map(
-      (fixture) => [fixture.name, fixture] as const,
-    ),
-  )('matches the expected day of %s without any selection', (_name, fixture) => {
-    const { slots: expectedSlots, ...expectedDay } = fixture.expected['day'] as {
-      slots: ExpectedSlot[];
-    };
+  it.each(DAY_FIXTURES)(
+    'matches the expected day of %s without any selection',
+    (_name, fixture) => {
+      const { slots: expectedSlots, ...expectedDay } = fixture.expected['day'] as {
+        slots: ExpectedSlot[];
+      };
 
-    const day = buildDayView(fixture.input.today, fixture.input);
+      const day = buildDayView(fixture.input.today, readonlyData(fixture));
 
-    expect(day).toMatchObject(expectedDay);
-    expect(day.slots).toEqual(expectedSlots.map(readonlySlot));
-  });
+      expect(day).toMatchObject(expectedDay);
+      expect(day.slots).toEqual(expectedSlots.map(readonlySlot));
+    },
+  );
 
   it('respects the slot duration of each complex on the same day (30, 60 and 90 min)', () => {
     const labelsOf = (fixture: CalendarFixture) =>
-      buildDayView(fixture.input.today, fixture.input).slots.map((slot) => slot.label);
+      buildDayView(fixture.input.today, readonlyData(fixture)).slots.map((slot) => slot.label);
 
     expect(labelsOf(CALENDAR_FIXTURES.day30)[0]).toBe('18:00–18:30');
     expect(labelsOf(CALENDAR_FIXTURES.day60)[0]).toBe('18:00–19:00');
@@ -85,7 +99,7 @@ describe('calendar model (read-only)', () => {
         cells: (string | null)[][];
       };
 
-      const week = buildWeekView(render(fixture).range, fixture.input);
+      const week = buildWeekView(render(fixture).range, readonlyData(fixture));
 
       expect(week.columns).toMatchObject(expected.columns);
       expect(week.rows).toEqual(expected.rows);
@@ -98,7 +112,7 @@ describe('calendar model (read-only)', () => {
   it('matches the expected month', () => {
     const fixture = CALENDAR_FIXTURES.monthMixed;
 
-    const month = buildMonthView(render(fixture).range, fixture.input);
+    const month = buildMonthView(render(fixture).range, readonlyData(fixture));
 
     expect(month).toMatchObject(fixture.expected['month'] as object);
   });
@@ -106,7 +120,7 @@ describe('calendar model (read-only)', () => {
   it('labels the days that open the day view with date, summary and today', () => {
     const fixture = CALENDAR_FIXTURES.weekReadonly;
 
-    const week = buildWeekView(render(fixture).range, fixture.input);
+    const week = buildWeekView(render(fixture).range, readonlyData(fixture));
 
     expect(week.columns[2].accessibleLabel).toBe('miércoles 2 de diciembre de 2026, 2 libres, Hoy');
     expect(week.columns[1].accessibleLabel).toBe('martes 1 de diciembre de 2026, Sin horarios');
@@ -126,5 +140,39 @@ describe('calendar model (read-only)', () => {
     ['month', '2026-03-31', '2026-02-01'],
   ] as const)('moves a %s back from %s to %s', (view, anchor, expected) => {
     expect(shiftAnchor(view, anchor, -1)).toBe(expected);
+  });
+});
+
+describe('calendar model (editable)', () => {
+  it.each(DAY_FIXTURES.filter(([, fixture]) => fixture.input.mode === 'editable'))(
+    'matches the expected day of %s with its selection',
+    (_name, fixture) => {
+      const day = buildDayView(fixture.input.today, editableData(fixture));
+
+      expect(day).toMatchObject(fixture.expected['day'] as object);
+      expect(effectiveSelection(editableData(fixture))).toEqual(
+        fixture.expected['selected'] ?? null,
+      );
+    },
+  );
+
+  it('matches the expected week with its selection', () => {
+    const fixture = CALENDAR_FIXTURES.weekMixed;
+    const expected = fixture.expected['week'] as { cells: (string | null)[][] };
+
+    const week = buildWeekView(render(fixture).range, editableData(fixture));
+
+    expect(week.cells.map((row) => row.map((cell) => cell?.status ?? null))).toEqual(
+      expected.cells,
+    );
+  });
+
+  it('ignores a selection that points to an occupied slot', () => {
+    const fixture = CALENDAR_FIXTURES.dayAllOccupied;
+
+    const day = buildDayView(fixture.input.today, editableData(fixture));
+
+    expect(day.slots.every((slot) => !slot.selectable && slot.status === 'occupied')).toBe(true);
+    expect(effectiveSelection(editableData(fixture))).toBeNull();
   });
 });

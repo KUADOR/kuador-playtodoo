@@ -20,6 +20,23 @@
       </option>
     }
   </select>
+} @else if (kind() === 'textarea') {
+  <textarea
+    #control
+    class="field__control field__control--multiline"
+    [class.field__control--error]="hasError()"
+    [id]="controlId"
+    [rows]="rows()"
+    [disabled]="disabled()"
+    [value]="value()"
+    [attr.placeholder]="placeholder() || null"
+    [attr.autocomplete]="autocomplete() || null"
+    [attr.maxlength]="maxLength() ?? null"
+    [attr.aria-required]="required() || null"
+    [attr.aria-invalid]="hasError() || null"
+    [attr.aria-describedby]="describedBy()"
+    (input)="updateValue($event)"
+  ></textarea>
 } @else {
   <div class="field__row">
     <input

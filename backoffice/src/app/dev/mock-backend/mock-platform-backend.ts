@@ -7,6 +7,7 @@ import {
 import { MockComplexesBackend } from './mock-complexes-backend';
 import { MockPlansBackend } from './mock-plans-backend';
 import { MockRequest, MockResponse, ok, pageOf, problem } from './mock-responses';
+import { MockSupportBackend } from './mock-support-backend';
 
 export type { MockRequest, MockResponse } from './mock-responses';
 
@@ -63,6 +64,7 @@ export class MockPlatformBackend {
   private nextChangeId = 1;
   private readonly plans = new MockPlansBackend();
   private readonly complexes = new MockComplexesBackend();
+  private readonly support = new MockSupportBackend(this.complexes);
 
   handle(request: MockRequest): MockResponse {
     const route = `${request.method} ${request.path}`;
@@ -91,10 +93,22 @@ export class MockPlatformBackend {
       default:
         // Plans first: it owns the full plan catalogue (P10–P12), published reads included.
         return (
+          this.support.handlePlatform(request, this.currentUser(user)) ??
           this.plans.handle(request, user.role === 'SUPER_ADMIN') ??
           this.complexes.handle(request, this.currentUser(user)) ?? { status: 404, body: null }
         );
     }
+  }
+
+  /** A staff operation that Kuador support calls on the host of `subdomain` (ADR-020). */
+  handleTenant(subdomain: string, request: MockRequest, sessionId: string | null): MockResponse {
+    const user = this.userOf(request.bearerToken);
+    return this.support.handleTenant(
+      subdomain,
+      request,
+      user === null ? null : this.currentUser(user),
+      sessionId,
+    );
   }
 
   private login(body: unknown): MockResponse {

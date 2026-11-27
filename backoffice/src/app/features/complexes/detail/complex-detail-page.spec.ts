@@ -1,6 +1,7 @@
+import { Component } from '@angular/core';
 import { HttpTestingController, TestRequest } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { Routes, provideRouter } from '@angular/router';
+import { Router, Routes, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { expectNoAxeViolations } from '../../../../testing/axe';
 import {
@@ -18,22 +19,36 @@ import {
   suspendedComplex,
 } from '../../../../testing/complex-fixtures';
 import {
+  ME_URL,
   OPERATOR_USER,
   SUPER_ADMIN_USER,
   problemBody,
 } from '../../../../testing/platform-fixtures';
 import { provideTestApi, settle, signInAs } from '../../../../testing/platform-testing';
+import {
+  AUDIT_ENTRIES,
+  AUDIT_URL,
+  REASON,
+  SUPPORT_SESSIONS_URL,
+  supportSession,
+} from '../../../../testing/support-fixtures';
+import { SupportAccess } from '../../support/support-access';
 import { ROOT_DOMAIN } from '../../../core/api/root-domain';
 import { CurrentPlatformUser } from '../../../core/auth/platform-user';
 import { todayAsCalendarDate } from '../../../core/format/date-format';
 import { ComplexDetail, Payment } from '../complexes-api';
 import { ComplexDetailPage } from './complex-detail-page';
 import { PROVISIONING_POLL_MS } from './complex-detail-store';
+import { ComplexAuditTab } from './complex-audit-tab';
 import { ComplexHistoryTab } from './complex-history-tab';
 import { ComplexPaymentsTab } from './complex-payments-tab';
 import { ComplexSummaryTab } from './complex-summary-tab';
 
+@Component({ template: '<h1>Vista de soporte</h1>' })
+class SupportViewStub {}
+
 const ROUTES: Routes = [
+  { path: 'complexes/:complexId/support', component: SupportViewStub },
   {
     path: 'complexes/:complexId',
     component: ComplexDetailPage,
@@ -41,6 +56,7 @@ const ROUTES: Routes = [
       { path: '', component: ComplexSummaryTab },
       { path: 'payments', component: ComplexPaymentsTab },
       { path: 'history', component: ComplexHistoryTab },
+      { path: 'audit', component: ComplexAuditTab },
     ],
   },
 ];
@@ -164,6 +180,7 @@ describe('ComplexDetailPage (P4, P5, P6)', () => {
         'Registrar pago',
         'Cambiar estado',
         'Cambiar plan',
+        'Acceder a datos del complejo',
       ]);
     });
 
@@ -577,16 +594,189 @@ describe('ComplexDetailPage (P4, P5, P6)', () => {
     it('moves between tabs with the arrow keys', async () => {
       await openSummary(ACTIVE_COMPLEX);
       const tabs = Array.from(root().querySelectorAll<HTMLAnchorElement>('[role="tab"]'));
-      expect(tabs.map(text)).toEqual(['Resumen', 'Pagos', 'Historial']);
-      expect(tabs.map((tab) => tab.getAttribute('tabindex'))).toEqual(['0', '-1', '-1']);
+      expect(tabs.map(text)).toEqual(['Resumen', 'Pagos', 'Historial', 'Auditoría']);
+      expect(tabs.map((tab) => tab.getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1']);
 
       tabs[0].focus();
       tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       expect(document.activeElement).toBe(tabs[1]);
       tabs[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
       tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-      expect(document.activeElement).toBe(tabs[2]);
+      expect(document.activeElement).toBe(tabs[3]);
       expect(tabs[1].getAttribute('href')).toBe(`/complexes/${ACTIVE_COMPLEX.id}/payments`);
+    });
+  });
+
+  describe('P8 · Acceder con motivo', () => {
+    const reasonField = () => dialog()?.querySelector('textarea') as HTMLTextAreaElement;
+
+    async function openAccessDialog(complex: ComplexDetail = ACTIVE_COMPLEX): Promise<void> {
+      await openSummary(complex);
+      button('Acceder a datos del complejo').click();
+      await settle();
+    }
+
+    async function writeReason(value: string): Promise<void> {
+      reasonField().value = value;
+      reasonField().dispatchEvent(new Event('input'));
+      await settle();
+    }
+
+    it('asks for the reason in an empty field, with help, counter and notice', async () => {
+      await openAccessDialog();
+
+      expect(text(dialog()?.querySelector('h2'))).toBe('Acceder a datos · Canchas El Sol');
+      expect(reasonField().value).toBe('');
+      expect(reasonField().getAttribute('maxlength')).toBe('500');
+      expect(document.activeElement).toBe(reasonField());
+      expect(text(dialog())).toContain(
+        'No escribas datos personales (nombres, correos o teléfonos). 0/500',
+      );
+      expect(text(dialog())).toContain(
+        'Podrás ver y editar datos de este complejo. El motivo y cada operación quedan en la auditoría.',
+      );
+      await writeReason('Ticket');
+      expect(text(dialog())).toContain('6/500');
+      await expectNoAxeViolations(dialog() as HTMLElement);
+    });
+
+    it('loads nothing without a reason (or only spaces)', async () => {
+      await openAccessDialog();
+      await writeReason('   ');
+
+      button('Acceder', dialog() as HTMLElement).click();
+      await settle();
+
+      expect(text(dialog())).toContain('Escribe el motivo para continuar.');
+      expect(reasonField().getAttribute('aria-invalid')).toBe('true');
+      backend.expectNone(SUPPORT_SESSIONS_URL);
+    });
+
+    it('opens the session with the reason and goes to the support view', async () => {
+      await openAccessDialog();
+      await writeReason(`  ${REASON}  `);
+
+      button('Acceder', dialog() as HTMLElement).click();
+      await settle();
+      const open = backend.expectOne(SUPPORT_SESSIONS_URL);
+      expect(open.request.body).toEqual({ reason: REASON });
+      open.flush(supportSession(), { status: 201, statusText: 'Created' });
+      await settle();
+
+      expect(TestBed.inject(Router).url).toBe(`/complexes/${ACTIVE_COMPLEX.id}/support`);
+      expect(TestBed.inject(SupportAccess).activeFor(ACTIVE_COMPLEX.id)?.reason).toBe(REASON);
+    });
+
+    it.each([
+      [
+        'TENANT_NOT_ACCESSIBLE',
+        403,
+        'No tienes permiso para acceder a los datos de este complejo.',
+      ],
+      ['CAPABILITY_REVOKED', 403, 'No tienes permiso para acceder a los datos de este complejo.'],
+      ['INVALID_REQUEST', 500, 'No pudimos abrir el acceso. No se mostró ningún dato.'],
+    ])('explains a %s answer without showing any data', async (code, status, message) => {
+      await openAccessDialog();
+      await writeReason(REASON);
+
+      button('Acceder', dialog() as HTMLElement).click();
+      await settle();
+      backend.expectOne(SUPPORT_SESSIONS_URL).flush(problemBody(status, code), {
+        status,
+        statusText: 'Error',
+      });
+      await settle();
+      if (code === 'CAPABILITY_REVOKED') {
+        backend.expectOne(ME_URL).flush(SUPER_ADMIN_USER);
+        await settle();
+      }
+
+      expect(text(dialog()?.querySelector('[role="alert"]'))).toBe(message);
+      expect(TestBed.inject(SupportAccess).active()).toBeNull();
+    });
+
+    it('offers the access on a suspended complex only to the super admin', async () => {
+      await openSummary(suspendedComplex(10), {
+        ...OPERATOR_USER,
+        capabilities: ['TENANT_DATA_ACCESS'],
+      });
+
+      expect(button('Acceder a datos del complejo')).toBeUndefined();
+    });
+  });
+
+  describe('P7 · Auditoría', () => {
+    async function openAudit(user: CurrentPlatformUser = SUPER_ADMIN_USER): Promise<TestRequest> {
+      await open(ACTIVE_COMPLEX, user, 'audit');
+      return backend.expectOne((request) => request.url === AUDIT_URL);
+    }
+
+    it('lists who accessed, why, what they did and the result', async () => {
+      (await openAudit()).flush(pageWith(AUDIT_ENTRIES));
+      await settle();
+
+      const rows = Array.from(root().querySelectorAll('.audit tbody tr')).map((row) =>
+        Array.from(row.children).map(text),
+      );
+      expect(rows).toEqual([
+        [
+          expect.stringMatching(/^11\/01\/2027 \d{2}:\d{2}$/),
+          'Sam Example',
+          expect.stringMatching(/Ver motivo$/),
+          'Canceló una reserva o quitó un bloqueo',
+          'Permitido',
+        ],
+        [expect.any(String), 'Robin Example', '—', 'Consultó reservas', 'Denegado'],
+        [
+          expect.any(String),
+          'Sam Example',
+          'Motivo anonimizado',
+          'Otra operación GET /api/v1/staff/reports',
+          'Permitido',
+        ],
+      ]);
+      expect(text(root().querySelector('.audit'))).toContain('Se conserva 1 año.');
+      await expectNoAxeViolations(root());
+    });
+
+    it('shows the whole reason in a dialog', async () => {
+      (await openAudit()).flush(pageWith(AUDIT_ENTRIES));
+      await settle();
+
+      Array.from(root().querySelectorAll<HTMLButtonElement>('.audit tbody button'))[0].click();
+      await settle();
+
+      expect(text(dialog()?.querySelector('h2'))).toBe('Motivo del acceso');
+      expect(text(dialog()?.querySelector('.audit__full-reason'))).toBe(REASON);
+    });
+
+    it('says when there are no accesses', async () => {
+      (await openAudit()).flush(EMPTY_PAGE);
+      await settle();
+
+      expect(text(root().querySelector('.audit'))).toContain('No hay accesos registrados.');
+    });
+
+    it('shows the load error with «Reintentar»', async () => {
+      (await openAudit()).flush(problemBody(500, 'INVALID_REQUEST'), {
+        status: 500,
+        statusText: 'Error',
+      });
+      await settle();
+
+      expect(text(root().querySelector('.audit [role="alert"]'))).toContain(
+        'No pudimos cargar la información.',
+      );
+      button('Reintentar').click();
+      await settle();
+      backend.expectOne((request) => request.url === AUDIT_URL).flush(EMPTY_PAGE);
+    });
+
+    it('offers the tab only to the super admin', async () => {
+      await openSummary(ACTIVE_COMPLEX, OPERATOR_USER, null);
+
+      const tabs = Array.from(root().querySelectorAll('[role="tab"]')).map(text);
+      expect(tabs).not.toContain('Auditoría');
     });
   });
 });
