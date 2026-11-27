@@ -4,9 +4,11 @@ Cómo montar en un VPS con Dokploy el ambiente de pruebas de Playtodoo: `api`, `
 alimentado por la rama `develop` y publicado bajo `develop.play.kuador.com`.
 
 - **Tarjeta:** PLATODO-95 (épica PLATODO-94). **Fecha:** 2026-11-27.
-- **Estado:** redactado a partir del código de `develop` y de la documentación de Dokploy v0.31.4. Todavía **no se
-  ejecutó en un VPS**: eso lo hace PLATODO-96, que registra la evidencia. Lo que depende de esa prueba está marcado
-  **[POR VALIDAR]**.
+- **Estado:** redactado a partir del código de `develop` y de la documentación de Dokploy v0.31.4. PLATODO-96 hizo
+  un **ensayo local** (2026-11-27, commit `ceef6ab`): builds con Railpack 0.44.0, PostgreSQL 18, Traefik v3.6 con
+  las rutas de la sección 5 y la lista de la sección 10; de ahí salieron las correcciones de build de 5.4 y 5.5.
+  Todavía **no se ejecutó en un VPS**: lo que solo se puede comprobar allí sigue marcado **[POR VALIDAR]**. La
+  evidencia está en `odd/tasks/platodo-94-despliegue-vps-dokploy.md`.
 - **Fuera de este manual:** producción, `movil`, respaldos, monitoreo y cualquier valor de secreto.
 
 > **Regla de secretos.** Este documento solo trae **nombres**. Los valores se escriben a mano en Dokploy y no se
@@ -108,6 +110,7 @@ Solo nombres y propósito. «Dónde» es siempre la pestaña `Environment` del s
 | `PLAYTODOO_CORS_BACKOFFICE_ORIGIN` | Único origen admitido por CORS: `https://admin.develop.play.kuador.com` | no | sí |
 | `SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES` | Red desde la que se aceptan los encabezados `X-Forwarded-*`: la subred de `dokploy-network` (sección 5.4) | no | sí |
 | `RAILPACK_JDK_VERSION` | Versión de JDK del build: `25` | no | sí (build) |
+| `RAILPACK_BUILD_CMD` | Comando de build: `./mvnw -B -DskipTests -DskipITs clean package`. Sin él, Railpack ejecuta las pruebas de integración, que necesitan Docker y hacen fallar el build | no | sí (build) |
 | `PLAYTODOO_BOOKINGS_PLAYER_API_ENABLED`, `PLAYTODOO_BOOKINGS_STAFF_API_ENABLED` | Activan los endpoints de reservas del jugador y del personal. Por defecto `false`; `true` solo si la prueba los necesita | no | no |
 | `PLAYTODOO_IDENTITY_TOKEN_TIME_TO_LIVE`, `PLAYTODOO_AUDIT_ACCESS_SESSION_TIME_TO_LIVE` | Duración de tokens (`PT1H`) y de sesiones de acceso (`PT30M`) | no | no |
 | `TENANCY_PURGE_ENABLED`, `TENANCY_PURGE_CRON`, `PLAYTODOO_RETENTION_ENABLED`, `PLAYTODOO_RETENTION_CRON` | Tareas diarias de purga y retención (activas por defecto, 03:00 y 03:30 UTC) | no | no |
@@ -117,7 +120,7 @@ Solo nombres y propósito. «Dónde» es siempre la pestaña `Environment` del s
 
 | Nombre | Propósito | Secreto | Obligatoria |
 |---|---|---|---|
-| `NIXPACKS_NODE_VERSION` | Versión de Node del build: `22` | no | sí (build) |
+| `RAILPACK_NODE_VERSION` | Versión de Node del build: `22` | no | sí (build) |
 | `VITE_PLATFORM_URL` | Destino del botón «Ir a Playtodoo». Sin definir, usa `https://develop.play.kuador.com/`, que hoy responde `404` | no | no |
 
 Todo lo que empieza con `VITE_` queda dentro del JavaScript público: nunca un secreto ahí.
@@ -126,9 +129,10 @@ Todo lo que empieza con `VITE_` queda dentro del JavaScript público: nunca un s
 
 | Nombre | Propósito | Secreto | Obligatoria |
 |---|---|---|---|
-| `NIXPACKS_NODE_VERSION` | Versión de Node del build: `22` | no | sí (build) |
+| `RAILPACK_NODE_VERSION` | Versión de Node del build: `22` | no | sí (build) |
+| `RAILPACK_SPA_OUTPUT_DIR` | Carpeta que se publica: `dist/backoffice/browser`. Sin ella, Railpack busca `browser` y el build falla | no | sí (build) |
 
-No tiene variables propias: su configuración es el host `admin.<raíz>`.
+No tiene variables de ejecución: su configuración es el host `admin.<raíz>`.
 
 ### PostgreSQL (formulario del servicio de base de datos)
 
@@ -183,9 +187,10 @@ Ver la sección 6. Hazla antes de crear las aplicaciones.
 1. `Create Service` → `Application`. Nombre: `api`.
 2. Pestaña `General`, proveedor `Github`: cuenta de la GitHub App, repositorio `KUADOR/kuador-playtodoo`, `Branch`:
    `develop`, `Build Path`: `/api`, `Watch Paths`: `api/**`. `Trigger Type`: `On Push`.
-3. `Build Type`: `Railpack`. Nixpacks no sirve aquí: no ofrece JDK 25. **[POR VALIDAR]** que Railpack compile con
-   `RAILPACK_JDK_VERSION=25` y arranque el jar; si no lo logra, la api necesita un `Dockerfile`, que es un cambio de
-   código y va en una tarjeta aparte (sección 9).
+3. `Build Type`: `Railpack`. Nixpacks no sirve aquí: no ofrece JDK 25. Comprobado en local con Railpack 0.44.0:
+   con `RAILPACK_JDK_VERSION=25` y `RAILPACK_BUILD_CMD` (sección 4) compila con JDK 25 y arranca el jar en el puerto
+   8080. **[POR VALIDAR]** la versión de Railpack que trae Dokploy en el VPS (campo `Railpack Version`); si es
+   anterior y falla, sube ese campo a `0.44.0`.
 4. Pestaña `Environment`: carga las variables obligatorias de la sección 4.
    - Clave de firma: genera el valor en tu equipo con `openssl rand -base64 32` y pégalo directo en Dokploy.
    - `SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES`: en el VPS, `docker network inspect dokploy-network | grep Subnet`, y
@@ -197,21 +202,25 @@ Ver la sección 6. Hazla antes de crear las aplicaciones.
 
 ### 5.5 app y backoffice
 
-Ambas son sitios estáticos: Nixpacks compila y Dokploy sirve el resultado con NGINX en el puerto 80.
+Ambas son sitios estáticos. Se construyen con **Railpack**, que detecta el sitio (Vite y Angular), compila y deja
+una imagen que lo sirve con Caddy en el puerto 80, con respuesta de `index.html` para las rutas internas.
+
+Nixpacks no sirve para ninguna de las dos (comprobado con Nixpacks 1.41.0): en `app` no logra instalar
+`pnpm@12.23.0`, y en `backoffice` trae Node 22.11, anterior al mínimo de Angular CLI (22.22.3).
 
 | Campo | `app` | `backoffice` |
 |---|---|---|
 | `Branch` | `develop` | `develop` |
 | `Build Path` | `/app` | `/backoffice` |
 | `Watch Paths` | `app/**` | `backoffice/**` |
-| `Build Type` | `Nixpacks` | `Nixpacks` |
-| `Publish Directory` | `./dist` | `./dist/backoffice/browser` |
-| `Single Page Application (SPA)` | activado | activado |
-| `Environment` | `NIXPACKS_NODE_VERSION=22` | `NIXPACKS_NODE_VERSION=22` |
-| Comando que debe ejecutar el build | `pnpm build` | `npm run build` |
+| `Build Type` | `Railpack` | `Railpack` |
+| `Environment` | `RAILPACK_NODE_VERSION=22` | `RAILPACK_NODE_VERSION=22`, `RAILPACK_SPA_OUTPUT_DIR=dist/backoffice/browser` |
+| Comando que ejecuta el build | `pnpm run build` | `npm run build` |
+| Carpeta publicada | `dist` (detectada) | `dist/backoffice/browser` (por la variable) |
 
-- La casilla SPA hace que una ruta interna (por ejemplo `/complejos/…`) devuelva `index.html` al recargar.
-- `app` fija `pnpm@12.23.0` en `packageManager`. **[POR VALIDAR]** que Nixpacks instale esa versión.
+- Railpack lee `pnpm@12.23.0` de `packageManager` en `app` y lo instala tal cual.
+- No hay casilla de SPA ni `Publish Directory` que configurar: son opciones del build con Nixpacks. **[POR VALIDAR]**
+  en el VPS que el formulario de Dokploy no pida nada más para Railpack.
 - Dominio de `backoffice`: `Host` `admin.develop.play.kuador.com`, `Path` `/`, `Container Port` `80`, `HTTPS`
   activado, `Let's Encrypt`.
 - `app` no lleva un dominio propio: recibe los de cada complejo (5.6).
@@ -351,6 +360,9 @@ Sustituye los subdominios por los de tus complejos ficticios.
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
 | El build de la api falla por la versión de Java | Falta `RAILPACK_JDK_VERSION=25`, o Railpack no ofrece JDK 25 | Cargar la variable. Si persiste, tarjeta aparte para un `Dockerfile` de la api |
+| El build de la api falla en `failsafe` con `Could not find a valid Docker environment` | Falta `RAILPACK_BUILD_CMD`: se están ejecutando las pruebas de integración | Cargar la variable (sección 4) y `Deploy` |
+| El build de `backoffice` falla con `"/app/browser": not found` | Falta `RAILPACK_SPA_OUTPUT_DIR` | Cargar `dist/backoffice/browser` y `Deploy` |
+| El build de `app` falla con `Cannot find module …/corepack/pnpm/…/pnpm.cjs`, o el de `backoffice` con `The Angular CLI requires a minimum Node.js version` | `Build Type` en `Nixpacks` | Cambiar a `Railpack` (sección 5.5) |
 | La api se reinicia: falta `signing-key` | No está `PLAYTODOO_IDENTITY_TOKEN_SIGNING_KEY` | Cargarla (sección 5.4) y `Deploy` |
 | La api no arranca: `Connection refused` o `password authentication failed` | `SPRING_DATASOURCE_*` no coincide con el servicio de base | Revisar `Internal Host`, base, usuario y contraseña |
 | La api no arranca: error de Flyway con `gist` o `btree_gist` | No se ejecutó `01-extensions.sql` | Paso 5 de 5.2 y volver a desplegar |
@@ -360,8 +372,7 @@ Sustituye los subdominios por los de tus complejos ficticios.
 | `/api/v1/…` devuelve HTML en el host de un complejo | El dominio `/api` está en `app` o no existe | Corregirlo en el servicio `api` |
 | El backoffice carga pero el login falla con error de CORS | `PLAYTODOO_CORS_BACKOFFICE_ORIGIN` no es exactamente `https://admin.develop.play.kuador.com` | Corregir (sin barra final) y `Deploy` |
 | El backoffice llama a `admin.…/api/v1` y recibe HTML | Se publicó en un host que no empieza por `admin.` | Usar `admin.develop.play.kuador.com` |
-| Recargar una ruta interna da `404` de NGINX | Casilla `Single Page Application (SPA)` desactivada | Activarla y `Deploy` |
-| La web sale en blanco o el build «termina» sin archivos | `Publish Directory` equivocado | `./dist` en `app`, `./dist/backoffice/browser` en `backoffice` |
+| La web de `backoffice` sale en blanco o sin archivos | `RAILPACK_SPA_OUTPUT_DIR` equivocado | Debe ser `dist/backoffice/browser` |
 | Aviso de certificado no válido | Let's Encrypt no pudo validar: DNS sin propagar o puerto 80 cerrado | Corregir y volver a guardar el dominio. Let's Encrypt limita los intentos fallidos por hora |
 | Un push a `develop` no despliega | `Autodeploy` apagado, `Branch` distinta, `Watch Paths` sin coincidencia o panel inaccesible desde GitHub | Revisar la aplicación y, en GitHub, las entregas recientes del webhook de la GitHub App |
 | `403` del backoffice tras un despliegue que cambia roles | Token emitido antes del cambio | Cerrar sesión y volver a entrar |
