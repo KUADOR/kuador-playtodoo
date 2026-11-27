@@ -8,7 +8,11 @@ import {
   INITIAL_CAPABILITIES,
   ME_URL,
   OPERATOR_USER,
+  PLAN_FIELDS_URL,
+  PLAN_OPTIONS,
+  PLAN_OPTIONS_URL,
   SUPER_ADMIN_USER,
+  pageOf,
   storeAccessToken,
 } from '../testing/platform-fixtures';
 import { COMPLEXES_URL, EMPTY_PAGE, PLANS_URL } from '../testing/complex-fixtures';
@@ -21,6 +25,9 @@ import './features/login/login-page';
 import './features/forbidden/forbidden-page';
 import './features/upcoming-section/upcoming-section-page';
 import './features/operator-permissions/operator-permissions-page';
+import './features/plans/plans-page/plans-page';
+import './features/plans/plan-editor-page/plan-editor-page';
+import './features/plans/plan-fields-page/plan-fields-page';
 import './features/complexes/list/complexes-page';
 import './features/complexes/register/register-complex-page';
 
@@ -74,7 +81,7 @@ describe('App routes and guards', () => {
     expect(await navigateAs(SUPER_ADMIN_USER, '/login')).toBe('/complexes');
   });
 
-  it.each(['/operator-permissions', '/plans'])(
+  it.each(['/operator-permissions', '/plans', '/plans/new', '/plans/fields', '/plans/some-id'])(
     'shows «No tienes permiso» to an operator who types %s (CA15)',
     async (url) => {
       expect(await navigateAs(OPERATOR_USER, url)).toBe('/forbidden');
@@ -102,6 +109,30 @@ describe('App routes and guards', () => {
       });
 
     expect(heading()).toBe('Permisos del operador');
+  });
+
+  it('lets the super admin open «Planes», «Crear plan» and «Campos de plan»', async () => {
+    expect(await navigateAs(SUPER_ADMIN_USER, '/plans')).toBe('/plans');
+    backend.expectOne((request) => request.url === PLANS_URL).flush(pageOf([]));
+    await settle();
+    expect(heading()).toBe('Planes');
+    expect(document.title).toBe('Planes · Backoffice de Kuador');
+
+    const creating = harness.navigateByUrl('/plans/new');
+    await vi.waitFor(() => backend.expectOne(PLAN_OPTIONS_URL).flush(PLAN_OPTIONS));
+    backend.expectOne(PLAN_FIELDS_URL).flush([]);
+    await creating;
+    await settle();
+    expect(heading()).toBe('Crear plan');
+
+    const fields = harness.navigateByUrl('/plans/fields');
+    await vi.waitFor(() => backend.expectOne(PLAN_FIELDS_URL).flush([]));
+    await fields;
+    await settle();
+    expect(heading()).toBe('Campos de plan');
+    expect(
+      harness.fixture.nativeElement.querySelector('[aria-current="page"]')?.textContent,
+    ).toContain('Planes');
   });
 
   it('opens «Dar de alta complejo» only with COMPLEX_CREATE', async () => {

@@ -1,0 +1,138 @@
+@let current = state();
+<a class="fields__back" [routerLink]="plansUrl">
+  <svg lucideChevronLeft [size]="backIconSize" aria-hidden="true"></svg>
+  <span>Planes</span>
+</a>
+
+<div class="fields__header">
+  <h1>Campos de plan</h1>
+  <app-button label="Crear campo" (press)="open({ kind: 'create' })" />
+</div>
+<p class="fields__intro">
+  Define qué datos describen un plan. Los campos básicos los usa toda la plataforma y no se cambian.
+</p>
+
+@if (notice(); as message) {
+  <app-alert tone="success" [dismissible]="true" (dismiss)="notice.set(null)">{{
+    message
+  }}</app-alert>
+}
+@if (pageError(); as message) {
+  <app-alert tone="error">{{ message }}</app-alert>
+}
+
+<section aria-labelledby="fields-heading" [attr.aria-busy]="current.status === 'loading'">
+  <h2 id="fields-heading" class="visually-hidden">Lista de campos</h2>
+
+  @if (current.status === 'loading') {
+    <app-skeleton [rows]="skeletonRows" />
+  } @else if (current.status === 'error') {
+    <app-alert tone="error">
+      {{ current.message }}
+      <app-button alertActions label="Reintentar" variant="secondary" (press)="load()" />
+    </app-alert>
+  } @else {
+    <table class="data-table">
+      <caption class="visually-hidden">
+        Campos de plan
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Nombre</th>
+          <th scope="col">Tipo</th>
+          <th scope="col">Obligatorio</th>
+          <th scope="col">Origen</th>
+          <th scope="col">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (field of current.fields; track field.id) {
+          <tr>
+            <td data-label="Nombre">
+              <span class="fields__name">
+                {{ fieldLabel(field) }}
+                @if (field.retiredAt !== null) {
+                  <app-status-badge [status]="retiredBadge" />
+                }
+              </span>
+            </td>
+            <td data-label="Tipo">{{ typeLabels[field.type] }}</td>
+            <td data-label="Obligatorio">{{ field.required ? 'Sí' : 'No' }}</td>
+            <td data-label="Origen">{{ field.origin === 'BASIC' ? 'Básico' : 'Adicional' }}</td>
+            <td data-label="Acciones">
+              @if (canChange(field)) {
+                <span class="fields__actions">
+                  <app-button
+                    label="Editar"
+                    variant="text"
+                    [accessibleLabel]="'Editar campo ' + field.label"
+                    (press)="open({ kind: 'edit', field })"
+                  />
+                  <app-button
+                    label="Retirar"
+                    variant="text"
+                    [accessibleLabel]="'Retirar campo ' + field.label"
+                    (press)="openRetire(field)"
+                  />
+                </span>
+              } @else {
+                <span aria-hidden="true">—</span>
+                <span class="visually-hidden">Sin acciones</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (!hasCustomFields()) {
+      <p class="fields__empty">Todavía no hay campos adicionales.</p>
+    }
+  }
+</section>
+
+@if (creating()) {
+  <app-plan-field-dialog
+    (saved)="onSaved($event)"
+    (staleState)="onStaleState()"
+    (closeRequest)="closeDialog()"
+  />
+}
+@if (editing(); as field) {
+  <app-plan-field-dialog
+    [field]="field"
+    (saved)="onSaved($event)"
+    (staleState)="onStaleState()"
+    (closeRequest)="closeDialog()"
+  />
+}
+@if (retireAction(); as currentAction) {
+  <app-dialog
+    [heading]="'Retirar campo «' + currentAction.field.label + '»'"
+    [busy]="retiring()"
+    (closeRequest)="closeDialog()"
+  >
+    <p>
+      El campo dejará de pedirse en los planes. Los valores ya guardados y el historial no se
+      borran.
+    </p>
+    @if (currentAction.error; as message) {
+      <app-alert tone="error">{{ message }}</app-alert>
+    }
+    <app-button
+      dialogActions
+      data-dialog-initial-focus
+      label="Cancelar"
+      variant="secondary"
+      [disabled]="retiring()"
+      (press)="closeDialog()"
+    />
+    <app-button
+      dialogActions
+      label="Retirar campo"
+      variant="danger"
+      loadingLabel="Retirando…"
+      [loading]="retiring()"
+      (press)="retire()"
+    />
+  </app-dialog>
+}

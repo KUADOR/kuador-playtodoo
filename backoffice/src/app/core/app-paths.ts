@@ -3,6 +3,8 @@ export const APP_PATHS = {
   login: 'login',
   complexes: 'complexes',
   plans: 'plans',
+  newPlan: 'plans/new',
+  planFields: 'plans/fields',
   operatorPermissions: 'operator-permissions',
   forbidden: 'forbidden',
 } as const;

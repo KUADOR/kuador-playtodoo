@@ -53,7 +53,8 @@ export class Field {
   readonly value = model('');
 
   protected readonly errorIconSize = ERROR_ICON_SIZE_PX;
-  protected readonly controlId = `app-field-${nextFieldId++}`;
+  /** Id of the native control, for example to link it from an error summary. */
+  readonly controlId = `app-field-${nextFieldId++}`;
   protected readonly helpId = `${this.controlId}-help`;
   protected readonly errorId = `${this.controlId}-error`;
   protected readonly suffixId = `${this.controlId}-suffix`;

@@ -67,6 +67,12 @@ describe('Field', () => {
       expect(control().getAttribute('aria-required')).toBe('true');
     });
 
+    it('exposes the id of its control so other elements can link to it', async () => {
+      await render();
+
+      expect(control().id).toBe(fixture.componentInstance.controlId);
+    });
+
     it('moves the focus to its control on request', async () => {
       await render();
       document.body.appendChild(fixture.nativeElement);
