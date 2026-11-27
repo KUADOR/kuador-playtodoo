@@ -25,7 +25,7 @@ En la fila «Planes y suscripciones», agregar:
 
 En la fila «Reservas»: las respuestas de personal llevan `inactive`, calculado en la presentación (`BookingInactivity`) a partir del estado del tenant resuelto, con una consulta al directorio global por solicitud (no por entrada). No se escribe ninguna fila de `booking` (ADR-019).
 
-En «Catálogo de eventos», agregar `TenantStatusChanged` (tenantId, status, purgeDueAt, occurredAt): lo publica Tenancy en cada cambio de estado del tenant, dentro de la misma transacción; sus consumidores escuchan con `@EventListener` y, si fallan, se revierten el tenant y la suscripción (prueba `aFailingTenantStatusConsumerRollsBackTheTenantAndTheSubscription`). `TenantActivated`, `TenantSuspended` y `TenantArchived` se siguen publicando como antes.
+En «Catálogo de eventos», agregar `TenantStatusChanged` (tenantId, status, purgeDueAt, occurredAt): lo publica Tenancy en cada cambio de estado del tenant, dentro de la misma transacción; sus consumidores escuchan con `@EventListener` y, si fallan, se revierten el tenant y la suscripción (prueba `aFailingCatalogRollsBackTheCatalogTheTenantAndTheSubscription`). `TenantActivated`, `TenantSuspended` y `TenantArchived` se siguen publicando como antes.
 
 En «Ciclo de vida del tenant», precisar:
 
@@ -38,9 +38,14 @@ En «Ciclo de vida del tenant», precisar:
 
 Sin cambios de decisión. Nota de implementación para la sección «Consecuencias»: el estado se consulta con `TenantDirectory.find` (una consulta por solicitud); el filtro todavía no deja pasar a nadie a un complejo `SUSPENDED` o `ARCHIVED` (eso llega con la sesión de soporte de PLATODO-88), así que hoy `inactive` es siempre `false` en las respuestas reales y el caso `true` está probado en `BookingInactivityTest`.
 
-## Catálogo global de complejos (para el arquitecto)
+## Catálogo global de complejos
 
-El diseño de la épica da por existente la tabla `complex_catalog` y el módulo «Complejos y canchas», pero en el repo no existen (no hay tabla, migración ni código del catálogo). Esta tarea publica `TenantStatusChanged` de forma síncrona y prueba que un consumidor que falla revierte todo, que es el punto de enganche del catálogo. El consumidor que oculta y muestra la fila queda para la tarea que cree el catálogo; mientras no exista, ningún complejo aparece en ningún catálogo y el bloqueo lo da el filtro del host.
+El Equipo Kuador eligió la opción B: esta tarjeta crea un `complex_catalog` mínimo. Agregar en «docs/architecture.md»:
+
+- **Módulo «Complejos y canchas»** (`com.kuador.platodo.api.complexes`): `SyncComplexCatalog` (solo un tenant `ACTIVE` es visible), el puerto `ComplexCatalog` con el adaptador `JpaComplexCatalog` (unidad global) y `TenantCatalogListener`, que escucha `TenantStatusChanged` y `TenantSubdomainChanged` con `@EventListener`, dentro de la transacción del cambio.
+- **Tabla `complex_catalog`** (migración global V10): `tenant_id` (PK, FK a `tenant`), `subdomain`, `display_name`, `visible` y `updated_at`. La migración carga los complejos existentes que tienen subdominio vigente, visibles solo si están `ACTIVE`. Se aplica sobre datos reales sin cambiar otras tablas.
+- **Pendiente:** dirección, ubicación, contacto y deportes para la búsqueda de cercanos siguen [POR DEFINIR]. La purga (PLATODO-87) debe borrar la fila (ADR-016). Hoy `PurgeDueTenants` no pasa por `TenantTransitions`, así que la fila de un complejo purgado queda oculta, no borrada.
+- **Prueba:** `aFailingCatalogRollsBackTheCatalogTheTenantAndTheSubscription` envuelve el catálogo real para que falle después de ocultar y comprueba que la fila, el tenant y la suscripción no cambian.
 
 ## infra/local/e2e/tenancy-walkthrough.sh
 

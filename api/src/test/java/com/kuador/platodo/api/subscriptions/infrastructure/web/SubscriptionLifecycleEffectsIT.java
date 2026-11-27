@@ -34,7 +34,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.event.EventListener;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -50,6 +50,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 import com.kuador.platodo.api.bookings.infrastructure.web.ConditionalOnPlayerApiEnabled;
 import com.kuador.platodo.api.bookings.infrastructure.web.ConditionalOnStaffApiEnabled;
 import com.kuador.platodo.api.bookings.support.StubCourtSlotRules;
+import com.kuador.platodo.api.complexes.application.port.out.ComplexCatalog;
+import com.kuador.platodo.api.complexes.domain.CatalogEntry;
 import com.kuador.platodo.api.support.TenantDatabase;
 import com.kuador.platodo.api.support.TestAccounts;
 import com.kuador.platodo.api.support.TestTenants;
@@ -109,13 +111,14 @@ class SubscriptionLifecycleEffectsIT {
     void tearDown() {
         ComplexRequests.restorePlanOptions();
         setOperatorCapability(STATUS_CHANGE, false);
-        FailingCatalogConsumer.FAILING_TENANTS.clear();
+        FailingCatalog.FAILING_TENANTS.clear();
     }
 
     /** CA8: suspending blocks staff and players on every endpoint of app and movil and starts the retention. */
     @Test
     void suspendingBlocksEveryTenantEndpointAndStartsTheRetention() throws Exception {
         Complex complex = registeredComplex("suspend");
+        assertThat(catalogVisibilityOf(complex)).isTrue();
         String staffToken = complex.staffToken();
         String playerToken = api.playerToken();
 
@@ -130,6 +133,7 @@ class SubscriptionLifecycleEffectsIT {
         assertThat(suspendedAt).isEqualTo(Instant.parse(suspended.get("subscription").get("statusSince").asString()));
         assertThat(Instant.parse(suspended.get("purgeDueAt").asString()))
                 .isEqualTo(suspendedAt.plus(Duration.ofDays(DEFAULT_RETENTION_DAYS)));
+        assertThat(catalogVisibilityOf(complex)).isFalse();
         assertThat(blockedTenantRoutes(complex, staffToken)).containsAll(appAndMovilRoutes());
         assertThat(blockedTenantRoutes(complex, playerToken)).containsAll(appAndMovilRoutes());
         assertThat(statusEventsOf(complex)).singleElement().satisfies(changed -> {
@@ -155,6 +159,7 @@ class SubscriptionLifecycleEffectsIT {
                 .isEqualTo(archivedAt.plus(Duration.ofDays(DEFAULT_RETENTION_DAYS)));
         expectProblem(api.tenantState(complex.subdomain()), 403, "TENANT_UNAVAILABLE");
         expectProblem(staffLogin(complex), 403, "TENANT_UNAVAILABLE");
+        assertThat(catalogVisibilityOf(complex)).isFalse();
     }
 
     @Test
@@ -194,6 +199,7 @@ class SubscriptionLifecycleEffectsIT {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].inactive").value(false));
         api.tenantState(complex.subdomain()).andExpect(status().isOk());
+        assertThat(catalogVisibilityOf(complex)).isTrue();
         assertThat(statusEventsOf(complex).stream().map(TenantStatusChanged::status))
                 .containsExactly(TenantStatus.SUSPENDED, TenantStatus.ACTIVE);
     }
@@ -290,16 +296,18 @@ class SubscriptionLifecycleEffectsIT {
     }
 
     /**
-     * ADR-014: {@link TenantStatusChanged} is synchronous, so if its consumer (the catalog) fails, neither the tenant
-     * nor the subscription change: the status, the access and the catalog never drift apart.
+     * ADR-014: the catalog follows {@link TenantStatusChanged} inside the change transaction, so if it fails after
+     * hiding the complex, neither the catalog, the tenant nor the subscription change: they never drift apart.
      */
     @Test
-    void aFailingTenantStatusConsumerRollsBackTheTenantAndTheSubscription() throws Exception {
+    void aFailingCatalogRollsBackTheCatalogTheTenantAndTheSubscription() throws Exception {
         Complex complex = registeredComplex("catalog-rollback");
-        FailingCatalogConsumer.FAILING_TENANTS.add(complex.tenantId());
+        FailingCatalog.FAILING_TENANTS.add(UUID.fromString(complex.id()));
 
         assertThatThrownBy(() -> api.changeStatus(superAdminToken, complex.id(), "SUSPENDED", REGISTERED_VERSION))
-                .rootCause().hasMessage(FailingCatalogConsumer.FAILURE);
+                .rootCause().hasMessage(FailingCatalog.FAILURE);
+
+        assertThat(catalogVisibilityOf(complex)).isTrue();
 
         api.detail(superAdminToken, complex.id())
                 .andExpect(jsonPath("$.subscription.status").value("ACTIVE"))
@@ -330,6 +338,8 @@ class SubscriptionLifecycleEffectsIT {
                 .andExpect(jsonPath("$[0].inactive").value(false));
         expectProblem(api.tenantState(suspended.subdomain()), 403, "TENANT_UNAVAILABLE");
         assertThat(statusEventsOf(untouched)).isEmpty();
+        assertThat(catalogVisibilityOf(untouched)).isTrue();
+        assertThat(catalogVisibilityOf(suspended)).isFalse();
     }
 
     /**
@@ -434,6 +444,14 @@ class SubscriptionLifecycleEffectsIT {
                 .toList();
     }
 
+    /** Whether the complex is visible in the global catalog; fails if it has no catalog row. */
+    private static boolean catalogVisibilityOf(Complex complex) {
+        return TenantDatabase.admin().sql("SELECT visible FROM global.complex_catalog WHERE tenant_id = :id::uuid")
+                .param("id", complex.id())
+                .query(Boolean.class)
+                .single();
+    }
+
     private static List<Map<String, Object>> bookingRowsOf(Complex complex) {
         return TenantDatabase.admin()
                 .sql("SELECT * FROM \"%s\".booking ORDER BY id".formatted(TestTenants.schemaOf(complex.tenantId())))
@@ -497,23 +515,46 @@ class SubscriptionLifecycleEffectsIT {
             return new StubCourtSlotRules();
         }
 
+        /** Makes the real catalog fail on demand right after it wrote, to prove the write is rolled back. */
         @Bean
-        FailingCatalogConsumer failingCatalogConsumer() {
-            return new FailingCatalogConsumer();
+        static BeanPostProcessor failingCatalog() {
+            return new BeanPostProcessor() {
+                @Override
+                public Object postProcessAfterInitialization(Object bean, String beanName) {
+                    return bean instanceof ComplexCatalog catalog ? new FailingCatalog(catalog) : bean;
+                }
+            };
         }
     }
 
-    /** Stands for the catalog: a synchronous consumer of {@link TenantStatusChanged} that fails on demand. */
-    static class FailingCatalogConsumer {
+    /** The real catalog, failing after hiding one of {@link #FAILING_TENANTS}. */
+    static final class FailingCatalog implements ComplexCatalog {
 
-        static final Set<TenantId> FAILING_TENANTS = ConcurrentHashMap.newKeySet();
+        static final Set<UUID> FAILING_TENANTS = ConcurrentHashMap.newKeySet();
         static final String FAILURE = "Simulated failure of the catalog";
 
-        @EventListener
-        void on(TenantStatusChanged event) {
-            if (FAILING_TENANTS.contains(event.tenantId())) {
+        private final ComplexCatalog delegate;
+
+        FailingCatalog(ComplexCatalog delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void show(CatalogEntry entry, Instant at) {
+            delegate.show(entry, at);
+        }
+
+        @Override
+        public void hide(UUID tenantId, Instant at) {
+            delegate.hide(tenantId, at);
+            if (FAILING_TENANTS.contains(tenantId)) {
                 throw new IllegalStateException(FAILURE);
             }
+        }
+
+        @Override
+        public void changeSubdomain(UUID tenantId, String subdomain, Instant at) {
+            delegate.changeSubdomain(tenantId, subdomain, at);
         }
     }
 }
