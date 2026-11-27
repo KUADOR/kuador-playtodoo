@@ -4,7 +4,9 @@ import {
   CalendarSlot,
   CalendarView,
   IsoDate,
+  CalendarMode,
   LocalTime,
+  SlotSelection,
   SlotStatus,
 } from './booking-calendar.types';
 import {
@@ -26,11 +28,18 @@ import {
 } from './calendar-dates';
 
 /**
- * Read-only presentation model of the BookingCalendar contract. The backoffice never selects,
- * so every slot shows the status it receives and the contract's `selected` input does not exist.
+ * Presentation model of the BookingCalendar contract. In `readonly` mode every slot shows the
+ * status it receives; in `editable` mode the free slot that matches `selected` shows as selected.
  */
 
-const STATUS_TEXT: Record<SlotStatus, string> = { available: 'Libre', occupied: 'Ocupado' };
+/** Status a slot is shown with: the received one, or `selected` for the chosen free slot. */
+export type ShownSlotStatus = SlotStatus | 'selected';
+
+const STATUS_TEXT: Record<ShownSlotStatus, string> = {
+  available: 'Libre',
+  occupied: 'Ocupado',
+  selected: 'Seleccionado',
+};
 const NO_SLOTS_SUMMARY = 'Sin horarios';
 const EMPTY_DAY_MESSAGE = 'Este día no tiene horarios. Prueba con otro día.';
 const TODAY_TEXT = 'Hoy';
@@ -40,14 +49,20 @@ export interface CalendarData {
   readonly days: readonly CalendarDay[];
   readonly slotDurationMinutes: number;
   readonly today: IsoDate;
+  /** `readonly` when absent. */
+  readonly mode?: CalendarMode;
+  /** Ignored in `readonly` mode and when it points to an occupied or missing slot. */
+  readonly selected?: SlotSelection | null;
 }
 
 export interface SlotView {
   readonly start: LocalTime;
   readonly end: LocalTime;
   readonly label: string;
-  readonly status: SlotStatus;
+  readonly status: ShownSlotStatus;
   readonly accessibleLabel: string;
+  /** Only in `editable` mode and when it is not occupied. */
+  readonly selectable: boolean;
 }
 
 interface DaySummary {
@@ -120,10 +135,12 @@ export function periodTitle(view: CalendarView, range: CalendarRange): string {
 }
 
 export function buildDayView(date: IsoDate, data: CalendarData): DayView {
+  const editable = data.mode === 'editable';
+  const selectedStart = editable && data.selected?.date === date ? data.selected.start : null;
   const slots = [...slotsOf(date, data.days)]
     .sort((a, b) => toMinutes(a.start) - toMinutes(b.start))
-    .map((slot) => describeSlot(slot, data.slotDurationMinutes));
-  const availableCount = slots.filter((slot) => slot.status === 'available').length;
+    .map((slot) => describeSlot(slot, data.slotDurationMinutes, editable, selectedStart));
+  const availableCount = slots.filter((slot) => slot.status !== 'occupied').length;
   const isToday = date === data.today;
   const summary = availabilitySummary(availableCount);
   return {
@@ -177,15 +194,33 @@ function slotsOf(date: IsoDate, days: readonly CalendarDay[]): readonly Calendar
   return days.find((day) => day.date === date)?.slots ?? [];
 }
 
-function describeSlot(slot: CalendarSlot, slotDurationMinutes: number): SlotView {
+function describeSlot(
+  slot: CalendarSlot,
+  slotDurationMinutes: number,
+  editable: boolean,
+  selectedStart: LocalTime | null,
+): SlotView {
   const end = addMinutes(slot.start, slotDurationMinutes);
+  const free = slot.status === 'available';
+  const status: ShownSlotStatus = free && slot.start === selectedStart ? 'selected' : slot.status;
   return {
     start: slot.start,
     end,
     label: `${slot.start}–${end}`,
-    status: slot.status,
-    accessibleLabel: `${slot.start} a ${end}, ${STATUS_TEXT[slot.status]}`,
+    status,
+    accessibleLabel: `${slot.start} a ${end}, ${STATUS_TEXT[status]}`,
+    selectable: editable && free,
   };
+}
+
+/** The selection that the calendar actually shows: `selected` if it is a free slot of `days`. */
+export function effectiveSelection(data: CalendarData): SlotSelection | null {
+  const selected = data.selected ?? null;
+  if (data.mode !== 'editable' || selected === null) {
+    return null;
+  }
+  const slot = slotsOf(selected.date, data.days).find((item) => item.start === selected.start);
+  return slot?.status === 'available' ? selected : null;
 }
 
 function availabilitySummary(availableCount: number): string {

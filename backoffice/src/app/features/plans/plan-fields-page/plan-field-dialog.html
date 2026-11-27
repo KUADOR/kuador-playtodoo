@@ -1,0 +1,53 @@
+<app-dialog [heading]="heading()" [busy]="saving()" (closeRequest)="close()">
+  <app-field
+    label="Nombre"
+    [required]="true"
+    [error]="errors().label"
+    [disabled]="saving()"
+    [value]="label()"
+    (valueChange)="label.set($event)"
+  />
+  @if (field(); as current) {
+    <p class="field-dialog__type">
+      Tipo: {{ typeLabels[current.type] }}. No se puede cambiar después de crear el campo.
+    </p>
+  } @else {
+    <app-field
+      label="Tipo"
+      kind="select"
+      placeholder="Elige un tipo"
+      help="No se puede cambiar después de crear el campo."
+      [options]="typeOptions"
+      [error]="errors().type"
+      [disabled]="saving()"
+      [value]="type()"
+      (valueChange)="type.set($event)"
+    />
+  }
+  <app-checkbox
+    label="Obligatorio"
+    description="Se pedirá al publicar un plan o al guardar uno publicado."
+    [disabled]="saving()"
+    [checked]="required()"
+    (checkedChange)="required.set($event)"
+  />
+  <app-alert tone="info">
+    El campo solo describe el plan: no activa funciones ni límites nuevos por sí solo.
+  </app-alert>
+  @if (saveError(); as message) {
+    <app-alert tone="error">{{ message }}</app-alert>
+  }
+  <app-button
+    dialogActions
+    label="Cancelar"
+    variant="secondary"
+    [disabled]="saving()"
+    (press)="close()"
+  />
+  <app-button
+    dialogActions
+    [label]="field() === null ? 'Crear campo' : 'Guardar cambios'"
+    [loading]="saving()"
+    (press)="save()"
+  />
+</app-dialog>

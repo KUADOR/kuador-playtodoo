@@ -1,0 +1,33 @@
+:host {
+  --status-badge-color: var(--color-fg-muted);
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width-sm) solid var(--status-badge-color);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--status-badge-color);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-heading);
+  white-space: nowrap;
+}
+
+:host([data-tone='success']) {
+  --status-badge-color: var(--color-success);
+}
+
+:host([data-tone='warning']) {
+  --status-badge-color: var(--color-warning);
+}
+
+:host([data-tone='danger']) {
+  --status-badge-color: var(--color-danger);
+}
+
+.status-badge__icon {
+  display: inline-flex;
+}

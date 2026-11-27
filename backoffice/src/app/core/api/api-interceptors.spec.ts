@@ -12,6 +12,7 @@ import {
 import { provideTestApi, signInAs } from '../../../testing/platform-testing';
 import { Session } from '../auth/session';
 import { ApiError } from './api-error';
+import { SUPPORT_SESSION_HEADER } from './api-interceptors';
 
 describe('api interceptors', () => {
   let http: HttpClient;
@@ -43,6 +44,19 @@ describe('api interceptors', () => {
     expect(
       backend.expectOne('https://elsewhere.example/data').request.headers.has('Authorization'),
     ).toBe(false);
+  });
+
+  it('sends the access token to a complex host only with a support session', () => {
+    storeAccessToken('abc');
+    const tenantUrl = 'https://canchas-el-sol.playtodoo.com/api/v1/staff/bookings';
+
+    http.get(tenantUrl, { headers: { [SUPPORT_SESSION_HEADER]: 'session-1' } }).subscribe();
+    http.get(`${tenantUrl}?plain`).subscribe();
+
+    expect(backend.expectOne(tenantUrl).request.headers.get('Authorization')).toBe('Bearer abc');
+    expect(backend.expectOne(`${tenantUrl}?plain`).request.headers.has('Authorization')).toBe(
+      false,
+    );
   });
 
   it('turns a Problem Details failure into an ApiError', async () => {

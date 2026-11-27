@@ -1,0 +1,98 @@
+@let plansState = plans.state();
+<a class="text-link" [routerLink]="complexesUrl">‹ Complejos</a>
+<h1>Dar de alta complejo</h1>
+
+@if (failure(); as message) {
+  <app-alert tone="error">{{ message }}</app-alert>
+}
+
+<form class="register" novalidate (submit)="submit($event)">
+  <app-field
+    label="Nombre del complejo"
+    autocomplete="organization"
+    [required]="true"
+    [maxLength]="displayNameMaxLength"
+    [disabled]="submitting()"
+    [error]="fieldErrors().displayName"
+    [value]="displayName()"
+    (valueChange)="changeDisplayName($event)"
+  />
+
+  <div class="register__subdomain">
+    <app-field
+      label="Subdominio"
+      autocomplete="off"
+      help="Se sugiere a partir del nombre. Es la dirección del complejo."
+      [suffix]="rootDomainSuffix"
+      [required]="true"
+      [disabled]="submitting()"
+      [error]="subdomainError()"
+      [value]="subdomain()"
+      (valueChange)="changeSubdomain($event)"
+    />
+    <p
+      class="register__subdomain-status"
+      role="status"
+      [class.register__subdomain-status--available]="subdomainCheck() === 'available'"
+    >
+      {{ subdomainStatusText() }}
+    </p>
+  </div>
+
+  <app-field
+    label="Correo del propietario"
+    inputType="email"
+    inputMode="email"
+    autocomplete="email"
+    [required]="true"
+    [maxLength]="ownerEmailMaxLength"
+    [disabled]="submitting()"
+    [error]="fieldErrors().ownerEmail"
+    [value]="ownerEmail()"
+    (valueChange)="changeOwnerEmail($event)"
+  />
+
+  <div [attr.aria-busy]="plansState.status === 'loading'">
+    @if (plansState.status === 'loading') {
+      <app-skeleton [rows]="1" />
+    } @else if (plansState.status === 'error') {
+      <app-alert tone="error">
+        {{ plansState.message }}
+        <app-button alertActions label="Reintentar" variant="secondary" (press)="plans.load()" />
+      </app-alert>
+    } @else if (hasNoPublishedPlans()) {
+      <app-alert tone="warning">
+        No hay planes publicados. Publica un plan antes de dar de alta un complejo.
+        @if (canManagePlans()) {
+          <a alertActions class="text-link" [routerLink]="plansUrl">Ir a Planes</a>
+        }
+      </app-alert>
+    } @else {
+      <app-field
+        label="Plan"
+        kind="select"
+        placeholder="Elige un plan"
+        [required]="true"
+        [options]="planOptions()"
+        [help]="selectedPlanSummary()"
+        [disabled]="submitting()"
+        [error]="fieldErrors().planId"
+        [value]="planId()"
+        (valueChange)="changePlan($event)"
+      />
+    }
+  </div>
+
+  <app-alert tone="info">La suscripción quedará activa.</app-alert>
+
+  <div class="register__actions">
+    <app-button label="Cancelar" variant="secondary" [disabled]="submitting()" (press)="cancel()" />
+    <app-button
+      label="Dar de alta"
+      type="submit"
+      loadingLabel="Creando el espacio del complejo…"
+      [disabled]="plansState.status !== 'ready' || hasNoPublishedPlans()"
+      [loading]="submitting()"
+    />
+  </div>
+</form>

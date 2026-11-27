@@ -20,22 +20,47 @@
       </option>
     }
   </select>
-} @else {
-  <input
+} @else if (kind() === 'textarea') {
+  <textarea
     #control
-    class="field__control"
+    class="field__control field__control--multiline"
     [class.field__control--error]="hasError()"
-    [type]="inputType()"
     [id]="controlId"
+    [rows]="rows()"
     [disabled]="disabled()"
     [value]="value()"
     [attr.placeholder]="placeholder() || null"
     [attr.autocomplete]="autocomplete() || null"
+    [attr.maxlength]="maxLength() ?? null"
     [attr.aria-required]="required() || null"
     [attr.aria-invalid]="hasError() || null"
     [attr.aria-describedby]="describedBy()"
     (input)="updateValue($event)"
-  />
+  ></textarea>
+} @else {
+  <div class="field__row">
+    <input
+      #control
+      class="field__control"
+      [class.field__control--error]="hasError()"
+      [type]="inputType()"
+      [id]="controlId"
+      [disabled]="disabled()"
+      [value]="value()"
+      [attr.placeholder]="placeholder() || null"
+      [attr.autocomplete]="autocomplete() || null"
+      [attr.inputmode]="inputMode() || null"
+      [attr.maxlength]="maxLength() ?? null"
+      [attr.max]="max() || null"
+      [attr.aria-required]="required() || null"
+      [attr.aria-invalid]="hasError() || null"
+      [attr.aria-describedby]="describedBy()"
+      (input)="updateValue($event)"
+    />
+    @if (suffix()) {
+      <span class="field__suffix" [id]="suffixId">{{ suffix() }}</span>
+    }
+  </div>
 }
 
 @if (help()) {

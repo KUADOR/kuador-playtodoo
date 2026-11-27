@@ -1,29 +1,21 @@
-import { Page } from '../../core/api/page';
 import { Capability, CurrentPlatformUser } from '../../core/auth/platform-user';
 import {
   CapabilityChange,
   ChangeOperatorCapabilitiesRequest,
   OperatorCapabilities,
 } from '../../features/operator-permissions/operator-capabilities-api';
+import { MockComplexesBackend } from './mock-complexes-backend';
+import { MockPlansBackend } from './mock-plans-backend';
+import { MockRequest, MockResponse, ok, pageOf, problem } from './mock-responses';
+import { MockSupportBackend } from './mock-support-backend';
 
-/**
+export type { MockRequest, MockResponse } from './mock-responses';
+
+/*
  * In-memory stand-in of the platform operations this backoffice uses, built from the examples of
  * contracts/platform-backoffice.openapi.yaml and contracts/tenancy.openapi.yaml. Development
  * builds only (see mock-backend.development.ts). Every password is accepted: there are no secrets.
  */
-export interface MockRequest {
-  readonly method: string;
-  /** Path after the api base URL, for example `/platform/me`. */
-  readonly path: string;
-  readonly query: URLSearchParams;
-  readonly bearerToken: string | null;
-  readonly body: unknown;
-}
-
-export interface MockResponse {
-  readonly status: number;
-  readonly body: unknown;
-}
 
 /** Sign in with one of these e-mails (any password) to try each role. */
 export const MOCK_ACCOUNTS = {
@@ -32,7 +24,6 @@ export const MOCK_ACCOUNTS = {
 } as const;
 
 const TOKEN_LIFETIME_SECONDS = 3600;
-const DEFAULT_PAGE_SIZE = 20;
 
 const CAPABILITY_DESCRIPTIONS: Record<Capability, string> = {
   COMPLEX_CREATE: 'Register complexes and retry their provisioning.',
@@ -71,11 +62,18 @@ export class MockPlatformBackend {
   );
   private readonly changes: CapabilityChange[] = [];
   private nextChangeId = 1;
+  private readonly plans = new MockPlansBackend();
+  private readonly complexes = new MockComplexesBackend();
+  private readonly support = new MockSupportBackend(this.complexes);
 
   handle(request: MockRequest): MockResponse {
     const route = `${request.method} ${request.path}`;
     if (route === 'POST /auth/platform/login') {
       return this.login(request.body);
+    }
+    const publicResponse = this.complexes.handlePublic(request);
+    if (publicResponse !== null) {
+      return publicResponse;
     }
     const user = this.userOf(request.bearerToken);
     if (user === null) {
@@ -91,10 +89,26 @@ export class MockPlatformBackend {
           this.changeCapabilities(user, request.body as ChangeOperatorCapabilitiesRequest),
         );
       case 'GET /platform/operator-capabilities/changes':
-        return this.onlySuperAdmin(user, () => ok(this.changesPage(request.query)));
+        return this.onlySuperAdmin(user, () => ok(pageOf(this.changes, request.query)));
       default:
-        return { status: 404, body: null };
+        // Plans first: it owns the full plan catalogue (P10–P12), published reads included.
+        return (
+          this.support.handlePlatform(request, this.currentUser(user)) ??
+          this.plans.handle(request, user.role === 'SUPER_ADMIN') ??
+          this.complexes.handle(request, this.currentUser(user)) ?? { status: 404, body: null }
+        );
     }
+  }
+
+  /** A staff operation that Kuador support calls on the host of `subdomain` (ADR-020). */
+  handleTenant(subdomain: string, request: MockRequest, sessionId: string | null): MockResponse {
+    const user = this.userOf(request.bearerToken);
+    return this.support.handleTenant(
+      subdomain,
+      request,
+      user === null ? null : this.currentUser(user),
+      sessionId,
+    );
   }
 
   private login(body: unknown): MockResponse {
@@ -164,31 +178,4 @@ export class MockPlatformBackend {
     this.capabilitiesVersion++;
     return ok(this.capabilities());
   }
-
-  private changesPage(query: URLSearchParams): Page<CapabilityChange> {
-    const page = Number(query.get('page') ?? 0);
-    const size = Number(query.get('size') ?? DEFAULT_PAGE_SIZE);
-    return {
-      items: this.changes.slice(page * size, (page + 1) * size),
-      page,
-      size,
-      totalItems: this.changes.length,
-    };
-  }
-}
-
-function ok(body: unknown): MockResponse {
-  return { status: 200, body };
-}
-
-function problem(status: number, code: string): MockResponse {
-  return {
-    status,
-    body: {
-      type: `https://playtodoo.com/problems/${code.toLowerCase()}`,
-      title: code,
-      status,
-      code,
-    },
-  };
 }

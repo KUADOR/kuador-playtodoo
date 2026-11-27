@@ -5,6 +5,7 @@
   [disabled]="disabled()"
   [attr.aria-disabled]="loading() || null"
   [attr.aria-busy]="loading() || null"
+  [attr.aria-label]="accessibleLabel() || null"
   (click)="handleClick($event)"
 >
   @if (loading()) {

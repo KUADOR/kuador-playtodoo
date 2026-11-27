@@ -1,0 +1,173 @@
+<a class="text-link" [routerLink]="detailUrl()">‹ Volver al complejo</a>
+
+@if (access(); as current) {
+  <app-support-bar
+    [complexName]="current.complex.displayName"
+    [reason]="current.reason"
+    [timeLeft]="timeLeft()"
+    (closeAccess)="closeAccess()"
+  />
+  @if (phase() === 'expiring') {
+    <app-alert tone="warning">{{ texts.expiring }}</app-alert>
+  }
+
+  <header class="support__header">
+    <h1>Reservas y bloqueos</h1>
+    <div class="support__actions">
+      <app-button
+        label="Bloquear horario"
+        variant="secondary"
+        [disabled]="!canEditSlots()"
+        (press)="open({ kind: 'block' })"
+      />
+      <app-button
+        label="Crear reserva"
+        [disabled]="!canEditSlots()"
+        (press)="open({ kind: 'create' })"
+      />
+    </div>
+  </header>
+
+  @if (lifecycleNotice(); as notice) {
+    <app-alert tone="warning">{{ notice }}</app-alert>
+  }
+  @if (!courtsLoading() && !canEditSlots()) {
+    <app-alert tone="info">{{ texts.noCourts }}</app-alert>
+  }
+  @if (resultNotice(); as notice) {
+    <app-alert tone="success" [dismissible]="true" (dismiss)="resultNotice.set(null)">{{
+      notice
+    }}</app-alert>
+  }
+  @if (pageError(); as message) {
+    <app-alert tone="error">{{ message }}</app-alert>
+  }
+
+  <div class="support__filters">
+    <app-field label="Día" inputType="date" [value]="date()" (valueChange)="changeDate($event)" />
+    <app-field
+      kind="select"
+      label="Cancha"
+      [options]="courtOptions()"
+      [value]="courtFilter()"
+      (valueChange)="courtFilter.set($event)"
+    />
+  </div>
+
+  @let state = day();
+  <section
+    class="support__day"
+    aria-labelledby="support-day-heading"
+    [attr.aria-busy]="state.status === 'loading'"
+  >
+    <h2 id="support-day-heading" class="visually-hidden">Reservas y bloqueos del día</h2>
+    @if (state.status === 'loading') {
+      <app-skeleton [rows]="skeletonRows" />
+    } @else if (state.status === 'error') {
+      <app-alert tone="error">
+        {{ state.message }}
+        <app-button alertActions label="Reintentar" variant="secondary" (press)="reloadDay()" />
+      </app-alert>
+    } @else if (rows().length === 0) {
+      <p>{{ texts.emptyDay }}</p>
+    } @else {
+      <table class="data-table">
+        <caption class="visually-hidden">
+          Reservas y bloqueos del día elegido
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Hora</th>
+            <th scope="col">Cancha</th>
+            <th scope="col">Tipo</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Titular / motivo</th>
+            <th scope="col">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.entry.id) {
+            <tr>
+              <td data-label="Hora">{{ row.time }}</td>
+              <td data-label="Cancha">{{ row.court }}</td>
+              <td data-label="Tipo">{{ row.kind }}</td>
+              <td data-label="Estado">
+                <span class="support__tags">
+                  @if (row.statusLook; as look) {
+                    <app-status-tag [look]="look" />
+                  } @else {
+                    —
+                  }
+                  @if (row.entry.inactive) {
+                    <app-status-tag [look]="inactiveLook" />
+                  }
+                </span>
+              </td>
+              <td data-label="Titular / motivo">{{ row.detail ?? '—' }}</td>
+              <td data-label="Acción">
+                <app-button
+                  variant="text"
+                  [label]="row.entry.kind === 'BLOCK' ? 'Quitar bloqueo' : 'Cancelar reserva'"
+                  [accessibleLabel]="cancelLabel(row)"
+                  (press)="open({ kind: 'cancel', row })"
+                />
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+
+  @let dialog = openDialog();
+  @if (dialog?.kind === 'create') {
+    <app-create-reservation-dialog
+      [complexName]="current.complex.displayName"
+      [session]="current.session"
+      [courts]="courts()"
+      (created)="changed(texts.bookingCreated)"
+      (sessionEnded)="sessionEnded()"
+      (closeRequest)="closeDialog()"
+    />
+  } @else if (dialog?.kind === 'block') {
+    <app-block-slot-dialog
+      [complexName]="current.complex.displayName"
+      [session]="current.session"
+      [courts]="courts()"
+      (blocked)="changed(texts.slotBlocked)"
+      (sessionEnded)="sessionEnded()"
+      (closeRequest)="closeDialog()"
+    />
+  } @else if (dialog?.kind === 'cancel') {
+    <app-cancel-entry-dialog
+      [complexName]="current.complex.displayName"
+      [session]="current.session"
+      [row]="dialog.row"
+      (cancelled)="changed(cancelledText($event))"
+      (gone)="entryGone($event)"
+      (sessionEnded)="sessionEnded()"
+      (closeRequest)="closeDialog()"
+    />
+  }
+} @else {
+  <h1>Reservas y bloqueos</h1>
+  <app-alert tone="warning">
+    {{ texts.expired }}
+    @if (canReopen()) {
+      <app-button
+        alertActions
+        label="Acceder de nuevo"
+        variant="secondary"
+        (press)="open({ kind: 'reopen' })"
+      />
+    }
+    <a alertActions class="text-link" [routerLink]="detailUrl()">Volver al complejo</a>
+  </app-alert>
+  @if (openDialog()?.kind === 'reopen' && complex(); as complex) {
+    <app-support-access-dialog
+      [complex]="complex"
+      (opened)="reopened($event)"
+      (closeRequest)="closeDialog()"
+    />
+  }
+}

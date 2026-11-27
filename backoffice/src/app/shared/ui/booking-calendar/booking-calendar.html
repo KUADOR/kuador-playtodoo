@@ -4,10 +4,12 @@
   aria-label="Calendario de reservas"
   [attr.aria-busy]="isLoading() || null"
 >
-  <p class="calendar__readonly">
-    <svg lucideEye [size]="iconSize"></svg>
-    <span>Solo lectura</span>
-  </p>
+  @if (!isEditable()) {
+    <p class="calendar__readonly">
+      <svg lucideEye [size]="iconSize"></svg>
+      <span>Solo lectura</span>
+    </p>
+  }
 
   <div class="calendar__toolbar">
     <div class="calendar__period">
@@ -78,7 +80,12 @@
           } @else {
             <ul class="calendar__slots" aria-label="Franjas del día">
               @for (slot of shown.day.slots; track slot.start) {
-                <li><app-calendar-slot [slot]="slot" /></li>
+                <li>
+                  <ng-container
+                    [ngTemplateOutlet]="slotContent"
+                    [ngTemplateOutletContext]="{ $implicit: slot, date: shown.day.date }"
+                  />
+                </li>
               }
             </ul>
           }
@@ -113,10 +120,16 @@
                 @for (start of shown.week.rows; track start; let row = $index) {
                   <tr>
                     <th scope="row" class="calendar__row-header">{{ start }}</th>
-                    @for (cell of shown.week.cells[row]; track $index) {
+                    @for (cell of shown.week.cells[row]; track $index; let column = $index) {
                       <td>
                         @if (cell) {
-                          <app-calendar-slot [slot]="cell" />
+                          <ng-container
+                            [ngTemplateOutlet]="slotContent"
+                            [ngTemplateOutletContext]="{
+                              $implicit: cell,
+                              date: shown.week.columns[column].date,
+                            }"
+                          />
                         }
                       </td>
                     }
@@ -172,3 +185,23 @@
     }
   }
 </div>
+
+<!-- A slot: plain content in read-only mode; a toggle button in editable mode. -->
+<ng-template #slotContent let-slot let-date="date">
+  @if (isEditable()) {
+    <button
+      type="button"
+      class="calendar__slot-button"
+      [attr.data-slot-key]="slotKeyOf(date, slot)"
+      [attr.aria-pressed]="slot.status === 'selected'"
+      [attr.aria-disabled]="!slot.selectable || null"
+      [tabIndex]="slotKeyOf(date, slot) === tabbableSlotKey() ? 0 : -1"
+      (click)="activateSlot(date, slot)"
+      (keydown)="moveSlotFocus($event)"
+    >
+      <app-calendar-slot [slot]="slot" />
+    </button>
+  } @else {
+    <app-calendar-slot [slot]="slot" />
+  }
+</ng-template>

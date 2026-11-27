@@ -20,8 +20,8 @@ describe('Field', () => {
     await fixture.whenStable();
   }
 
-  function control(): HTMLInputElement | HTMLSelectElement {
-    return fixture.nativeElement.querySelector('input, select');
+  function control(): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
+    return fixture.nativeElement.querySelector('input, textarea, select');
   }
 
   function describedTexts(): string[] {
@@ -30,6 +30,27 @@ describe('Field', () => {
   }
 
   describe('text kind', () => {
+    it('shows a suffix linked to the control and passes the native hints', async () => {
+      await render({
+        suffix: '.playtodoo.com',
+        inputMode: 'decimal',
+        maxLength: 120,
+        inputType: 'date',
+        max: '2026-12-31',
+      });
+      document.body.appendChild(fixture.nativeElement);
+
+      expect(fixture.nativeElement.querySelector('.field__suffix')?.textContent).toBe(
+        '.playtodoo.com',
+      );
+      expect(describedTexts()).toEqual(['.playtodoo.com']);
+      expect(control().getAttribute('inputmode')).toBe('decimal');
+      expect(control().getAttribute('maxlength')).toBe('120');
+      expect(control().getAttribute('type')).toBe('date');
+      expect(control().getAttribute('max')).toBe('2026-12-31');
+      fixture.nativeElement.remove();
+    });
+
     it('defaults to a plain text input without autocomplete or required hints', async () => {
       await render();
 
@@ -44,6 +65,12 @@ describe('Field', () => {
       expect(control().getAttribute('type')).toBe('password');
       expect(control().getAttribute('autocomplete')).toBe('current-password');
       expect(control().getAttribute('aria-required')).toBe('true');
+    });
+
+    it('exposes the id of its control so other elements can link to it', async () => {
+      await render();
+
+      expect(control().id).toBe(fixture.componentInstance.controlId);
     });
 
     it('moves the focus to its control on request', async () => {
@@ -96,6 +123,29 @@ describe('Field', () => {
       await render({ disabled: true });
 
       expect(control().disabled).toBe(true);
+    });
+  });
+
+  describe('textarea kind', () => {
+    it('renders a labelled multi-line control with its length limit and hints', async () => {
+      await render({ kind: 'textarea', rows: 5, maxLength: 500, required: true, help: 'Ayuda.' });
+
+      const textarea = control() as HTMLTextAreaElement;
+      expect(textarea.tagName).toBe('TEXTAREA');
+      expect(textarea.rows).toBe(5);
+      expect(textarea.getAttribute('maxlength')).toBe('500');
+      expect(textarea.getAttribute('aria-required')).toBe('true');
+      expect(describedTexts()).toEqual(['Ayuda.']);
+      await expectNoAxeViolations(fixture.nativeElement);
+    });
+
+    it('updates the value model as the person types', async () => {
+      await render({ kind: 'textarea' });
+
+      control().value = 'Reclamo por una reserva duplicada';
+      control().dispatchEvent(new Event('input'));
+
+      expect(fixture.componentInstance.value()).toBe('Reclamo por una reserva duplicada');
     });
   });
 

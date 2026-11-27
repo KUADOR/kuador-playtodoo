@@ -1,14 +1,16 @@
 import { Routes } from '@angular/router';
-import { APP_PATHS } from './core/app-paths';
-import { SUPER_ADMIN_ONLY } from './core/auth/access';
+import { APP_PATHS, COMPLEX_PATHS } from './core/app-paths';
+import { requiresCapability, SUPER_ADMIN_ONLY } from './core/auth/access';
 import { accessGuard, signedInGuard, signedOutGuard } from './core/auth/guards';
-import { SECTION_HEADING_KEY } from './features/upcoming-section/section-heading';
+import { unsavedChangesGuard } from './core/navigation/unsaved-changes-guard';
+import { PLAN_ID_PARAM } from './features/plans/plan-paths';
+import { supportAccessGuard } from './features/support/support-access.guard';
 import { devRoutes } from './dev-routes';
 
 const TITLE_SUFFIX = ' · Backoffice de Kuador';
 
-const loadUpcomingSection = () =>
-  import('./features/upcoming-section/upcoming-section-page').then((m) => m.UpcomingSectionPage);
+const loadPlanEditor = () =>
+  import('./features/plans/plan-editor-page/plan-editor-page').then((m) => m.PlanEditorPage);
 
 export const routes: Routes = [
   ...devRoutes,
@@ -25,19 +27,102 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: APP_PATHS.complexes },
       {
-        // Replaced by P2 «Complejos» in PLATODO-90.
         path: APP_PATHS.complexes,
-        title: `Complejos${TITLE_SUFFIX}`,
-        data: { [SECTION_HEADING_KEY]: 'Complejos' },
-        loadComponent: loadUpcomingSection,
+        children: [
+          {
+            path: '',
+            pathMatch: 'full',
+            title: `Complejos${TITLE_SUFFIX}`,
+            loadComponent: () =>
+              import('./features/complexes/list/complexes-page').then((m) => m.ComplexesPage),
+          },
+          {
+            path: COMPLEX_PATHS.register,
+            title: `Dar de alta complejo${TITLE_SUFFIX}`,
+            canActivate: [accessGuard(requiresCapability('COMPLEX_CREATE'))],
+            loadComponent: () =>
+              import('./features/complexes/register/register-complex-page').then(
+                (m) => m.RegisterComplexPage,
+              ),
+          },
+          {
+            path: `:${COMPLEX_PATHS.complexIdParam}/${COMPLEX_PATHS.support}`,
+            title: `Vista de soporte${TITLE_SUFFIX}`,
+            canActivate: [supportAccessGuard],
+            loadComponent: () =>
+              import('./features/support/view/support-view-page').then((m) => m.SupportViewPage),
+          },
+          {
+            path: `:${COMPLEX_PATHS.complexIdParam}`,
+            title: `Detalle del complejo${TITLE_SUFFIX}`,
+            loadComponent: () =>
+              import('./features/complexes/detail/complex-detail-page').then(
+                (m) => m.ComplexDetailPage,
+              ),
+            children: [
+              {
+                path: '',
+                pathMatch: 'full',
+                loadComponent: () =>
+                  import('./features/complexes/detail/complex-summary-tab').then(
+                    (m) => m.ComplexSummaryTab,
+                  ),
+              },
+              {
+                path: COMPLEX_PATHS.payments,
+                loadComponent: () =>
+                  import('./features/complexes/detail/complex-payments-tab').then(
+                    (m) => m.ComplexPaymentsTab,
+                  ),
+              },
+              {
+                path: COMPLEX_PATHS.history,
+                loadComponent: () =>
+                  import('./features/complexes/detail/complex-history-tab').then(
+                    (m) => m.ComplexHistoryTab,
+                  ),
+              },
+              {
+                path: COMPLEX_PATHS.audit,
+                canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
+                loadComponent: () =>
+                  import('./features/complexes/detail/complex-audit-tab').then(
+                    (m) => m.ComplexAuditTab,
+                  ),
+              },
+            ],
+          },
+        ],
       },
       {
-        // Replaced by P10 «Planes» in PLATODO-91.
         path: APP_PATHS.plans,
         title: `Planes${TITLE_SUFFIX}`,
         canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
-        data: { [SECTION_HEADING_KEY]: 'Planes' },
-        loadComponent: loadUpcomingSection,
+        loadComponent: () =>
+          import('./features/plans/plans-page/plans-page').then((m) => m.PlansPage),
+      },
+      {
+        path: APP_PATHS.planFields,
+        title: `Campos de plan${TITLE_SUFFIX}`,
+        canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
+        loadComponent: () =>
+          import('./features/plans/plan-fields-page/plan-fields-page').then(
+            (m) => m.PlanFieldsPage,
+          ),
+      },
+      {
+        path: APP_PATHS.newPlan,
+        title: `Crear plan${TITLE_SUFFIX}`,
+        canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: loadPlanEditor,
+      },
+      {
+        path: `${APP_PATHS.plans}/:${PLAN_ID_PARAM}`,
+        title: `Editar plan${TITLE_SUFFIX}`,
+        canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
+        canDeactivate: [unsavedChangesGuard],
+        loadComponent: loadPlanEditor,
       },
       {
         path: APP_PATHS.operatorPermissions,

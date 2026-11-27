@@ -7,7 +7,9 @@ describe('Button', () => {
   let pressCount: number;
 
   async function render(
-    inputs: Partial<Record<'label' | 'variant' | 'loading' | 'disabled' | 'type', unknown>> = {},
+    inputs: Partial<
+      Record<'label' | 'variant' | 'loading' | 'disabled' | 'type' | 'accessibleLabel', unknown>
+    > = {},
   ) {
     fixture = TestBed.createComponent(Button);
     fixture.componentRef.setInput('label', 'Guardar cambios');
@@ -39,6 +41,20 @@ describe('Button', () => {
       expect(nativeButton().classList).toContain(`button--${variant}`);
     },
   );
+
+  it('uses the full accessible name when the visible label repeats', async () => {
+    await render({ label: 'Cancelar reserva', accessibleLabel: 'Cancelar reserva de las 18:00' });
+
+    expect(nativeButton().getAttribute('aria-label')).toBe('Cancelar reserva de las 18:00');
+    expect(nativeButton().textContent?.trim()).toBe('Cancelar reserva');
+  });
+
+  it('uses the full accessible name when the visible label repeats on the page', async () => {
+    await render({ label: 'Publicar', accessibleLabel: 'Publicar plan Premium' });
+
+    expect(nativeButton().textContent?.trim()).toBe('Publicar');
+    expect(nativeButton().getAttribute('aria-label')).toBe('Publicar plan Premium');
+  });
 
   it('emits press when clicked', async () => {
     await render();

@@ -4,7 +4,7 @@ import { DOCUMENT } from '@angular/common';
 /** Same-origin prefix used when the backoffice is not served on `admin.{root domain}`. */
 export const SAME_ORIGIN_API_BASE_URL = '/api/v1';
 
-const BACKOFFICE_HOST_LABEL = 'admin';
+export const BACKOFFICE_HOST_LABEL = 'admin';
 const API_HOST_LABEL = 'api';
 
 export interface HostLocation {
@@ -32,4 +32,25 @@ export function resolveApiBaseUrl(location: HostLocation): string {
 export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL', {
   providedIn: 'root',
   factory: () => resolveApiBaseUrl(inject(DOCUMENT).location),
+});
+
+/**
+ * Base URL of the api on the host of a complex (`tenantHost` of a support session, ADR-020):
+ * `canchas-el-sol.playtodoo.com` gives `https://canchas-el-sol.playtodoo.com/api/v1`. The
+ * protocol and port are the backoffice's own, as every host shares the proxy (routes.caddy).
+ */
+export function resolveTenantApiBaseUrl(tenantHost: string, location: HostLocation): string {
+  const port = location.port ? `:${location.port}` : '';
+  return `${location.protocol}//${tenantHost}${port}${SAME_ORIGIN_API_BASE_URL}`;
+}
+
+/** Builds the tenant api base URL of a complex host (see `resolveTenantApiBaseUrl`). */
+export type TenantApiBaseUrl = (tenantHost: string) => string;
+
+export const TENANT_API_BASE_URL = new InjectionToken<TenantApiBaseUrl>('TENANT_API_BASE_URL', {
+  providedIn: 'root',
+  factory: () => {
+    const location = inject(DOCUMENT).location;
+    return (tenantHost) => resolveTenantApiBaseUrl(tenantHost, location);
+  },
 });

@@ -9,10 +9,21 @@ import { toApiError } from './api-error';
 
 const AUTHORIZATION_HEADER = 'Authorization';
 
-/** Sends the platform access token, only to the api. */
+/**
+ * Header with the id of a support session (ADR-020). Requests to the host of a complex carry it
+ * together with the platform token; the host they go to is the `tenantHost` the api returned.
+ */
+export const SUPPORT_SESSION_HEADER = 'X-Support-Session';
+
+/**
+ * Sends the platform access token only to the api: the global context, and the host of a complex
+ * when the request carries a support session.
+ */
 export const accessTokenInterceptor: HttpInterceptorFn = (request, next) => {
   const token = inject(Session).accessToken();
-  if (token === null || !request.url.startsWith(inject(API_BASE_URL))) {
+  const toApi =
+    request.url.startsWith(inject(API_BASE_URL)) || request.headers.has(SUPPORT_SESSION_HEADER);
+  if (token === null || !toApi) {
     return next(request);
   }
   return next(request.clone({ setHeaders: { [AUTHORIZATION_HEADER]: `Bearer ${token}` } }));
