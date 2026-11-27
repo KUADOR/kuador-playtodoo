@@ -52,7 +52,8 @@ info:
     are replaced by `platform-backoffice.openapi.yaml` (ADR-014 to ADR-020): the tenant lifecycle
     now follows the subscription status, `PLATFORM_OWNER` becomes `SUPER_ADMIN` (plus `OPERATOR`),
     and the access session becomes a support session sent with `X-Support-Session` instead of
-    `X-Platform-Access-Session`. They stay until the `api` tasks of PLATODO-27 remove them.
+    `X-Platform-Access-Session`. They stay until the `api` tasks of PLATODO-27 remove them; PLATODO-86 removed the lifecycle operations
+    (`suspend`, `activate`, `archive`, `reactivate`, `retention`).
 
     **Errors.** Every error uses Problem Details (RFC 9457) with a stable machine-readable `code`.
     Clients map `code` to the user-facing text; `title` and `detail` are for developers and logs
@@ -398,168 +399,6 @@ paths:
           $ref: '#/components/responses/SubdomainTaken'
         '422':
           $ref: '#/components/responses/SubdomainRejected'
-  /platform/tenants/{tenantId}/suspend:
-    post:
-      tags: [Platform tenants]
-      operationId: suspendTenant
-      deprecated: true
-      x-replaced-by: 'POST /complexes/{complexId}/status-changes (platform-backoffice.openapi.yaml)'
-      summary: Suspend an active complex.
-      description: |
-        `ACTIVE → SUSPENDED`. From then on its host answers `403 TENANT_UNAVAILABLE` to everyone.
-        Publishes `TenantSuspended`.
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      responses:
-        '200':
-          $ref: '#/components/responses/TenantChanged'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/PlatformTenantNotFound'
-        '409':
-          $ref: '#/components/responses/InvalidTransition'
-  /platform/tenants/{tenantId}/activate:
-    post:
-      tags: [Platform tenants]
-      operationId: activateTenant
-      deprecated: true
-      x-replaced-by: 'POST /complexes/{complexId}/status-changes and POST /complexes/{complexId}/provisioning-retries (platform-backoffice.openapi.yaml)'
-      summary: Activate a suspended complex, or retry a failed provisioning.
-      description: |
-        `SUSPENDED → ACTIVE`, or `PROVISIONING → ACTIVE` re-running the idempotent provisioning.
-        Publishes `TenantActivated`.
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      responses:
-        '200':
-          $ref: '#/components/responses/TenantChanged'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/PlatformTenantNotFound'
-        '409':
-          $ref: '#/components/responses/InvalidTransition'
-  /platform/tenants/{tenantId}/archive:
-    post:
-      tags: [Platform tenants]
-      operationId: archiveTenant
-      deprecated: true
-      x-replaced-by: 'POST /complexes/{complexId}/status-changes (platform-backoffice.openapi.yaml)'
-      summary: Archive a complex (cancellation with a retention period).
-      description: |
-        `ACTIVE | SUSPENDED → ARCHIVED`. Sets `retentionDays` from the configured default
-        (`tenancy.archive.default-retention-days`) and `purgeDueAt = archivedAt + retentionDays`.
-        When `purgeDueAt` is reached without reactivation the daily purge job deletes the schema
-        (ADR-013). Publishes `TenantArchived`.
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      responses:
-        '200':
-          description: Tenant archived.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Tenant'
-              examples:
-                archived:
-                  $ref: '#/components/examples/ArchivedTenant'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/PlatformTenantNotFound'
-        '409':
-          $ref: '#/components/responses/InvalidTransition'
-  /platform/tenants/{tenantId}/reactivate:
-    post:
-      tags: [Platform tenants]
-      operationId: reactivateTenant
-      deprecated: true
-      x-replaced-by: 'POST /complexes/{complexId}/status-changes (platform-backoffice.openapi.yaml)'
-      summary: Reactivate an archived complex before its purge date.
-      description: |
-        `ARCHIVED → ACTIVE` while `now < purgeDueAt`; the complex recovers all its data. Clears the
-        archive fields and publishes `TenantActivated`.
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      responses:
-        '200':
-          $ref: '#/components/responses/TenantChanged'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/PlatformTenantNotFound'
-        '409':
-          description: |
-            `INVALID_TRANSITION`: the tenant is not `ARCHIVED`.
-            `RETENTION_EXPIRED`: `purgeDueAt` has already passed.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-              examples:
-                invalidTransition:
-                  $ref: '#/components/examples/InvalidTransitionProblem'
-                retentionExpired:
-                  $ref: '#/components/examples/RetentionExpiredProblem'
-  /platform/tenants/{tenantId}/retention:
-    put:
-      tags: [Platform tenants]
-      operationId: changeTenantRetention
-      deprecated: true
-      x-replaced-by: 'PUT /complexes/{complexId}/retention (platform-backoffice.openapi.yaml)'
-      summary: Change the retention period of an archived complex.
-      description: |
-        Only while `ARCHIVED`. Recomputes `purgeDueAt = archivedAt + days`. The resulting
-        `purgeDueAt` must be in the future, so an archived complex is never purged by mistake as a
-        side effect of this call. Upper bound: [POR DEFINIR: maximum retention days, if any].
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChangeRetentionRequest'
-            examples:
-              extend:
-                value:
-                  days: 60
-      responses:
-        '200':
-          $ref: '#/components/responses/TenantChanged'
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/PlatformTenantNotFound'
-        '409':
-          $ref: '#/components/responses/InvalidTransition'
-        '422':
-          description: '`RETENTION_INVALID`: the resulting `purgeDueAt` would not be in the future.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-              examples:
-                retentionInvalid:
-                  value:
-                    type: https://playtodoo.com/problems/retention-invalid
-                    title: Invalid retention
-                    status: 422
-                    detail: The resulting purge date must be in the future.
-                    code: RETENTION_INVALID
   /platform/tenants/{tenantId}/access-sessions:
     post:
       tags: [Platform access]
@@ -854,16 +693,6 @@ components:
           type: [string, 'null']
           enum: [INVALID, RESERVED, TAKEN, null]
           description: Why it is not available. `TAKEN` also covers retired subdomains. Null when available.
-    ChangeRetentionRequest:
-      type: object
-      additionalProperties: false
-      required: [days]
-      properties:
-        days:
-          type: integer
-          format: int32
-          minimum: 1
-          description: 'New retention period in days, counted from `archivedAt`. Upper bound: [POR DEFINIR].'
     LoginRequest:
       type: object
       additionalProperties: false
@@ -991,8 +820,6 @@ components:
         - SUBDOMAIN_INVALID
         - SUBDOMAIN_RESERVED
         - INVALID_TRANSITION
-        - RETENTION_EXPIRED
-        - RETENTION_INVALID
         - REASON_REQUIRED
     Problem:
       type: object
@@ -1032,15 +859,6 @@ components:
                 accessToken: example.jwt.token
                 tokenType: Bearer
                 expiresIn: 3600
-    TenantChanged:
-      description: Tenant after the change.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Tenant'
-          examples:
-            active:
-              $ref: '#/components/examples/ActiveTenant'
     InvalidRequest:
       description: '`INVALID_REQUEST`: malformed body or parameters.'
       content:
@@ -1152,15 +970,6 @@ components:
                 title: Reserved subdomain
                 status: 422
                 code: SUBDOMAIN_RESERVED
-    InvalidTransition:
-      description: '`INVALID_TRANSITION`: the lifecycle state does not allow this operation.'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-          examples:
-            invalidTransition:
-              $ref: '#/components/examples/InvalidTransitionProblem'
   examples:
     ActiveTenant:
       summary: Active complex
@@ -1175,20 +984,6 @@ components:
         archivedAt: null
         retentionDays: null
         purgeDueAt: null
-        purgedAt: null
-    ArchivedTenant:
-      summary: Archived complex with the default retention
-      value:
-        id: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
-        displayName: Canchas El Sol
-        subdomain: canchas-el-sol
-        status: ARCHIVED
-        createdAt: '2026-12-01T14:00:00Z'
-        activatedAt: '2026-12-01T14:00:02Z'
-        suspendedAt: null
-        archivedAt: '2027-01-10T12:00:00Z'
-        retentionDays: 45
-        purgeDueAt: '2027-02-24T12:00:00Z'
         purgedAt: null
     ForbiddenProblem:
       summary: Token type or role not allowed
@@ -1211,19 +1006,3 @@ components:
         title: Complex not found
         status: 404
         code: TENANT_NOT_FOUND
-    InvalidTransitionProblem:
-      summary: Lifecycle state does not allow the operation
-      value:
-        type: https://playtodoo.com/problems/invalid-transition
-        title: Invalid lifecycle transition
-        status: 409
-        detail: The tenant is not in a state that allows this operation.
-        code: INVALID_TRANSITION
-    RetentionExpiredProblem:
-      summary: Archive retention already ended
-      value:
-        type: https://playtodoo.com/problems/retention-expired
-        title: Retention expired
-        status: 409
-        detail: The purge date has passed; the complex can no longer be reactivated.
-        code: RETENTION_EXPIRED

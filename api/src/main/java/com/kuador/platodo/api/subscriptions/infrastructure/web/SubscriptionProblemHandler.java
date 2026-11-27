@@ -7,12 +7,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.kuador.platodo.api.subscriptions.application.ComplexNotFoundException;
+import com.kuador.platodo.api.subscriptions.application.RetentionExpiredException;
 import com.kuador.platodo.api.subscriptions.application.StaleVersionException;
 import com.kuador.platodo.api.subscriptions.domain.InvalidPaymentException;
 import com.kuador.platodo.api.subscriptions.domain.PlanNotPublishedException;
 import com.kuador.platodo.api.subscriptions.domain.SamePlanException;
 import com.kuador.platodo.api.subscriptions.domain.SubscriptionCancelledException;
 import com.kuador.platodo.api.subscriptions.domain.TransitionNotAllowedException;
+import com.kuador.platodo.api.tenancy.domain.NotInRetentionException;
+import com.kuador.platodo.api.tenancy.domain.RetentionInvalidException;
 
 /**
  * Problem Details of {@link SubscriptionController}. Guard denials ({@code 401}, {@code 403}) are rendered for every
@@ -49,6 +52,26 @@ class SubscriptionProblemHandler {
     @ExceptionHandler(TransitionNotAllowedException.class)
     ProblemDetail transitionNotAllowed(TransitionNotAllowedException notAllowed) {
         return SubscriptionsProblem.TRANSITION_NOT_ALLOWED.toProblem(notAllowed.getMessage() + ".");
+    }
+
+    @ExceptionHandler(RetentionExpiredException.class)
+    ProblemDetail retentionExpired() {
+        return SubscriptionsProblem.RETENTION_EXPIRED.toProblem();
+    }
+
+    @ExceptionHandler(NotInRetentionException.class)
+    ProblemDetail notInRetention() {
+        return SubscriptionsProblem.NOT_IN_RETENTION.toProblem();
+    }
+
+    @ExceptionHandler(RetentionInvalidException.class)
+    ProblemDetail retentionDeadlineInPast() {
+        return SubscriptionsProblem.RETENTION_DEADLINE_IN_PAST.toProblem();
+    }
+
+    @ExceptionHandler(InvalidRetentionRequestException.class)
+    ProblemDetail invalidRetention(InvalidRetentionRequestException invalid) {
+        return SubscriptionsProblem.VALIDATION_FAILED.toProblem(invalid.fieldErrors());
     }
 
     @ExceptionHandler(InvalidPaymentException.class)

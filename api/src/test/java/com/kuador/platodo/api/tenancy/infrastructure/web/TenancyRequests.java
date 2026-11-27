@@ -86,20 +86,6 @@ final class TenancyRequests {
         return new TenantId(body.get("id").asString());
     }
 
-    ResultActions lifecycle(String token, TenantId tenant, String operation) throws Exception {
-        return mvc.perform(withToken(
-                post(PLATFORM_TENANTS + "/" + tenant.value() + "/" + operation).with(onHost(TestTenants.GLOBAL_HOST)),
-                token));
-    }
-
-    ResultActions changeRetention(String token, TenantId tenant, String body) throws Exception {
-        return mvc.perform(withToken(
-                put(PLATFORM_TENANTS + "/" + tenant.value() + "/retention").with(onHost(TestTenants.GLOBAL_HOST)),
-                token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body));
-    }
-
     ResultActions changeSubdomain(String token, String onSubdomain, String subdomain) throws Exception {
         return mvc.perform(withToken(put(TENANT_SUBDOMAIN).with(onHost(hostOf(onSubdomain))), token)
                 .contentType(MediaType.APPLICATION_JSON)

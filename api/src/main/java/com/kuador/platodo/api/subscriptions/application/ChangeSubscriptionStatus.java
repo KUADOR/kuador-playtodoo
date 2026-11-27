@@ -54,6 +54,8 @@ public final class ChangeSubscriptionStatus {
     /**
      * @throws ComplexNotFoundException      if no complex has this id
      * @throws StaleVersionException         if {@code expectedVersion} is not the current version of the complex
+     * @throws RetentionExpiredException     if {@code target} reactivates a suspended subscription whose retention is
+     *                                       over
      * @throws TransitionNotAllowedException if {@code target} is not an allowed transition now
      */
     public ComplexDetail change(UUID complexId, SubscriptionStatus target, long expectedVersion) {
@@ -62,6 +64,9 @@ public final class ChangeSubscriptionStatus {
             LockedComplex complex = locks.lockAt(complexId, expectedVersion);
             Subscription current = complex.subscription();
             Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
+            if (isReactivation(current, target) && ComplexDetails.retentionOver(complex.tenant(), now)) {
+                throw new RetentionExpiredException();
+            }
             Subscription changed = current.changeStatus(target, caller.id(), now,
                     ComplexDetails.acceptsCommercialChanges(complex.tenant(), now));
             subscriptions.update(changed);
@@ -69,5 +74,9 @@ public final class ChangeSubscriptionStatus {
             events.publish(new SubscriptionStatusChanged(complexId, current.status(), target, caller.id(), now));
             return details.of(complexId);
         });
+    }
+
+    private static boolean isReactivation(Subscription current, SubscriptionStatus target) {
+        return current.status() == SubscriptionStatus.SUSPENDED && target == SubscriptionStatus.ACTIVE;
     }
 }

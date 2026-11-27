@@ -64,6 +64,8 @@ class SubscriptionsApiIT {
     private static final String PAYMENT_RECORD = "SUBSCRIPTION_PAYMENT_RECORD";
     /** Version of a complex right after its registration: tenant 1 (provisioned) + subscription 0. */
     private static final long REGISTERED_VERSION = 1;
+    /** A status change with an effect on the tenant (suspend, cancel, reactivate) raises both versions. */
+    private static final long SUBSCRIPTION_AND_TENANT_CHANGE = 2;
 
     @Autowired
     private MockMvc mvc;
@@ -157,8 +159,8 @@ class SubscriptionsApiIT {
         String otherId = api.publishedPlan(superAdminToken, "Other " + UUID.randomUUID());
         api.changeStatus(superAdminToken, complexId, "CANCELLED", REGISTERED_VERSION).andExpect(status().isOk());
 
-        expectProblem(api.changePlan(superAdminToken, complexId, otherId, REGISTERED_VERSION + 1), 422,
-                "SUBSCRIPTION_CANCELLED");
+        expectProblem(api.changePlan(superAdminToken, complexId, otherId,
+                REGISTERED_VERSION + SUBSCRIPTION_AND_TENANT_CHANGE), 422, "SUBSCRIPTION_CANCELLED");
     }
 
     /** CA6: every allowed transition is applied by hand, with when and who, and CANCELLED is terminal. */
@@ -167,13 +169,14 @@ class SubscriptionsApiIT {
         String complexId = registeredComplex("status-table");
         long version = REGISTERED_VERSION;
         for (String target : List.of("EXPIRING", "ACTIVE", "SUSPENDED", "CANCELLED")) {
-            api.changeStatus(superAdminToken, complexId, target, version)
+            long previous = version;
+            version = json(api.changeStatus(superAdminToken, complexId, target, version)
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.subscription.status").value(target))
                     .andExpect(jsonPath("$.subscription.statusChangedBy.displayName")
-                            .value(TestAccounts.PLATFORM_USER_NAME))
-                    .andExpect(jsonPath("$.version").value(version + 1));
-            version++;
+                            .value(TestAccounts.PLATFORM_USER_NAME)))
+                    .get("version").asLong();
+            assertThat(version).isGreaterThan(previous);
         }
 
         api.detail(superAdminToken, complexId).andExpect(jsonPath("$.allowedTransitions").value(empty()));
@@ -199,20 +202,21 @@ class SubscriptionsApiIT {
     @Test
     void aTransitionOutsideTheTableOrWithAStaleVersionChangesNothing() throws Exception {
         String complexId = registeredComplex("status-rejected");
-        api.changeStatus(superAdminToken, complexId, "SUSPENDED", REGISTERED_VERSION).andExpect(status().isOk());
+        long suspended = json(api.changeStatus(superAdminToken, complexId, "SUSPENDED", REGISTERED_VERSION)
+                .andExpect(status().isOk())).get("version").asLong();
 
-        expectProblem(api.changeStatus(superAdminToken, complexId, "EXPIRING", REGISTERED_VERSION + 1), 422,
+        expectProblem(api.changeStatus(superAdminToken, complexId, "EXPIRING", suspended), 422,
                 "TRANSITION_NOT_ALLOWED");
-        expectProblem(api.changeStatus(superAdminToken, complexId, "SUSPENDED", REGISTERED_VERSION + 1), 422,
+        expectProblem(api.changeStatus(superAdminToken, complexId, "SUSPENDED", suspended), 422,
                 "TRANSITION_NOT_ALLOWED");
         expectProblem(api.changeStatus(superAdminToken, complexId, "ACTIVE", REGISTERED_VERSION), 409,
                 "STALE_STATE");
-        expectProblem(api.changeStatus(superAdminToken, complexId, "PAUSED", REGISTERED_VERSION + 1), 400,
+        expectProblem(api.changeStatus(superAdminToken, complexId, "PAUSED", suspended), 400,
                 "INVALID_REQUEST");
 
         api.detail(superAdminToken, complexId)
                 .andExpect(jsonPath("$.subscription.status").value("SUSPENDED"))
-                .andExpect(jsonPath("$.version").value(REGISTERED_VERSION + 1));
+                .andExpect(jsonPath("$.version").value(suspended));
     }
 
     /** Optimistic concurrency: two changes made from the same version apply exactly one. */
@@ -231,7 +235,8 @@ class SubscriptionsApiIT {
         }
 
         assertThat(historyOf(complexId).stream().filter(change -> change.startsWith("STATUS:ACTIVE->"))).hasSize(1);
-        api.detail(superAdminToken, complexId).andExpect(jsonPath("$.version").value(REGISTERED_VERSION + 1));
+        api.detail(superAdminToken, complexId)
+                .andExpect(jsonPath("$.version").value(REGISTERED_VERSION + SUBSCRIPTION_AND_TENANT_CHANGE));
     }
 
     /**

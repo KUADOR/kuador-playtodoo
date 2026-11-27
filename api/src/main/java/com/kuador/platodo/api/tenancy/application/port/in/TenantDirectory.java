@@ -36,8 +36,8 @@ public interface TenantDirectory {
      *
      * @param subdomain     current subdomain; null once it has none (purge)
      * @param ownerEmail    owner e-mail given at registration; null when it was not kept or once redacted (purge)
-     * @param retentionDays retention of the current archive; null unless archived
-     * @param purgeDueAt    instant from which the purge may delete the schema; null unless archived
+     * @param retentionDays retention of the current suspension or archive; null unless suspended or archived
+     * @param purgeDueAt    instant from which the purge may delete the schema; null unless suspended or archived
      * @param version       raised by every lifecycle change, for optimistic concurrency
      */
     record TenantProfile(

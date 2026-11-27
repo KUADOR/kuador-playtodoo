@@ -48,7 +48,13 @@ enum SubscriptionsProblem {
     SUBSCRIPTION_CANCELLED(HttpStatus.UNPROCESSABLE_CONTENT, "subscription-cancelled", "Subscription cancelled",
             "A cancelled subscription keeps its plan."),
     TRANSITION_NOT_ALLOWED(HttpStatus.UNPROCESSABLE_CONTENT, "transition-not-allowed", "Transition not allowed",
-            "The target status is not in allowedTransitions.");
+            "The target status is not in allowedTransitions."),
+    RETENTION_EXPIRED(HttpStatus.UNPROCESSABLE_CONTENT, "retention-expired", "Retention expired",
+            "The purge date has passed; the complex can no longer be reactivated."),
+    NOT_IN_RETENTION(HttpStatus.UNPROCESSABLE_CONTENT, "not-in-retention", "Not in retention",
+            "The complex is neither suspended nor archived."),
+    RETENTION_DEADLINE_IN_PAST(HttpStatus.UNPROCESSABLE_CONTENT, "retention-deadline-in-past",
+            "Retention deadline in the past", "The resulting purge date must be in the future.");
 
     private static final String TYPE_BASE = "https://playtodoo.com/problems/";
     private static final String CODE = "code";

@@ -10,6 +10,8 @@ import com.kuador.platodo.api.bookings.domain.BookingStatus;
 /**
  * {@code StaffBooking} schema of the API contract. The holder name of a pending booking is not disclosed (D9):
  * personal data is not exposed for a 5-minute hold. The holder phone is never part of the response.
+ *
+ * @param inactive whether the complex is suspended or archived (ADR-019): the entry is kept but has no effect
  */
 record StaffBookingResponse(
         UUID id,
@@ -19,12 +21,14 @@ record StaffBookingResponse(
         Instant start,
         Instant end,
         String holderName,
-        String blockReason) {
+        String blockReason,
+        boolean inactive) {
 
     /** Expects a booking already in its effective status. */
-    static StaffBookingResponse of(Booking booking) {
+    static StaffBookingResponse of(Booking booking, boolean inactive) {
         return new StaffBookingResponse(booking.id(), booking.courtId(), booking.kind(), booking.status(),
-                booking.period().start(), booking.period().end(), disclosedHolderName(booking), booking.blockReason());
+                booking.period().start(), booking.period().end(), disclosedHolderName(booking), booking.blockReason(),
+                inactive);
     }
 
     private static String disclosedHolderName(Booking booking) {

@@ -13,11 +13,9 @@ import com.kuador.platodo.api.tenancy.application.SubdomainTakenException;
 import com.kuador.platodo.api.tenancy.application.TenantNotFoundException;
 import com.kuador.platodo.api.tenancy.application.TenantUnavailableException;
 import com.kuador.platodo.api.tenancy.domain.InvalidTransitionException;
-import com.kuador.platodo.api.tenancy.domain.RetentionExpiredException;
-import com.kuador.platodo.api.tenancy.domain.RetentionInvalidException;
 import com.kuador.platodo.api.tenancy.domain.SubdomainRejectedException;
 
-/** Problem Details of the lifecycle and subdomain operations of {@code contracts/tenancy.openapi.yaml}. */
+/** Problem Details of the registration and subdomain operations of {@code contracts/tenancy.openapi.yaml}. */
 @RestControllerAdvice(assignableTypes = {
         PlatformTenantController.class, SubdomainController.class, TenantSubdomainController.class})
 class TenancyOperationsProblemHandler {
@@ -63,16 +61,6 @@ class TenancyOperationsProblemHandler {
     @ExceptionHandler(ProvisioningIncompleteException.class)
     ProblemDetail provisioningIncomplete() {
         return TenancyProblem.PROVISIONING_INCOMPLETE.toProblem();
-    }
-
-    @ExceptionHandler(RetentionExpiredException.class)
-    ProblemDetail retentionExpired() {
-        return TenancyProblem.RETENTION_EXPIRED.toProblem();
-    }
-
-    @ExceptionHandler(RetentionInvalidException.class)
-    ProblemDetail retentionInvalid() {
-        return TenancyProblem.RETENTION_INVALID.toProblem();
     }
 
     /**

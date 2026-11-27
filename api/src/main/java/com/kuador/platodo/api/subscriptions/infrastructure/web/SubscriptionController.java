@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kuador.platodo.api.subscriptions.application.ChangeComplexPlan;
+import com.kuador.platodo.api.subscriptions.application.ChangeComplexRetention;
 import com.kuador.platodo.api.subscriptions.application.ChangeSubscriptionStatus;
 import com.kuador.platodo.api.subscriptions.application.ListComplexHistory;
 import com.kuador.platodo.api.subscriptions.application.ListComplexPayments;
@@ -21,8 +22,8 @@ import com.kuador.platodo.api.subscriptions.application.RecordComplexPayment;
 import com.kuador.platodo.api.subscriptions.application.port.out.Plans.PageRequest;
 
 /**
- * Tag «Subscriptions» of {@code contracts/platform-backoffice.openapi.yaml}, except the retention of a complex
- * (PLATODO-86); global host. Payments are immutable: there is no operation to edit or delete one.
+ * Tag «Subscriptions» of {@code contracts/platform-backoffice.openapi.yaml}; global host. Payments are immutable:
+ * there is no operation to edit or delete one.
  */
 @RestController
 @RequestMapping(PlansApiPaths.PLATFORM)
@@ -30,19 +31,23 @@ class SubscriptionController {
 
     static final String PLAN = ComplexController.COMPLEX + "/plan";
     static final String STATUS_CHANGES = ComplexController.COMPLEX + "/status-changes";
+    static final String RETENTION = ComplexController.COMPLEX + "/retention";
     static final String PAYMENTS = ComplexController.COMPLEX + "/payments";
     static final String HISTORY = ComplexController.COMPLEX + "/history";
 
     private final ChangeComplexPlan changePlan;
     private final ChangeSubscriptionStatus changeStatus;
+    private final ChangeComplexRetention changeRetention;
     private final RecordComplexPayment recordPayment;
     private final ListComplexPayments listPayments;
     private final ListComplexHistory listHistory;
 
     SubscriptionController(ChangeComplexPlan changePlan, ChangeSubscriptionStatus changeStatus,
-            RecordComplexPayment recordPayment, ListComplexPayments listPayments, ListComplexHistory listHistory) {
+            ChangeComplexRetention changeRetention, RecordComplexPayment recordPayment,
+            ListComplexPayments listPayments, ListComplexHistory listHistory) {
         this.changePlan = changePlan;
         this.changeStatus = changeStatus;
+        this.changeRetention = changeRetention;
         this.recordPayment = recordPayment;
         this.listPayments = listPayments;
         this.listHistory = listHistory;
@@ -59,6 +64,14 @@ class SubscriptionController {
         ChangeStatusRequest complete = request.requireComplete();
         return ComplexResponses.Detail.of(
                 changeStatus.change(complexId, complete.targetStatus(), complete.version()));
+    }
+
+    @PutMapping(RETENTION)
+    ComplexResponses.Detail changeRetention(@PathVariable UUID complexId,
+            @RequestBody ChangeRetentionRequest request) {
+        ChangeRetentionRequest valid = request.requireValid();
+        return ComplexResponses.Detail.of(
+                changeRetention.change(complexId, valid.retentionDays(), valid.version()));
     }
 
     @PostMapping(PAYMENTS)

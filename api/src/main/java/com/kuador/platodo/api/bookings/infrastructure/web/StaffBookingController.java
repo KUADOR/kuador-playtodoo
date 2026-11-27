@@ -23,8 +23,9 @@ import com.kuador.platodo.api.bookings.application.CreateStaffBooking;
 import com.kuador.platodo.api.bookings.application.GetStaffBooking;
 import com.kuador.platodo.api.bookings.application.ListStaffBookings;
 import com.kuador.platodo.api.bookings.domain.Booking;
+import com.kuador.platodo.api.tenancy.application.port.in.TenantDirectory;
 
-/** Staff booking endpoints of {@code contracts/bookings.openapi.yaml}. */
+/** Staff booking endpoints of {@code contracts/bookings.openapi.yaml}; every entry carries {@code inactive} (ADR-019). */
 @RestController
 @RequestMapping(StaffBookingController.STAFF_PATH)
 @ConditionalOnStaffApiEnabled
@@ -38,14 +39,17 @@ class StaffBookingController {
     private final CreateStaffBooking createStaffBooking;
     private final BlockSlot blockSlot;
     private final CancelBookingByStaff cancelBookingByStaff;
+    private final BookingInactivity inactivity;
 
     StaffBookingController(ListStaffBookings listStaffBookings, GetStaffBooking getStaffBooking,
-            CreateStaffBooking createStaffBooking, BlockSlot blockSlot, CancelBookingByStaff cancelBookingByStaff) {
+            CreateStaffBooking createStaffBooking, BlockSlot blockSlot, CancelBookingByStaff cancelBookingByStaff,
+            TenantDirectory tenantDirectory) {
         this.listStaffBookings = listStaffBookings;
         this.getStaffBooking = getStaffBooking;
         this.createStaffBooking = createStaffBooking;
         this.blockSlot = blockSlot;
         this.cancelBookingByStaff = cancelBookingByStaff;
+        this.inactivity = new BookingInactivity(tenantDirectory);
     }
 
     @GetMapping(BOOKINGS)
@@ -53,14 +57,17 @@ class StaffBookingController {
             @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime from,
             @RequestParam @DateTimeFormat(iso = ISO.DATE_TIME) OffsetDateTime to,
             @RequestParam Optional<UUID> courtId) {
-        return listStaffBookings.list(from.toInstant(), to.toInstant(), courtId).stream()
-                .map(StaffBookingResponse::of)
-                .toList();
+        List<Booking> bookings = listStaffBookings.list(from.toInstant(), to.toInstant(), courtId);
+        if (bookings.isEmpty()) {
+            return List.of();
+        }
+        boolean inactive = inactivity.ofResolvedTenant();
+        return bookings.stream().map(booking -> StaffBookingResponse.of(booking, inactive)).toList();
     }
 
     @GetMapping(BOOKINGS + "/{bookingId}")
     StaffBookingResponse get(@PathVariable UUID bookingId) {
-        return StaffBookingResponse.of(getStaffBooking.get(bookingId));
+        return answer(getStaffBooking.get(bookingId));
     }
 
     @PostMapping(BOOKINGS)
@@ -75,11 +82,15 @@ class StaffBookingController {
 
     @PostMapping(BOOKINGS + "/{bookingId}/cancel")
     StaffBookingResponse cancel(@PathVariable UUID bookingId) {
-        return StaffBookingResponse.of(cancelBookingByStaff.cancel(bookingId));
+        return answer(cancelBookingByStaff.cancel(bookingId));
     }
 
-    private static ResponseEntity<StaffBookingResponse> created(Booking booking) {
+    private ResponseEntity<StaffBookingResponse> created(Booking booking) {
         return ResponseEntity.created(URI.create(STAFF_PATH + BOOKINGS + "/" + booking.id()))
-                .body(StaffBookingResponse.of(booking));
+                .body(answer(booking));
+    }
+
+    private StaffBookingResponse answer(Booking booking) {
+        return StaffBookingResponse.of(booking, inactivity.ofResolvedTenant());
     }
 }

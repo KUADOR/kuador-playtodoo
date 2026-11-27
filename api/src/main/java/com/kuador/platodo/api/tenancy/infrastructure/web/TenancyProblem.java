@@ -37,10 +37,6 @@ enum TenancyProblem {
     PROVISIONING_INCOMPLETE(HttpStatus.CONFLICT, "invalid-transition", "Invalid lifecycle transition",
             "The owner account of the complex is missing, so its provisioning cannot be completed.",
             "INVALID_TRANSITION"),
-    RETENTION_EXPIRED(HttpStatus.CONFLICT, "retention-expired", "Retention expired",
-            "The purge date has passed; the complex can no longer be reactivated."),
-    RETENTION_INVALID(HttpStatus.UNPROCESSABLE_CONTENT, "retention-invalid", "Invalid retention",
-            "The resulting purge date must be in the future."),
     ACCESS_SESSION_INVALID(HttpStatus.FORBIDDEN, "access-session-invalid", "Access session invalid",
             "A valid access session for this complex is required.");
 

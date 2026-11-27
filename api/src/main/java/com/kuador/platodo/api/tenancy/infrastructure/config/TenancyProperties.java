@@ -21,7 +21,9 @@ public record TenancyProperties(Archive archive, Subdomains subdomains) {
         Objects.requireNonNull(subdomains, "tenancy.subdomains is required");
     }
 
-    /** @param defaultRetentionDays retention of a new archive, in days ({@code 45} by decision of Kuador) */
+    /**
+     * @param defaultRetentionDays retention of a new suspension or archive, in days ({@code 45} by decision of Kuador)
+     */
     public record Archive(int defaultRetentionDays) {
 
         public Archive {

@@ -1,6 +1,7 @@
 package com.kuador.platodo.api.tenancy.infrastructure.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,7 +36,10 @@ import com.kuador.platodo.api.support.TenantDatabase;
 import com.kuador.platodo.api.support.TestAccounts;
 import com.kuador.platodo.api.support.TestTenants;
 import com.kuador.platodo.api.tenancy.application.PurgeDueTenants;
+import com.kuador.platodo.api.tenancy.application.TenancyUseCases;
+import com.kuador.platodo.api.tenancy.application.TenantLifecycle;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
+import com.kuador.platodo.api.tenancy.domain.InvalidTransitionException;
 import com.kuador.platodo.api.tenancy.domain.event.TenantPurged;
 import com.kuador.platodo.api.tenancy.infrastructure.scheduling.PurgeDueTenantsJob;
 
@@ -60,14 +64,18 @@ class TenantPurgeIT {
     private PurgeDueTenants purge;
     @Autowired
     private PurgeEvents purgeEvents;
+    @Autowired
+    private TenancyUseCases useCases;
 
     private TenancyRequests api;
     private String ownerToken;
+    private TenantLifecycle lifecycle;
 
     @BeforeEach
     void setUp() throws Exception {
         api = new TenancyRequests(mvc);
         ownerToken = api.platformOwnerToken();
+        lifecycle = useCases.lifecycle();
     }
 
     /** Criteria 13 and 16: the owner is told, the schema is deleted and only the anonymized global records remain. */
@@ -131,7 +139,7 @@ class TenantPurgeIT {
     @Test
     void anArchivedComplexIsNotPurgedBeforeItsPurgeDate() throws Exception {
         TenantId archived = registered(TenancyRequests.uniqueSubdomain("early"), TestAccounts.uniqueEmail("o"));
-        api.lifecycle(ownerToken, archived, "archive").andExpect(status().isOk());
+        lifecycle.cancel(archived, Instant.now());
 
         runJob();
 
@@ -143,7 +151,7 @@ class TenantPurgeIT {
     void onlyArchivedComplexesArePurged() throws Exception {
         TenantId active = registered(TenancyRequests.uniqueSubdomain("active"), TestAccounts.uniqueEmail("o"));
         TenantId suspended = registered(TenancyRequests.uniqueSubdomain("susp"), TestAccounts.uniqueEmail("o"));
-        api.lifecycle(ownerToken, suspended, "suspend").andExpect(status().isOk());
+        lifecycle.suspend(suspended, Instant.now());
         forcePurgeDate(active, Instant.now().minus(OVERDUE));
         forcePurgeDate(suspended, Instant.now().minus(OVERDUE));
 
@@ -170,7 +178,8 @@ class TenantPurgeIT {
         assertThat(outboxFor(tenant)).isEmpty();
         assertThat(sessionReasonsOf(tenant)).containsExactly(ACCESS_REASON);
         api.tenantState(subdomain).andExpect(status().isNotFound());
-        api.lifecycle(ownerToken, tenant, "reactivate").andExpect(status().isConflict());
+        assertThatThrownBy(() -> lifecycle.reactivate(tenant, Instant.now()))
+                .isInstanceOf(InvalidTransitionException.class);
 
         purgeEvents.stopFailing();
         runJob();
@@ -250,7 +259,7 @@ class TenantPurgeIT {
     }
 
     private void archiveOverdue(TenantId tenant) throws Exception {
-        api.lifecycle(ownerToken, tenant, "archive").andExpect(status().isOk());
+        lifecycle.cancel(tenant, Instant.now());
         forcePurgeDate(tenant, Instant.now().minus(OVERDUE));
     }
 
