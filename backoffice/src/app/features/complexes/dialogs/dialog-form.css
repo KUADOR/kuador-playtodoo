@@ -1,0 +1,97 @@
+/* Layout shared by the dialogs of P5 («Pantallas», PLATODO-27). */
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dialog-form__note {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+.dialog-form__current {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.dialog-form__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dialog-form__legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dialog-form__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--size-touch-min);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-sm) solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.dialog-form__option:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.dialog-form__option input {
+  flex-shrink: 0;
+  width: var(--space-5);
+  height: var(--space-5);
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.dialog-form__option input:focus-visible {
+  outline: var(--border-focus-ring) solid var(--color-focus);
+  outline-offset: var(--border-focus-offset);
+}
+
+.dialog-form__option-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-form__option-label {
+  font-weight: var(--font-weight-semibold);
+}
+
+.dialog-form__option-description {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+.dialog-form__comparison {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.dialog-form__comparison th,
+.dialog-form__comparison td {
+  padding: var(--space-2);
+  border-bottom: var(--border-width-sm) solid var(--color-border);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.dialog-form__comparison thead th {
+  background: var(--color-surface-alt);
+}

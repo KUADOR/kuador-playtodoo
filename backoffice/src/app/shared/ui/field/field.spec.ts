@@ -30,6 +30,27 @@ describe('Field', () => {
   }
 
   describe('text kind', () => {
+    it('shows a suffix linked to the control and passes the native hints', async () => {
+      await render({
+        suffix: '.playtodoo.com',
+        inputMode: 'decimal',
+        maxLength: 120,
+        inputType: 'date',
+        max: '2026-12-31',
+      });
+      document.body.appendChild(fixture.nativeElement);
+
+      expect(fixture.nativeElement.querySelector('.field__suffix')?.textContent).toBe(
+        '.playtodoo.com',
+      );
+      expect(describedTexts()).toEqual(['.playtodoo.com']);
+      expect(control().getAttribute('inputmode')).toBe('decimal');
+      expect(control().getAttribute('maxlength')).toBe('120');
+      expect(control().getAttribute('type')).toBe('date');
+      expect(control().getAttribute('max')).toBe('2026-12-31');
+      fixture.nativeElement.remove();
+    });
+
     it('defaults to a plain text input without autocomplete or required hints', async () => {
       await render();
 

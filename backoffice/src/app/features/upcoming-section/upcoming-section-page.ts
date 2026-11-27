@@ -7,7 +7,7 @@ import { SECTION_HEADING_KEY } from './section-heading';
 
 /**
  * Placeholder of a menu section whose screens belong to another task of PLATODO-27
- * («Complejos»: PLATODO-90; «Planes»: PLATODO-91). Those tasks replace it on their routes.
+ * («Planes»: PLATODO-91). That task replaces it on its route.
  */
 @Component({
   selector: 'app-upcoming-section-page',
