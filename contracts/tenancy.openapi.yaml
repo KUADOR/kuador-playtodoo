@@ -1006,10 +1006,3 @@ components:
         title: Complex not found
         status: 404
         code: TENANT_NOT_FOUND
-      summary: Archive retention already ended
-      value:
-        type: https://playtodoo.com/problems/retention-expired
-        title: Retention expired
-        status: 409
-        detail: The purge date has passed; the complex can no longer be reactivated.
-        code: RETENTION_EXPIRED
