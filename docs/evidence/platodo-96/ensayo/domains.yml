@@ -1,0 +1,39 @@
+http:
+  routers:
+    api-global:
+      rule: "Host(`api.develop.play.kuador.com`)"
+      entryPoints: [websecure]
+      service: api
+    backoffice:
+      rule: "Host(`admin.develop.play.kuador.com`)"
+      entryPoints: [websecure]
+      service: backoffice
+    sol-api:
+      rule: "Host(`canchas-el-sol.develop.play.kuador.com`) && PathPrefix(`/api`)"
+      entryPoints: [websecure]
+      service: api
+    sol-app:
+      rule: "Host(`canchas-el-sol.develop.play.kuador.com`)"
+      entryPoints: [websecure]
+      service: app
+    esquina-api:
+      rule: "Host(`la-esquina.develop.play.kuador.com`) && PathPrefix(`/api`)"
+      entryPoints: [websecure]
+      service: api
+    esquina-app:
+      rule: "Host(`la-esquina.develop.play.kuador.com`)"
+      entryPoints: [websecure]
+      service: app
+  services:
+    api:
+      loadBalancer:
+        passHostHeader: true
+        servers: [{url: "http://api:8080"}]
+    app:
+      loadBalancer:
+        passHostHeader: true
+        servers: [{url: "http://app:80"}]
+    backoffice:
+      loadBalancer:
+        passHostHeader: true
+        servers: [{url: "http://backoffice:80"}]

@@ -1,0 +1,55 @@
+# Local rehearsal of docs/despliegue-dokploy-develop.md: same images, variables and routes Dokploy would use.
+name: platodo96
+networks:
+  dokploy-network:
+    ipam:
+      config:
+        - subnet: 10.96.0.0/24
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: playtodoo
+      POSTGRES_USER: playtodoo
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    networks: [dokploy-network]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U playtodoo -d playtodoo"]
+      interval: 2s
+      retries: 30
+  api:
+    image: platodo96-api
+    profiles: [apps]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/playtodoo
+      SPRING_DATASOURCE_USERNAME: playtodoo
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      PLAYTODOO_IDENTITY_TOKEN_SIGNING_KEY: ${SIGNING_KEY}
+      PLAYTODOO_ROOT_DOMAIN: develop.play.kuador.com
+      PLAYTODOO_TENANT_URL_PATTERN: https://{subdomain}.develop.play.kuador.com
+      PLAYTODOO_CORS_BACKOFFICE_ORIGIN: https://admin.develop.play.kuador.com
+      SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES: 10.96.0.0/24
+      PLAYTODOO_BOOKINGS_STAFF_API_ENABLED: "true"
+    networks: [dokploy-network]
+  app:
+    image: platodo96-app
+    profiles: [apps]
+    networks: [dokploy-network]
+  backoffice:
+    image: platodo96-backoffice
+    profiles: [apps]
+    networks: [dokploy-network]
+  traefik:
+    image: traefik:v3.6
+    profiles: [apps]
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
+      - --providers.file.directory=/dynamic
+      - --providers.file.watch=true
+    ports: ["127.0.0.1:41000:80", "127.0.0.1:41001:443"]
+    volumes: ["./dynamic:/dynamic:ro"]
+    networks: [dokploy-network]
