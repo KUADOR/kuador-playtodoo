@@ -16,7 +16,7 @@ alimentado por la rama `develop` y publicado bajo `develop.play.kuador.com`.
 
 ```mermaid
 flowchart LR
-  Dev[Equipo] -->|push a develop| GH[GitHub KUADOR/platodo]
+  Dev[Equipo] -->|push a develop| GH[GitHub KUADOR/kuador-playtodoo]
   GH -->|GitHub App de Dokploy| DK[Dokploy en el VPS]
   Web[Navegador] -->|HTTPS 443| TR[Traefik de Dokploy]
   TR -->|api.develop… y sub.develop…/api| API[api :8080]
@@ -88,7 +88,7 @@ encontrado» de `app`. La variante con comodín real, igual a producción, está
 - VPS con Dokploy instalado y el panel accesible por HTTPS desde internet (GitHub debe poder llamarlo). Puertos 80 y
   443 abiertos. Tamaño del VPS: [POR DEFINIR: proveedor y recursos].
 - Registros DNS de la sección 2 propagados (`dig +short canchas-el-sol.develop.play.kuador.com` devuelve la IP).
-- Una cuenta con permiso de administración sobre `KUADOR/platodo` en GitHub, para instalar la GitHub App.
+- Una cuenta con permiso de administración sobre el repositorio `KUADOR/kuador-playtodoo` en GitHub (antes `KUADOR/platodo`; GitHub redirige el nombre anterior), para instalar la GitHub App.
 - En tu equipo: `curl`, `openssl` y `htpasswd` (paquete `apache2-utils` o `httpd-tools`).
 
 ## 4. Inventario de variables y secretos
@@ -181,7 +181,7 @@ Ver la sección 6. Hazla antes de crear las aplicaciones.
 ### 5.4 api
 
 1. `Create Service` → `Application`. Nombre: `api`.
-2. Pestaña `General`, proveedor `Github`: cuenta de la GitHub App, repositorio `KUADOR/platodo`, `Branch`:
+2. Pestaña `General`, proveedor `Github`: cuenta de la GitHub App, repositorio `KUADOR/kuador-playtodoo`, `Branch`:
    `develop`, `Build Path`: `/api`, `Watch Paths`: `api/**`. `Trigger Type`: `On Push`.
 3. `Build Type`: `Railpack`. Nixpacks no sirve aquí: no ofrece JDK 25. **[POR VALIDAR]** que Railpack compile con
    `RAILPACK_JDK_VERSION=25` y arranque el jar; si no lo logra, la api necesita un `Dockerfile`, que es un cambio de
@@ -241,7 +241,7 @@ entrada es Traefik por 80 y 443.
 ## 6. Pasos en GitHub
 
 1. **GitHub App de Dokploy.** En Dokploy: `Settings` → `Git` → `Github` → elige la organización `KUADOR` →
-   `Create Github App` → `Install`. En GitHub, limita la instalación a **solo el repositorio `platodo`** y confirma
+   `Create Github App` → `Install`. En GitHub, limita la instalación a **solo el repositorio `kuador-playtodoo`** y confirma
    con `Install & Authorize`. La app pide lectura del contenido y recibe los eventos `push`.
 2. **Auto-despliegue.** Con la GitHub App no se crea ningún webhook a mano: la app ya trae el suyo, que llama al
    panel de Dokploy. En cada aplicación, deja `Autodeploy` activado y `Branch` en `develop`. Un push a `develop`
