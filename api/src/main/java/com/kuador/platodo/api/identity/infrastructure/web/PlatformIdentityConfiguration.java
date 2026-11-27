@@ -59,9 +59,15 @@ class PlatformIdentityConfiguration {
         return new CapabilityGuard(operatorCapabilities);
     }
 
+    /** Also the public {@code PlatformUserNames} port of the module. */
     @Bean
-    GetCurrentPlatformUser getCurrentPlatformUser(CapabilityGuard guard) {
-        return new GetCurrentPlatformUser(guard, new JpaPlatformUserProfiles(global));
+    JpaPlatformUserProfiles platformUserProfiles() {
+        return new JpaPlatformUserProfiles(global);
+    }
+
+    @Bean
+    GetCurrentPlatformUser getCurrentPlatformUser(CapabilityGuard guard, JpaPlatformUserProfiles profiles) {
+        return new GetCurrentPlatformUser(guard, profiles);
     }
 
     @Bean

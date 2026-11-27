@@ -21,7 +21,7 @@ record PlanRequest(String name, String price, String currency, String periodicit
 
     long requiredVersion() {
         if (version == null || version < 0) {
-            throw new InvalidPlansRequestException("`version` is required and must not be negative.");
+            throw new InvalidSubscriptionsRequestException("`version` is required and must not be negative.");
         }
         return version;
     }
@@ -31,7 +31,7 @@ record PlanRequest(String name, String price, String currency, String periodicit
             return Map.of();
         }
         if (!customFields.isObject()) {
-            throw new InvalidPlansRequestException("`customFields` must be an object.");
+            throw new InvalidSubscriptionsRequestException("`customFields` must be an object.");
         }
         Map<String, Object> values = new LinkedHashMap<>();
         customFields.properties().forEach(property -> values.put(property.getKey(), valueOf(property.getValue())));

@@ -16,6 +16,8 @@ public record FieldError(String field, Code code) {
         TOO_LONG,
         INVALID_FORMAT,
         NEGATIVE,
+        NOT_POSITIVE,
+        DATE_IN_FUTURE,
         NOT_ALLOWED,
         WRONG_TYPE,
         UNKNOWN_FIELD

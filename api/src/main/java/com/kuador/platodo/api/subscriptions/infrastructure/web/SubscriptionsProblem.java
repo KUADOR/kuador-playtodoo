@@ -10,10 +10,12 @@ import org.springframework.http.ProblemDetail;
 import com.kuador.platodo.api.subscriptions.domain.FieldError;
 
 /**
- * Problem Details of the plan operations ({@code contracts/platform-backoffice.openapi.yaml}). Title and detail are
- * developer-facing; the backoffice maps {@code code} and each field error code to the text shown to people.
+ * Problem Details of the plan and complex operations ({@code contracts/platform-backoffice.openapi.yaml}). Titles are
+ * developer-facing; the backoffice maps {@code code} and each field error code to the text shown to people. The
+ * subdomain rejections of a registration (PLATODO-27 CA2) also carry their Spanish message in {@code detail}, so any
+ * client can show it as is.
  */
-enum PlansProblem {
+enum SubscriptionsProblem {
 
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "invalid-request", "Invalid request", "Malformed body or parameters."),
     VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "validation-failed", "Validation failed",
@@ -29,7 +31,24 @@ enum PlansProblem {
             "Another plan field has this label."),
     PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "plan-not-found", "Plan not found", "No plan with this id."),
     PLAN_FIELD_NOT_FOUND(HttpStatus.NOT_FOUND, "plan-field-not-found", "Plan field not found",
-            "No plan field with this id.");
+            "No plan field with this id."),
+    COMPLEX_NOT_FOUND(HttpStatus.NOT_FOUND, "complex-not-found", "Complex not found", "No complex with this id."),
+    SUBDOMAIN_TAKEN(HttpStatus.CONFLICT, "subdomain-taken", "Subdomain taken",
+            "El subdominio ya está en uso o lo usó otro complejo; elige otro."),
+    SUBDOMAIN_INVALID(HttpStatus.UNPROCESSABLE_CONTENT, "subdomain-invalid", "Invalid subdomain",
+            "El subdominio no es válido: usa de 3 a 63 letras minúsculas, números o guiones simples, sin guion al"
+                    + " inicio ni al final."),
+    SUBDOMAIN_RESERVED(HttpStatus.UNPROCESSABLE_CONTENT, "subdomain-reserved", "Reserved subdomain",
+            "El subdominio está reservado por Playtodoo; elige otro."),
+    PLAN_NOT_PUBLISHED(HttpStatus.UNPROCESSABLE_CONTENT, "plan-not-published", "Plan not published",
+            "The plan does not exist or is a draft."),
+    NOT_PROVISIONING_FAILED(HttpStatus.CONFLICT, "not-provisioning-failed", "Provisioning did not fail",
+            "The complex is not waiting for a provisioning retry."),
+    SAME_PLAN(HttpStatus.UNPROCESSABLE_CONTENT, "same-plan", "Same plan", "The complex already has this plan."),
+    SUBSCRIPTION_CANCELLED(HttpStatus.UNPROCESSABLE_CONTENT, "subscription-cancelled", "Subscription cancelled",
+            "A cancelled subscription keeps its plan."),
+    TRANSITION_NOT_ALLOWED(HttpStatus.UNPROCESSABLE_CONTENT, "transition-not-allowed", "Transition not allowed",
+            "The target status is not in allowedTransitions.");
 
     private static final String TYPE_BASE = "https://playtodoo.com/problems/";
     private static final String CODE = "code";
@@ -41,7 +60,7 @@ enum PlansProblem {
     private final String title;
     private final String detail;
 
-    PlansProblem(HttpStatus status, String slug, String title, String detail) {
+    SubscriptionsProblem(HttpStatus status, String slug, String title, String detail) {
         this.status = status;
         this.type = URI.create(TYPE_BASE + slug);
         this.title = title;

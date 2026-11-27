@@ -1,6 +1,6 @@
 package com.kuador.platodo.api.subscriptions.application;
 
-/** The version sent with a change no longer matches the plan or plan field ({@code 409 STALE_STATE}). */
+/** The version sent with a change no longer matches the plan, plan field or complex ({@code 409 STALE_STATE}). */
 public final class StaleVersionException extends RuntimeException {
 
     public StaleVersionException() {

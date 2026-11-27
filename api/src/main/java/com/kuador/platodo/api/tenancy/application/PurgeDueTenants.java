@@ -26,7 +26,8 @@ import com.kuador.platodo.api.tenancy.domain.event.TenantPurged;
  *       the rows another instance holds: from then on they cannot be reactivated and their host answers "not found".
  *   </li>
  *   <li>{@link #purge(TenantId)} purges one {@code PURGING} complex in one transaction that holds its row: queues the
- *       e-mail to the owner, drops the schema, marks it {@code PURGED}, retires its subdomain and publishes
+ *       e-mail to the owner, drops the schema, marks it {@code PURGED}, retires its subdomain, redacts the owner
+ *       e-mail of the global registry (ADR-016) and publishes
  *       {@link TenantPurged}, whose consumers anonymize their own global data within the same transaction (D11).</li>
  * </ol>
  * If anything fails, the whole purge of that complex rolls back (PostgreSQL drops schemas transactionally): it stays
@@ -88,6 +89,7 @@ public final class PurgeDueTenants {
         ports.schemas().dropIfExists(id);
         ports.registry().save(purging.markPurged(now));
         ports.registry().retireCurrentSubdomain(id, now);
+        ports.registry().redactOwnerEmail(id);
         ports.events().publish(new TenantPurged(id, now));
         return true;
     }
