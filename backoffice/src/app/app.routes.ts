@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { APP_PATHS, COMPLEX_PATHS } from './core/app-paths';
 import { requiresCapability, SUPER_ADMIN_ONLY } from './core/auth/access';
 import { accessGuard, signedInGuard, signedOutGuard } from './core/auth/guards';
+import { supportAccessGuard } from './features/support/support-access.guard';
 import { SECTION_HEADING_KEY } from './features/upcoming-section/section-heading';
 import { devRoutes } from './dev-routes';
 
@@ -44,6 +45,13 @@ export const routes: Routes = [
               ),
           },
           {
+            path: `:${COMPLEX_PATHS.complexIdParam}/${COMPLEX_PATHS.support}`,
+            title: `Vista de soporte${TITLE_SUFFIX}`,
+            canActivate: [supportAccessGuard],
+            loadComponent: () =>
+              import('./features/support/view/support-view-page').then((m) => m.SupportViewPage),
+          },
+          {
             path: `:${COMPLEX_PATHS.complexIdParam}`,
             title: `Detalle del complejo${TITLE_SUFFIX}`,
             loadComponent: () =>
@@ -71,6 +79,14 @@ export const routes: Routes = [
                 loadComponent: () =>
                   import('./features/complexes/detail/complex-history-tab').then(
                     (m) => m.ComplexHistoryTab,
+                  ),
+              },
+              {
+                path: COMPLEX_PATHS.audit,
+                canActivate: [accessGuard(SUPER_ADMIN_ONLY)],
+                loadComponent: () =>
+                  import('./features/complexes/detail/complex-audit-tab').then(
+                    (m) => m.ComplexAuditTab,
                   ),
               },
             ],

@@ -263,6 +263,16 @@ export class MockComplexesBackend {
   private readonly complexes = seedData();
   private nextId = 1;
 
+  /** The complex with this id, as the detail reads it; null if there is none. */
+  complexById(complexId: string): ComplexDetail | null {
+    return this.complexes.find((stored) => stored.detail.id === complexId)?.detail ?? null;
+  }
+
+  /** The complex served on this subdomain; null if there is none. */
+  complexOnSubdomain(subdomain: string): ComplexDetail | null {
+    return this.complexes.find((stored) => stored.detail.subdomain === subdomain)?.detail ?? null;
+  }
+
   /** Public operations (no token): subdomain suggestion and availability. */
   handlePublic(request: MockRequest): MockResponse | null {
     if (request.method !== 'GET') {

@@ -24,6 +24,11 @@ export class Button {
   readonly loading = input(false);
   readonly disabled = input(false);
   readonly loadingLabel = input(DEFAULT_LOADING_LABEL);
+  /**
+   * Full accessible name when the visible label repeats on the screen, for example «Cancelar
+   * reserva de las 18:00, Cancha 1» for one of several «Cancelar reserva» buttons.
+   */
+  readonly accessibleLabel = input<string>();
 
   readonly press = output<void>();
 

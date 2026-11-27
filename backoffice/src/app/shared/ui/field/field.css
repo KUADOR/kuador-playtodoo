@@ -28,6 +28,12 @@
   font-size: var(--font-size-sm);
 }
 
+.field__control--multiline {
+  padding-block: var(--space-2);
+  line-height: var(--line-height-body);
+  resize: vertical;
+}
+
 .field__row {
   display: flex;
   align-items: center;

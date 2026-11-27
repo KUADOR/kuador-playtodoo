@@ -90,6 +90,7 @@ describe('complexActions (what P4 shows)', () => {
       changePlan: true,
       changeRetention: false,
       retryRegistration: false,
+      accessData: true,
     });
     expect(complexActions(SUPER_ADMIN_USER, suspendedComplex(10, NOW), NOW).changeRetention).toBe(
       true,
@@ -106,7 +107,22 @@ describe('complexActions (what P4 shows)', () => {
       changePlan: false,
       changeRetention: false,
       retryRegistration: false,
+      accessData: false,
     });
+  });
+
+  it('offers «Acceder a datos» by role and tenant status (ADR-020)', () => {
+    const dataOperator = { ...OPERATOR_USER, capabilities: ['TENANT_DATA_ACCESS' as const] };
+    const cancelled = { ...suspendedComplex(10, NOW), tenantStatus: 'ARCHIVED' as const };
+    const accessData = (user: typeof SUPER_ADMIN_USER, complex: typeof ACTIVE_COMPLEX) =>
+      complexActions(user, complex, NOW).accessData;
+
+    expect(accessData(dataOperator, ACTIVE_COMPLEX)).toBe(true);
+    expect(accessData(OPERATOR_USER, ACTIVE_COMPLEX)).toBe(false);
+    expect(accessData(dataOperator, suspendedComplex(10, NOW))).toBe(false);
+    expect(accessData(SUPER_ADMIN_USER, suspendedComplex(10, NOW))).toBe(true);
+    expect(accessData(SUPER_ADMIN_USER, cancelled)).toBe(true);
+    expect(accessData(SUPER_ADMIN_USER, PROVISIONING_FAILED_COMPLEX)).toBe(false);
   });
 
   it('allows nothing once the data is being deleted or was deleted', () => {

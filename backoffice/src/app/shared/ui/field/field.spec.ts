@@ -20,8 +20,8 @@ describe('Field', () => {
     await fixture.whenStable();
   }
 
-  function control(): HTMLInputElement | HTMLSelectElement {
-    return fixture.nativeElement.querySelector('input, select');
+  function control(): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
+    return fixture.nativeElement.querySelector('input, textarea, select');
   }
 
   function describedTexts(): string[] {
@@ -117,6 +117,29 @@ describe('Field', () => {
       await render({ disabled: true });
 
       expect(control().disabled).toBe(true);
+    });
+  });
+
+  describe('textarea kind', () => {
+    it('renders a labelled multi-line control with its length limit and hints', async () => {
+      await render({ kind: 'textarea', rows: 5, maxLength: 500, required: true, help: 'Ayuda.' });
+
+      const textarea = control() as HTMLTextAreaElement;
+      expect(textarea.tagName).toBe('TEXTAREA');
+      expect(textarea.rows).toBe(5);
+      expect(textarea.getAttribute('maxlength')).toBe('500');
+      expect(textarea.getAttribute('aria-required')).toBe('true');
+      expect(describedTexts()).toEqual(['Ayuda.']);
+      await expectNoAxeViolations(fixture.nativeElement);
+    });
+
+    it('updates the value model as the person types', async () => {
+      await render({ kind: 'textarea' });
+
+      control().value = 'Reclamo por una reserva duplicada';
+      control().dispatchEvent(new Event('input'));
+
+      expect(fixture.componentInstance.value()).toBe('Reclamo por una reserva duplicada');
     });
   });
 

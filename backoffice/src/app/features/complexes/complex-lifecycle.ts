@@ -2,6 +2,7 @@ import { AlertTone } from '../../shared/ui/alert/alert';
 import { canAccess, requiresCapability, SUPER_ADMIN_ONLY } from '../../core/auth/access';
 import { CurrentPlatformUser } from '../../core/auth/platform-user';
 import { daysUntil, formatDate, formatDateTime } from '../../core/format/date-format';
+import { canOpenSupportSession } from '../support/support-permissions';
 import { ComplexDetail } from './complexes-api';
 
 /** With this many days left or fewer, the purge notice turns from a warning into an error. */
@@ -124,6 +125,8 @@ export interface ComplexActions {
   readonly changePlan: boolean;
   readonly changeRetention: boolean;
   readonly retryRegistration: boolean;
+  /** «Acceder a datos del complejo» (P8). */
+  readonly accessData: boolean;
 }
 
 const NO_ACTIONS: ComplexActions = {
@@ -132,6 +135,7 @@ const NO_ACTIONS: ComplexActions = {
   changePlan: false,
   changeRetention: false,
   retryRegistration: false,
+  accessData: false,
 };
 
 export function complexActions(
@@ -151,5 +155,6 @@ export function complexActions(
     retryRegistration:
       complex.tenantStatus === 'PROVISIONING_FAILED' &&
       canAccess(user, requiresCapability('COMPLEX_CREATE')),
+    accessData: canOpenSupportSession(user, complex.tenantStatus),
   };
 }

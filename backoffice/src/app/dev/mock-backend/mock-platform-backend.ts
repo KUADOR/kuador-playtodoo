@@ -7,6 +7,7 @@ import {
 
 import { MockComplexesBackend } from './mock-complexes-backend';
 import { MockRequest, MockResponse, ok, pageOf, problem } from './mock-responses';
+import { MockSupportBackend } from './mock-support-backend';
 
 export type { MockRequest, MockResponse } from './mock-responses';
 
@@ -62,6 +63,7 @@ export class MockPlatformBackend {
   private readonly changes: CapabilityChange[] = [];
   private nextChangeId = 1;
   private readonly complexes = new MockComplexesBackend();
+  private readonly support = new MockSupportBackend(this.complexes);
 
   handle(request: MockRequest): MockResponse {
     const route = `${request.method} ${request.path}`;
@@ -89,9 +91,21 @@ export class MockPlatformBackend {
         return this.onlySuperAdmin(user, () => ok(pageOf(this.changes, request.query)));
       default:
         return (
+          this.support.handlePlatform(request, this.currentUser(user)) ??
           this.complexes.handle(request, this.currentUser(user)) ?? { status: 404, body: null }
         );
     }
+  }
+
+  /** A staff operation that Kuador support calls on the host of `subdomain` (ADR-020). */
+  handleTenant(subdomain: string, request: MockRequest, sessionId: string | null): MockResponse {
+    const user = this.userOf(request.bearerToken);
+    return this.support.handleTenant(
+      subdomain,
+      request,
+      user === null ? null : this.currentUser(user),
+      sessionId,
+    );
   }
 
   private login(body: unknown): MockResponse {

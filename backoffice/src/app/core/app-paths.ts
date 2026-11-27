@@ -13,6 +13,8 @@ export const COMPLEX_PATHS = {
   complexIdParam: 'complexId',
   payments: 'payments',
   history: 'history',
+  audit: 'audit',
+  support: 'support',
 } as const;
 
 /** Absolute URL of a section, for `navigateByUrl`, `parseUrl` and `routerLink`. */
@@ -38,4 +40,14 @@ export function complexPaymentsUrl(complexId: string): string {
 
 export function complexHistoryUrl(complexId: string): string {
   return `${complexDetailUrl(complexId)}/${COMPLEX_PATHS.history}`;
+}
+
+/** P7 «Auditoría» tab of P4. */
+export function complexAuditUrl(complexId: string): string {
+  return `${complexDetailUrl(complexId)}/${COMPLEX_PATHS.audit}`;
+}
+
+/** P9 «Vista de soporte» of a complex, open only with a support session. */
+export function complexSupportUrl(complexId: string): string {
+  return `${complexDetailUrl(complexId)}/${COMPLEX_PATHS.support}`;
 }

@@ -1,4 +1,8 @@
-import { SAME_ORIGIN_API_BASE_URL, resolveApiBaseUrl } from './api-base-url';
+import {
+  SAME_ORIGIN_API_BASE_URL,
+  resolveApiBaseUrl,
+  resolveTenantApiBaseUrl,
+} from './api-base-url';
 
 describe('resolveApiBaseUrl', () => {
   it('points the backoffice host to the global api host of the same root domain', () => {
@@ -21,4 +25,26 @@ describe('resolveApiBaseUrl', () => {
       );
     },
   );
+});
+
+describe('resolveTenantApiBaseUrl', () => {
+  it('points to the api on the host of the complex', () => {
+    expect(
+      resolveTenantApiBaseUrl('canchas-el-sol.playtodoo.com', {
+        protocol: 'https:',
+        hostname: 'admin.playtodoo.com',
+        port: '',
+      }),
+    ).toBe('https://canchas-el-sol.playtodoo.com/api/v1');
+  });
+
+  it('keeps the protocol and port of the local proxy', () => {
+    expect(
+      resolveTenantApiBaseUrl('canchas-el-sol.localhost', {
+        protocol: 'http:',
+        hostname: 'admin.localhost',
+        port: '8000',
+      }),
+    ).toBe('http://canchas-el-sol.localhost:8000/api/v1');
+  });
 });

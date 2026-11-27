@@ -1,10 +1,10 @@
 import { Component, ElementRef, computed, input, model, viewChild } from '@angular/core';
 import { LucideCircleAlert } from '@lucide/angular';
 
-export type FieldKind = 'text' | 'select';
+export type FieldKind = 'text' | 'textarea' | 'select';
 
 /** `type` of the native input when `kind` is `text`. */
-export type TextInputType = 'text' | 'email' | 'password' | 'date';
+export type TextInputType = 'text' | 'email' | 'password' | 'date' | 'time';
 
 /** Native `inputmode`: which on-screen keyboard a phone shows. */
 export type InputMode = 'text' | 'decimal' | 'numeric' | 'email';
@@ -15,11 +15,12 @@ export interface FieldOption {
 }
 
 const ERROR_ICON_SIZE_PX = 16;
+const DEFAULT_TEXTAREA_ROWS = 4;
 
 let nextFieldId = 0;
 
 /**
- * Labelled form field (text input or select). Follows the shared contract in
+ * Labelled form field (text input, multi-line text or select). Follows the shared contract in
  * design-system/docs/components/field.md. Help and error texts are linked to the
  * control with aria-describedby; an error also sets aria-invalid.
  */
@@ -47,6 +48,8 @@ export class Field {
   /** Fixed text shown right after the control, for example `.playtodoo.com`. */
   readonly suffix = input<string>();
   readonly options = input<readonly FieldOption[]>([]);
+  /** Visible lines of a `textarea`. */
+  readonly rows = input(DEFAULT_TEXTAREA_ROWS);
   readonly value = model('');
 
   protected readonly errorIconSize = ERROR_ICON_SIZE_PX;
@@ -66,7 +69,9 @@ export class Field {
   });
 
   private readonly control =
-    viewChild.required<ElementRef<HTMLInputElement | HTMLSelectElement>>('control');
+    viewChild.required<ElementRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>>(
+      'control',
+    );
 
   /** Moves the focus to the control, for example to the first field with an error. */
   focus(): void {
@@ -74,6 +79,8 @@ export class Field {
   }
 
   protected updateValue(event: Event): void {
-    this.value.set((event.target as HTMLInputElement | HTMLSelectElement).value);
+    this.value.set(
+      (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value,
+    );
   }
 }
