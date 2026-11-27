@@ -4,6 +4,6 @@ package com.kuador.platodo.api.audit.application;
 public class InvalidAuditPageException extends RuntimeException {
 
     public InvalidAuditPageException() {
-        super("Page must be 0 or more and size between 1 and " + ListAccessAudit.MAX_PAGE_SIZE, null, false, false);
+        super("Page must be 0 or more and size between 1 and " + ListAuditEntries.MAX_PAGE_SIZE, null, false, false);
     }
 }

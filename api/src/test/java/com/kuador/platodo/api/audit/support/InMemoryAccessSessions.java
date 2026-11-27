@@ -29,4 +29,8 @@ public final class InMemoryAccessSessions implements AccessSessions {
         sessions.computeIfPresent(sessionId, (id, session) -> new AccessSession(id, session.platformUserId(),
                 session.tenant(), session.reason(), session.startedAt(), session.expiresAt(), Optional.of(closedAt)));
     }
+
+    public int count() {
+        return sessions.size();
+    }
 }

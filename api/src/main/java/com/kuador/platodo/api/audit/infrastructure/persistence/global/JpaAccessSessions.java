@@ -9,7 +9,7 @@ import com.kuador.platodo.api.audit.domain.AccessSession;
 
 import jakarta.persistence.EntityManager;
 
-/** Access sessions through the global persistence unit; writes need a transaction of that unit. */
+/** Support sessions through the global persistence unit; writes need a transaction of that unit. */
 public final class JpaAccessSessions implements AccessSessions {
 
     private final EntityManager global;

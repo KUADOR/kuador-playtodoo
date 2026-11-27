@@ -24,6 +24,7 @@ import com.kuador.platodo.api.bookings.application.port.out.CurrentStaff;
 import com.kuador.platodo.api.bookings.infrastructure.failclosed.UnconfiguredCourtSlotRules;
 import com.kuador.platodo.api.bookings.infrastructure.identity.PrincipalCurrentStaff;
 import com.kuador.platodo.api.bookings.infrastructure.web.ConditionalOnStaffApiEnabled;
+import com.kuador.platodo.api.tenancy.application.port.in.SupportGrants;
 
 /**
  * Wires the staff booking use cases on the adapters of {@link BookingsConfiguration}. The staff member of each
@@ -44,11 +45,12 @@ class StaffBookingConfiguration {
 
     StaffBookingConfiguration(DataSource dataSource, BookingRepository bookings, BookingEventPublisher events,
             ObjectProvider<CourtSlotRules> courtSlotRules, ObjectProvider<CurrentStaff> currentStaff,
-            ObjectProvider<PlatformTransactionManager> transactionManager, ObjectProvider<Clock> clock) {
+            SupportGrants supportGrants, ObjectProvider<PlatformTransactionManager> transactionManager,
+            ObjectProvider<Clock> clock) {
         this.bookings = bookings;
         this.events = events;
         this.courtSlotRules = courtSlotRules.getIfAvailable(UnconfiguredCourtSlotRules::new);
-        this.currentStaff = currentStaff.getIfAvailable(PrincipalCurrentStaff::new);
+        this.currentStaff = currentStaff.getIfAvailable(() -> new PrincipalCurrentStaff(supportGrants));
         this.transactions = new TransactionTemplate(
                 transactionManager.getIfAvailable(() -> new DataSourceTransactionManager(dataSource)));
         this.clock = clock.getIfAvailable(Clock::systemUTC);

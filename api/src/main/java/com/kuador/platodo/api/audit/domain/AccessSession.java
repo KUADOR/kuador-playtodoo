@@ -9,8 +9,8 @@ import java.util.UUID;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 
 /**
- * Time-boxed permission of one Kuador platform user on the data of one complex (ADR-011). It grants nothing once it
- * expires or is closed, nor to another user or on another complex.
+ * Support session: time-boxed permission of one Kuador platform user on the data of one complex (ADR-011,
+ * ADR-020). It grants nothing once it expires or is closed, nor to another user or on another complex.
  */
 public record AccessSession(UUID id, UUID platformUserId, TenantId tenant, AccessReason reason, Instant startedAt,
         Instant expiresAt, Optional<Instant> closedAt) {
@@ -24,7 +24,7 @@ public record AccessSession(UUID id, UUID platformUserId, TenantId tenant, Acces
         Objects.requireNonNull(expiresAt, "expiresAt");
         Objects.requireNonNull(closedAt, "closedAt");
         if (!expiresAt.isAfter(startedAt)) {
-            throw new IllegalArgumentException("An access session must expire after it starts");
+            throw new IllegalArgumentException("A support session must expire after it starts");
         }
     }
 

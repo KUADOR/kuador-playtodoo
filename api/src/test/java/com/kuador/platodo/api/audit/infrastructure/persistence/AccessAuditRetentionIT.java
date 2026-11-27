@@ -86,9 +86,10 @@ class AccessAuditRetentionIT {
         UUID id = UUID.randomUUID();
         TenantDatabase.admin().sql("""
                         INSERT INTO global.access_audit_event (id, session_id, platform_user_id, tenant_id, reason,
-                            http_method, route_template, outcome, occurred_at)
+                            http_method, route_template, outcome, denial_code, occurred_at)
                         VALUES (:id, :session, :user, :tenant::uuid, CASE WHEN :allowed THEN 'Soporte' END, 'GET',
                                 '/api/v1/staff/bookings', CASE WHEN :allowed THEN 'ALLOWED' ELSE 'DENIED' END,
+                                CASE WHEN :allowed THEN NULL ELSE 'SUPPORT_SESSION_INVALID' END,
                                 now() - CAST(:age AS interval))
                         """)
                 .param("id", id).param("session", session).param("user", kuadorUser)

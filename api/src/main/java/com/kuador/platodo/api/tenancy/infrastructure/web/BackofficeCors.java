@@ -6,7 +6,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * CORS of the api (ADR-011): besides same-origin calls of the host itself, only the {@code backoffice} origin may
- * call it from a browser, with its bearer token and the access session header.
+ * call it from a browser, with its bearer token and the support session header.
  */
 final class BackofficeCors implements WebMvcConfigurer {
 
@@ -25,6 +25,6 @@ final class BackofficeCors implements WebMvcConfigurer {
                 .allowedOrigins(backofficeOrigin)
                 .allowedMethods(ALLOWED_METHODS)
                 .allowedHeaders(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE,
-                        PlatformAccessGuard.ACCESS_SESSION_HEADER);
+                        SupportRequests.SESSION_HEADER);
     }
 }

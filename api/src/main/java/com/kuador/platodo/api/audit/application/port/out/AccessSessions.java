@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import com.kuador.platodo.api.audit.domain.AccessSession;
 
-/** Access sessions of the Kuador owner, kept in the global schema. */
+/** Support sessions of the Kuador team (ADR-020), kept in the global schema. Writes need a global transaction. */
 public interface AccessSessions {
 
     void add(AccessSession session);
@@ -15,4 +15,5 @@ public interface AccessSessions {
 
     /** Marks the session as closed at {@code closedAt}. */
     void close(UUID sessionId, Instant closedAt);
+
 }

@@ -10,7 +10,9 @@ import com.kuador.platodo.api.tenancy.application.RequestHost;
 import com.kuador.platodo.api.tenancy.application.RequestHosts;
 import com.kuador.platodo.api.tenancy.application.ResolveTenant;
 import com.kuador.platodo.api.tenancy.application.TenantResolution;
+import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantScope;
+import com.kuador.platodo.api.tenancy.domain.TenantStatus;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,7 +27,9 @@ import jakarta.servlet.http.HttpServletResponse;
  *   <li>tenant operation on the global host, or global operation on a tenant host: 404 {@code RESOURCE_NOT_FOUND};</li>
  *   <li>malformed, unknown or retired subdomain, a complex that is not operating, or a foreign host:
  *       404 {@code TENANT_NOT_FOUND};</li>
- *   <li>suspended or archived complex: 403 {@code TENANT_UNAVAILABLE}.</li>
+ *   <li>suspended or archived complex: 403 {@code TENANT_UNAVAILABLE}, unless the request announces a support session
+ *       (ADR-020); then it runs in the scope of the complex and {@link SupportAccessGuard} lets only a valid support
+ *       session of the SUPER_ADMIN reach a handler.</li>
  * </ul>
  * The host is {@link HttpServletRequest#getServerName()}: the web server takes it from {@code X-Forwarded-Host} only
  * for requests of trusted proxies ({@code server.tomcat.remoteip.internal-proxies}).
@@ -59,17 +63,22 @@ final class TenantResolutionFilter extends OncePerRequestFilter {
     private void continueInTenant(TenantResolution resolution, HttpServletRequest request,
             HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
         switch (resolution) {
-            case TenantResolution.Active active -> runInScope(active, request, response, chain);
-            case TenantResolution.Unavailable() -> reject(TenancyProblem.TENANT_UNAVAILABLE, request, response);
+            case TenantResolution.Active(TenantId id, String displayName) ->
+                    runInScope(id, new ResolvedTenant(displayName, TenantStatus.ACTIVE), request, response, chain);
+            case TenantResolution.Unavailable(TenantId id, String displayName, TenantStatus status)
+                    when SupportRequests.announceSession(request) ->
+                    runInScope(id, new ResolvedTenant(displayName, status), request, response, chain);
+            case TenantResolution.Unavailable unavailable ->
+                    reject(TenancyProblem.TENANT_UNAVAILABLE, request, response);
             case TenantResolution.NotFound() -> reject(TenancyProblem.TENANT_NOT_FOUND, request, response);
         }
     }
 
-    private static void runInScope(TenantResolution.Active active, HttpServletRequest request,
+    private static void runInScope(TenantId tenantId, ResolvedTenant resolved, HttpServletRequest request,
             HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
-        request.setAttribute(ActiveTenant.REQUEST_ATTRIBUTE, new ActiveTenant(active.displayName()));
+        request.setAttribute(ResolvedTenant.REQUEST_ATTRIBUTE, resolved);
         try {
-            TenantScope.<Void, Exception>call(active.tenantId(), () -> {
+            TenantScope.<Void, Exception>call(tenantId, () -> {
                 chain.doFilter(request, response);
                 return null;
             });

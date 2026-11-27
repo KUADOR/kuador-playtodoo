@@ -403,11 +403,12 @@ class TenantPurgeIT {
                 .update();
         TenantDatabase.admin().sql("""
                         INSERT INTO global.access_audit_event (id, session_id, platform_user_id, tenant_id, reason,
-                            http_method, route_template, outcome, occurred_at)
+                            http_method, route_template, operation_id, outcome, denial_code, occurred_at)
                         VALUES (gen_random_uuid(), :session, :user, :tenant::uuid, :reason, 'GET',
-                                '/api/v1/staff/bookings', 'ALLOWED', now()),
+                                '/api/v1/staff/bookings', 'listStaffBookings', 'ALLOWED', NULL, now()),
                                (gen_random_uuid(), NULL, :user, :tenant::uuid, NULL, 'GET',
-                                '/api/v1/staff/bookings', 'DENIED', now())
+                                '/api/v1/staff/bookings', 'listStaffBookings', 'DENIED', 'SUPPORT_SESSION_INVALID',
+                                now())
                         """)
                 .param("session", session).param("user", kuadorUser).param("tenant", tenant.value())
                 .param("reason", ACCESS_REASON)

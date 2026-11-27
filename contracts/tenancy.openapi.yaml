@@ -37,23 +37,24 @@ info:
     On a tenant host:
     - `STAFF` is accepted only when `tid` is the resolved tenant; otherwise `401 UNAUTHENTICATED`.
     - `PLAYER` is always accepted (players have a global account).
-    - `PLATFORM` is accepted only together with a valid access session (below).
+    - `PLATFORM` is accepted only together with a valid support session (below).
 
-    **Kuador access to a complex (ADR-003, ADR-011).** Only a platform user with role
-    `PLATFORM_OWNER` may open an access session for a complex, with a mandatory reason. The
+    **Kuador support on a complex (ADR-003, ADR-011, ADR-020).** Support sessions are opened, with a
+    mandatory reason, through `platform-backoffice.openapi.yaml` (tag «Support access»). The
     `backoffice` then calls the tenant host with its bearer token plus the header
-    `X-Platform-Access-Session: <sessionId>`. Each such request is audited (method and route
+    `X-Support-Session: <sessionId>`. Each such request is audited (operationId, method and route
     template, never the concrete path or query string) **before** it runs; if the audit cannot be
-    written, access is denied. An expired, closed or foreign session answers
-    `403 ACCESS_SESSION_INVALID`. CORS on tenant hosts allows only the `backoffice` origin besides
-    the host itself.
+    written, access is denied. An expired, closed or foreign session, or a role the status of the
+    complex no longer allows, answers `403 SUPPORT_SESSION_INVALID`. On a suspended or archived
+    complex only a valid support session of the `SUPER_ADMIN` gets through; any other request
+    answers `403 TENANT_UNAVAILABLE`, with or without the header. CORS on tenant hosts allows only
+    the `backoffice` origin besides the host itself.
 
-    **Superseded by PLATODO-27.** The platform tenant and access operations marked `deprecated`
-    are replaced by `platform-backoffice.openapi.yaml` (ADR-014 to ADR-020): the tenant lifecycle
-    now follows the subscription status, `PLATFORM_OWNER` becomes `SUPER_ADMIN` (plus `OPERATOR`),
-    and the access session becomes a support session sent with `X-Support-Session` instead of
-    `X-Platform-Access-Session`. They stay until the `api` tasks of PLATODO-27 remove them; PLATODO-86 removed the lifecycle operations
-    (`suspend`, `activate`, `archive`, `reactivate`, `retention`).
+    **Superseded by PLATODO-27.** The platform tenant operation marked `deprecated` is replaced by
+    `platform-backoffice.openapi.yaml` (ADR-014 to ADR-020). PLATODO-86 removed the lifecycle
+    operations (`suspend`, `activate`, `archive`, `reactivate`, `retention`) and PLATODO-88 the
+    access sessions and their audit (`access-sessions`, `access-audit`), replaced by support
+    sessions and `audit-entries`.
 
     **Errors.** Every error uses Problem Details (RFC 9457) with a stable machine-readable `code`.
     Clients map `code` to the user-facing text; `title` and `detail` are for developers and logs
@@ -72,8 +73,6 @@ tags:
     description: Subdomain suggestion and availability used while registering a complex. Global host.
   - name: Platform tenants
     description: Tenant registration and lifecycle, used by `backoffice`. Global host, platform token.
-  - name: Platform access
-    description: Audited access sessions of the Kuador owner to a complex. Global host, platform token.
 security:
   - bearerAuth: []
 paths:
@@ -399,160 +398,6 @@ paths:
           $ref: '#/components/responses/SubdomainTaken'
         '422':
           $ref: '#/components/responses/SubdomainRejected'
-  /platform/tenants/{tenantId}/access-sessions:
-    post:
-      tags: [Platform access]
-      operationId: openAccessSession
-      deprecated: true
-      x-replaced-by: 'POST /complexes/{complexId}/support-sessions (platform-backoffice.openapi.yaml)'
-      summary: Open an audited access session to a complex.
-      description: |
-        Only role `PLATFORM_OWNER`. The reason is mandatory (non-blank) and is stored in the audit.
-        It must not contain personal data; it is anonymized when the complex is purged. The session
-        lasts 30 minutes by default (security setting) and only grants access on `tenantHost`.
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OpenAccessSessionRequest'
-            examples:
-              complaint:
-                value:
-                  reason: Complaint about a duplicated booking, ticket 1234
-      responses:
-        '201':
-          description: Access session opened.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccessSession'
-              examples:
-                opened:
-                  value:
-                    sessionId: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
-                    expiresAt: '2026-12-01T15:30:00Z'
-                    tenantHost: canchas-el-sol.playtodoo.com
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/PlatformTenantNotFound'
-        '422':
-          description: '`REASON_REQUIRED`: the reason is missing or blank.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-              examples:
-                reasonRequired:
-                  value:
-                    type: https://playtodoo.com/problems/reason-required
-                    title: Reason required
-                    status: 422
-                    detail: An access session needs a non-blank reason.
-                    code: REASON_REQUIRED
-  /platform/access-sessions/{sessionId}:
-    delete:
-      tags: [Platform access]
-      operationId: closeAccessSession
-      deprecated: true
-      x-replaced-by: 'DELETE /support-sessions/{sessionId} (platform-backoffice.openapi.yaml)'
-      summary: Close an access session before it expires.
-      description: Only the platform user who opened it. Closing an already closed or expired session is a no-op.
-      parameters:
-        - name: sessionId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-          example: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
-      responses:
-        '204':
-          description: Session closed.
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          description: '`ACCESS_SESSION_NOT_FOUND`: no session with this id for the caller.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-              examples:
-                notFound:
-                  value:
-                    type: https://playtodoo.com/problems/access-session-not-found
-                    title: Access session not found
-                    status: 404
-                    code: ACCESS_SESSION_NOT_FOUND
-  /platform/tenants/{tenantId}/access-audit:
-    get:
-      tags: [Platform access]
-      operationId: listAccessAudit
-      deprecated: true
-      x-replaced-by: 'GET /complexes/{complexId}/audit-entries (platform-backoffice.openapi.yaml)'
-      summary: List the audited Kuador accesses to a complex.
-      description: |
-        Only role `PLATFORM_OWNER`. Newest first. Also available for purged complexes: their
-        reasons are anonymized and `reasonRedacted` is `true`.
-      parameters:
-        - $ref: '#/components/parameters/TenantId'
-        - name: page
-          in: query
-          description: Zero-based page index.
-          schema:
-            type: integer
-            format: int32
-            minimum: 0
-            default: 0
-        - name: size
-          in: query
-          description: Page size.
-          schema:
-            type: integer
-            format: int32
-            minimum: 1
-            maximum: 100
-            default: 20
-      responses:
-        '200':
-          description: One page of audit events.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AccessAuditPage'
-              examples:
-                page:
-                  value:
-                    items:
-                      - id: 7d8e9f0a-1b2c-4d3e-8f4a-5b6c7d8e9f0a
-                        sessionId: 2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f
-                        platformUserId: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
-                        reason: Complaint about a duplicated booking, ticket 1234
-                        reasonRedacted: false
-                        httpMethod: GET
-                        routeTemplate: /api/v1/staff/bookings/{bookingId}
-                        outcome: ALLOWED
-                        occurredAt: '2026-12-01T15:02:10Z'
-                    page: 0
-                    size: 20
-                    totalItems: 1
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/PlatformTenantNotFound'
 components:
   securitySchemes:
     bearerAuth:
@@ -560,16 +405,6 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: Access token issued by one of the login operations.
-  parameters:
-    TenantId:
-      name: tenantId
-      in: path
-      required: true
-      description: Tenant id (not the subdomain).
-      schema:
-        type: string
-        format: uuid
-      example: 5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c
   schemas:
     TenantStatus:
       type: string
@@ -723,88 +558,11 @@ components:
           format: int32
           minimum: 1
           description: Lifetime of the token in seconds.
-    OpenAccessSessionRequest:
-      type: object
-      additionalProperties: false
-      required: [reason]
-      properties:
-        reason:
-          type: string
-          maxLength: 500
-          description: Why Kuador needs to access the complex. Must not contain personal data.
-    AccessSession:
-      type: object
-      additionalProperties: false
-      required: [sessionId, expiresAt, tenantHost]
-      properties:
-        sessionId:
-          type: string
-          format: uuid
-          description: Value of the `X-Platform-Access-Session` header on the tenant host.
-        expiresAt:
-          type: string
-          format: date-time
-        tenantHost:
-          type: string
-          description: Host of the complex where the session is valid.
-    AccessAuditEvent:
-      type: object
-      additionalProperties: false
-      required: [id, sessionId, platformUserId, reason, reasonRedacted, httpMethod, routeTemplate, outcome, occurredAt]
-      properties:
-        id:
-          type: string
-          format: uuid
-        sessionId:
-          type: [string, 'null']
-          format: uuid
-          description: Null when the request was denied before a valid session was found.
-        platformUserId:
-          type: string
-          format: uuid
-        reason:
-          type: [string, 'null']
-          description: Reason of the session. After a purge it is replaced by a fixed anonymized text.
-        reasonRedacted:
-          type: boolean
-        httpMethod:
-          type: string
-          examples: [GET]
-        routeTemplate:
-          type: string
-          description: Route template, never the concrete path or query string.
-        outcome:
-          type: string
-          enum: [ALLOWED, DENIED]
-        occurredAt:
-          type: string
-          format: date-time
-    AccessAuditPage:
-      type: object
-      additionalProperties: false
-      required: [items, page, size, totalItems]
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/AccessAuditEvent'
-        page:
-          type: integer
-          format: int32
-          minimum: 0
-        size:
-          type: integer
-          format: int32
-          minimum: 1
-        totalItems:
-          type: integer
-          format: int64
-          minimum: 0
     ProblemCode:
       type: string
       description: |
         Stable machine-readable error code. Clients map it to the user-facing text.
-        `RESOURCE_NOT_FOUND` and `ACCESS_SESSION_INVALID` are answered by tenant-host operations of
+        `RESOURCE_NOT_FOUND` and `SUPPORT_SESSION_INVALID` are answered by tenant-host operations of
         every contract.
       enum:
         - TENANT_NOT_FOUND
@@ -813,14 +571,12 @@ components:
         - INVALID_CREDENTIALS
         - UNAUTHENTICATED
         - FORBIDDEN
-        - ACCESS_SESSION_INVALID
-        - ACCESS_SESSION_NOT_FOUND
+        - SUPPORT_SESSION_INVALID
         - INVALID_REQUEST
         - SUBDOMAIN_TAKEN
         - SUBDOMAIN_INVALID
         - SUBDOMAIN_RESERVED
         - INVALID_TRANSITION
-        - REASON_REQUIRED
     Problem:
       type: object
       description: Problem Details (RFC 9457) with a stable `code` extension.
@@ -919,15 +675,6 @@ components:
               $ref: '#/components/examples/TenantUnavailableProblem'
     TenantNotFound:
       description: '`TENANT_NOT_FOUND`: malformed, unknown or retired subdomain, or a purged complex.'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-          examples:
-            tenantNotFound:
-              $ref: '#/components/examples/TenantNotFoundProblem'
-    PlatformTenantNotFound:
-      description: '`TENANT_NOT_FOUND`: no tenant with this id.'
       content:
         application/problem+json:
           schema:

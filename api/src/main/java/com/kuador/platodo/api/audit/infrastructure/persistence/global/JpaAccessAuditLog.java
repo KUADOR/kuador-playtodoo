@@ -1,5 +1,6 @@
 package com.kuador.platodo.api.audit.infrastructure.persistence.global;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,18 +30,22 @@ public final class JpaAccessAuditLog implements AccessAuditLog {
     }
 
     @Override
-    public AuditPage pageOf(TenantId tenant, PageRequest page) {
+    public AuditPage pageOf(TenantId tenant, Instant since, PageRequest page) {
         UUID tenantId = UUID.fromString(tenant.value());
         long total = global.createQuery("""
-                        SELECT count(e) FROM AccessAuditEventEntity e WHERE e.tenantId = :tenant
+                        SELECT count(e) FROM AccessAuditEventEntity e
+                        WHERE e.tenantId = :tenant AND e.occurredAt >= :since
                         """, Long.class)
                 .setParameter("tenant", tenantId)
+                .setParameter("since", since)
                 .getSingleResult();
         List<AccessAuditEvent> items = global.createQuery("""
-                        SELECT e FROM AccessAuditEventEntity e WHERE e.tenantId = :tenant
+                        SELECT e FROM AccessAuditEventEntity e
+                        WHERE e.tenantId = :tenant AND e.occurredAt >= :since
                         ORDER BY e.occurredAt DESC, e.id
                         """, AccessAuditEventEntity.class)
                 .setParameter("tenant", tenantId)
+                .setParameter("since", since)
                 .setFirstResult(Math.toIntExact(page.offset()))
                 .setMaxResults(page.size())
                 .getResultList()
