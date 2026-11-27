@@ -12,11 +12,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import com.kuador.platodo.api.tenancy.application.RequestHosts;
 import com.kuador.platodo.api.tenancy.application.ResolveTenant;
-import com.kuador.platodo.api.tenancy.application.port.out.PlatformAccessAuthorization;
+import com.kuador.platodo.api.tenancy.application.port.in.SupportGrants;
+import com.kuador.platodo.api.tenancy.application.port.out.SupportAccessAuthorization;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantDomains;
 
 /**
- * Tenant resolution by subdomain for every api request (ADR-002, ADR-012), the guard of Kuador access to a complex
+ * Tenant resolution by subdomain for every api request (ADR-002, ADR-012), the guard of Kuador support on a complex
  * and the CORS of the api (ADR-011).
  */
 @Configuration(proxyBeanMethods = false)
@@ -59,14 +60,20 @@ class TenancyWebConfiguration {
     }
 
     @Bean
-    WebMvcConfigurer platformAccessGuard(PlatformAccessAuthorization authorization) {
-        PlatformAccessGuard guard = new PlatformAccessGuard(authorization);
+    WebMvcConfigurer supportAccessGuard(SupportAccessAuthorization authorization) {
+        SupportAccessGuard guard = new SupportAccessGuard(authorization);
         return new WebMvcConfigurer() {
             @Override
             public void addInterceptors(InterceptorRegistry registry) {
                 registry.addInterceptor(guard).addPathPatterns(API_PATH_PATTERN);
             }
         };
+    }
+
+    /** The grants {@link SupportAccessGuard} records, for the modules whose operations support may use. */
+    @Bean
+    SupportGrants supportGrants() {
+        return new RequestSupportGrants();
     }
 
     @Bean

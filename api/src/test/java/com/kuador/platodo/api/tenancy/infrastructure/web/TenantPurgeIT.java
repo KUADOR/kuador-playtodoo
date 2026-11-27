@@ -109,6 +109,7 @@ class TenantPurgeIT {
         assertThat(sessionReasonsOf(purged)).containsExactly(REDACTED_REASON);
         assertThat(eventReasonsOf(purged)).containsExactlyInAnyOrder(REDACTED_REASON, null);
         assertThat(unredactedRowsOf(purged)).isZero();
+        assertThat(openSessionsOf(purged)).isZero();
         assertThat(purgeEvents.countFor(purged)).isEqualTo(1);
     }
 
@@ -131,6 +132,7 @@ class TenantPurgeIT {
         api.tenantState(keptSubdomain).andExpect(status().isOk());
         assertThat(sessionReasonsOf(kept)).containsExactly(ACCESS_REASON);
         assertThat(eventReasonsOf(kept)).containsExactlyInAnyOrder(ACCESS_REASON, null);
+        assertThat(openSessionsOf(kept)).isOne();
         assertThat(outboxFor(kept)).isEmpty();
         assertThat(purgeEvents.countFor(kept)).isZero();
     }
@@ -302,11 +304,12 @@ class TenantPurgeIT {
                 .update();
         TenantDatabase.admin().sql("""
                         INSERT INTO global.access_audit_event (id, session_id, platform_user_id, tenant_id, reason,
-                            http_method, route_template, outcome, occurred_at)
+                            http_method, route_template, operation_id, outcome, denial_code, occurred_at)
                         VALUES (gen_random_uuid(), :session, :user, :tenant::uuid, :reason, 'GET',
-                                '/api/v1/staff/bookings', 'ALLOWED', now()),
+                                '/api/v1/staff/bookings', 'listStaffBookings', 'ALLOWED', NULL, now()),
                                (gen_random_uuid(), NULL, :user, :tenant::uuid, NULL, 'GET',
-                                '/api/v1/staff/bookings', 'DENIED', now())
+                                '/api/v1/staff/bookings', 'listStaffBookings', 'DENIED', 'SUPPORT_SESSION_INVALID',
+                                now())
                         """)
                 .param("session", session).param("user", kuadorUser).param("tenant", tenant.value())
                 .param("reason", ACCESS_REASON)
@@ -349,6 +352,14 @@ class TenantPurgeIT {
                         """)
                 .param("tenant", tenant.value())
                 .query().listOfRows();
+    }
+
+    /** ADR-020: the purge invalidates the support sessions still open on the complex. */
+    private static long openSessionsOf(TenantId tenant) {
+        return TenantDatabase.admin()
+                .sql("SELECT count(*) FROM global.access_session WHERE tenant_id = :id::uuid AND closed_at IS NULL")
+                .param("id", tenant.value())
+                .query(Long.class).single();
     }
 
     private static List<String> sessionReasonsOf(TenantId tenant) {

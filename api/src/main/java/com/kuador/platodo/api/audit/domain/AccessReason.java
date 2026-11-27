@@ -1,7 +1,9 @@
 package com.kuador.platodo.api.audit.domain;
 
+import java.util.Optional;
+
 /**
- * Why the Kuador owner opens an access session to a complex (ADR-003): mandatory, trimmed and at most
+ * Why a Kuador team member opens a support session on a complex (ADR-003, ADR-020): mandatory, trimmed and at most
  * {@value #MAX_LENGTH} characters. It is free text, so it may hold personal data despite the guidance of the
  * backoffice; the purge of the complex anonymizes it.
  */
@@ -24,5 +26,11 @@ public record AccessReason(String value) {
         if (value.length() > MAX_LENGTH) {
             throw new ReasonTooLongException();
         }
+    }
+
+    /** The reason {@code value} stands for; empty when it is missing, blank or too long. */
+    public static Optional<AccessReason> parse(String value) {
+        boolean acceptable = value != null && !value.isBlank() && value.strip().length() <= MAX_LENGTH;
+        return acceptable ? Optional.of(new AccessReason(value)) : Optional.empty();
     }
 }

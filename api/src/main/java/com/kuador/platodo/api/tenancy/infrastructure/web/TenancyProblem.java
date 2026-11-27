@@ -6,7 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 
 /**
- * Problem Details answered by Tenancy: tenant resolution, the platform access guard, the lifecycle and the subdomain
+ * Problem Details answered by Tenancy: tenant resolution, the support access guard, the lifecycle and the subdomain
  * operations ({@code contracts/tenancy.openapi.yaml}). Title and detail are developer-facing; clients map {@code code}
  * to the text shown to people. Details never name the host, the state or personal data.
  */
@@ -37,8 +37,8 @@ enum TenancyProblem {
     PROVISIONING_INCOMPLETE(HttpStatus.CONFLICT, "invalid-transition", "Invalid lifecycle transition",
             "The owner account of the complex is missing, so its provisioning cannot be completed.",
             "INVALID_TRANSITION"),
-    ACCESS_SESSION_INVALID(HttpStatus.FORBIDDEN, "access-session-invalid", "Access session invalid",
-            "A valid access session for this complex is required.");
+    SUPPORT_SESSION_INVALID(HttpStatus.FORBIDDEN, "support-session-invalid", "Support session invalid",
+            "A valid support session for this complex is required.");
 
     private static final String TYPE_BASE = "https://playtodoo.com/problems/";
     private static final String CODE = "code";

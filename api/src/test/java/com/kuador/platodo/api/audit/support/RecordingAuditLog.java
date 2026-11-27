@@ -1,5 +1,6 @@
 package com.kuador.platodo.api.audit.support;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -32,9 +33,10 @@ public final class RecordingAuditLog implements AccessAuditLog {
     }
 
     @Override
-    public AuditPage pageOf(TenantId tenant, PageRequest page) {
-        List<AccessAuditEvent> ofTenant = new ArrayList<>(
-                events.stream().filter(event -> event.tenant().equals(tenant)).toList());
+    public AuditPage pageOf(TenantId tenant, Instant since, PageRequest page) {
+        List<AccessAuditEvent> ofTenant = new ArrayList<>(events.stream()
+                .filter(event -> event.tenant().equals(tenant) && !event.occurredAt().isBefore(since))
+                .toList());
         ofTenant.sort(Comparator.comparing(AccessAuditEvent::occurredAt).reversed());
         return new AuditPage(ofTenant.stream().skip(page.offset()).limit(page.size()).toList(), ofTenant.size());
     }

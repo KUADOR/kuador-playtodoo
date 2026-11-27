@@ -185,7 +185,7 @@ class StaffTenantIsolationIT {
     }
 
     @Test
-    void aPlatformTokenNeedsAnAccessSessionOnTheHostOfAComplex() throws Exception {
+    void aPlatformTokenNeedsASupportSessionOnTheHostOfAComplex() throws Exception {
         String email = TestAccounts.uniqueEmail("owner");
         TestAccounts.platformOwner(email);
         String platformLogin = "/api/v1/auth/platform/login";
@@ -196,7 +196,7 @@ class StaffTenantIsolationIT {
 
         listBookings(A, token)
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_SESSION_INVALID"));
+                .andExpect(jsonPath("$.code").value("SUPPORT_SESSION_INVALID"));
     }
 
     @Test

@@ -28,4 +28,18 @@ class AccessReasonTest {
         assertThatThrownBy(() -> new AccessReason("x".repeat(AccessReason.MAX_LENGTH + 1)))
                 .isInstanceOf(ReasonTooLongException.class);
     }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   ", "\t\n"})
+    void parsingAMissingOrBlankReasonGivesNone(String blank) {
+        assertThat(AccessReason.parse(blank)).isEmpty();
+    }
+
+    @Test
+    void parsingKeepsTheLimitAndTrims() {
+        assertThat(AccessReason.parse("  Ticket 1234  ")).contains(new AccessReason("Ticket 1234"));
+        assertThat(AccessReason.parse("x".repeat(AccessReason.MAX_LENGTH))).isPresent();
+        assertThat(AccessReason.parse("x".repeat(AccessReason.MAX_LENGTH + 1))).isEmpty();
+    }
 }

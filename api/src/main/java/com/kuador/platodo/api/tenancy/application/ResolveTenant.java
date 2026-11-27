@@ -11,7 +11,6 @@ import com.kuador.platodo.api.tenancy.domain.Subdomain;
 public final class ResolveTenant {
 
     private static final TenantResolution NOT_FOUND = new TenantResolution.NotFound();
-    private static final TenantResolution UNAVAILABLE = new TenantResolution.Unavailable();
 
     private final TenantDomains domains;
 
@@ -29,7 +28,8 @@ public final class ResolveTenant {
     private static TenantResolution byStatus(DomainOwner owner) {
         return switch (owner.status()) {
             case ACTIVE -> new TenantResolution.Active(owner.tenantId(), owner.displayName());
-            case SUSPENDED, ARCHIVED -> UNAVAILABLE;
+            case SUSPENDED, ARCHIVED ->
+                    new TenantResolution.Unavailable(owner.tenantId(), owner.displayName(), owner.status());
             case PROVISIONING, PROVISIONING_FAILED, PURGING, PURGED -> NOT_FOUND;
         };
     }

@@ -1,4 +1,4 @@
-# CI of the api piece (Java 25 · Spring Boot 4). Runs only when api/ or this workflow changes.
+# CI of the api piece (Java 25 · Spring Boot 4). Runs when api/, the contracts its tests read or this workflow change.
 # Integration tests (*IT) use Testcontainers: GitHub-hosted ubuntu runners ship a running Docker daemon.
 name: api
 
@@ -7,11 +7,15 @@ on:
     branches: [main, develop]
     paths:
       - 'api/**'
+      - 'contracts/bookings.openapi.yaml'
+      - 'contracts/tenancy.openapi.yaml'
       - '.github/workflows/api.yml'
   push:
     branches: [main, develop]
     paths:
       - 'api/**'
+      - 'contracts/bookings.openapi.yaml'
+      - 'contracts/tenancy.openapi.yaml'
       - '.github/workflows/api.yml'
 
 permissions:

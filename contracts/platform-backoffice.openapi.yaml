@@ -726,7 +726,7 @@ paths:
                           displayName: Sam Example
                         reason: Complaint about a duplicated booking, ticket 1234
                         reasonRedacted: false
-                        operationId: cancelStaffBooking
+                        operationId: cancelBookingByStaff
                         httpMethod: POST
                         pathTemplate: /api/v1/staff/bookings/{bookingId}/cancel
                         result: ALLOWED

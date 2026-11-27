@@ -37,7 +37,7 @@ class ResolveTenantTest {
     void aSuspendedOrArchivedComplexIsUnavailable_criterion3(TenantStatus status) {
         domains.add("elsol", status);
 
-        assertThat(resolveTenant.resolve("elsol")).isEqualTo(new TenantResolution.Unavailable());
+        assertThat(resolveTenant.resolve("elsol")).isEqualTo(new TenantResolution.Unavailable(TENANT, NAME, status));
     }
 
     @ParameterizedTest

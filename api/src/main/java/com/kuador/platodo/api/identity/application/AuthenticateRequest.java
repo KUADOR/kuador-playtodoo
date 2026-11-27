@@ -19,8 +19,8 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantScope;
  *       active there. Elsewhere, the global host included, it is not accepted.</li>
  *   <li>{@code PLAYER}: on every host, while the global account is active.</li>
  *   <li>{@code PLATFORM}: on every host while the account is active. On the host of a complex the request still
- *       needs a valid access session: Tenancy's {@code PlatformAccessGuard} checks and audits it before the handler
- *       runs (ADR-011).</li>
+ *       needs a valid support session: Tenancy's {@code SupportAccessGuard} checks and audits it before the handler
+ *       runs (ADR-011, ADR-020).</li>
  * </ul>
  */
 public final class AuthenticateRequest {
