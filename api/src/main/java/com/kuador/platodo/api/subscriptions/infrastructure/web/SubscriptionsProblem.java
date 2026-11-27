@@ -43,7 +43,12 @@ enum SubscriptionsProblem {
     PLAN_NOT_PUBLISHED(HttpStatus.UNPROCESSABLE_CONTENT, "plan-not-published", "Plan not published",
             "The plan does not exist or is a draft."),
     NOT_PROVISIONING_FAILED(HttpStatus.CONFLICT, "not-provisioning-failed", "Provisioning did not fail",
-            "The complex is not waiting for a provisioning retry.");
+            "The complex is not waiting for a provisioning retry."),
+    SAME_PLAN(HttpStatus.UNPROCESSABLE_CONTENT, "same-plan", "Same plan", "The complex already has this plan."),
+    SUBSCRIPTION_CANCELLED(HttpStatus.UNPROCESSABLE_CONTENT, "subscription-cancelled", "Subscription cancelled",
+            "A cancelled subscription keeps its plan."),
+    TRANSITION_NOT_ALLOWED(HttpStatus.UNPROCESSABLE_CONTENT, "transition-not-allowed", "Transition not allowed",
+            "The target status is not in allowedTransitions.");
 
     private static final String TYPE_BASE = "https://playtodoo.com/problems/";
     private static final String CODE = "code";

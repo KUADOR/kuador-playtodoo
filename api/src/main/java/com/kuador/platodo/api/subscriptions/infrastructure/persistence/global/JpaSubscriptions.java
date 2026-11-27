@@ -10,6 +10,7 @@ import com.kuador.platodo.api.subscriptions.domain.Subscription;
 import com.kuador.platodo.api.subscriptions.domain.SubscriptionStatus;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Subscriptions through the global persistence unit. {@code tenant_id} is unique: one subscription per complex. */
@@ -47,6 +48,21 @@ public final class JpaSubscriptions implements Subscriptions {
     }
 
     @Override
+    public Optional<Subscription> lockByTenant(UUID tenantId) {
+        return lockedRow(tenantId).map(this::toSubscription);
+    }
+
+    @Override
+    public void update(Subscription subscription) {
+        SubscriptionEntity row = global.find(SubscriptionEntity.class, subscription.id());
+        if (row == null) {
+            throw new IllegalStateException("No subscription " + subscription.id());
+        }
+        row.apply(subscription.plan().planId(), snapshots.write(subscription.plan()), subscription.status().name(),
+                subscription.statusSince(), subscription.statusChangedBy(), subscription.version());
+    }
+
+    @Override
     public SubscriptionPage page(PageRequest page) {
         List<Subscription> items = global.createQuery(NEWEST_FIRST, SubscriptionEntity.class)
                 .setFirstResult(Math.toIntExact(page.offset()))
@@ -55,6 +71,14 @@ public final class JpaSubscriptions implements Subscriptions {
                 .map(this::toSubscription)
                 .toList();
         return new SubscriptionPage(items, global.createQuery(COUNT, Long.class).getSingleResult());
+    }
+
+    private Optional<SubscriptionEntity> lockedRow(UUID tenantId) {
+        return global.createQuery(BY_TENANT, SubscriptionEntity.class)
+                .setParameter("tenantId", tenantId)
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                .getResultList().stream()
+                .findFirst();
     }
 
     private Subscription toSubscription(SubscriptionEntity row) {

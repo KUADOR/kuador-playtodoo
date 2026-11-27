@@ -29,9 +29,6 @@ import com.kuador.platodo.api.subscriptions.domain.PlanStatus;
 @RequestMapping(PlansApiPaths.PLATFORM)
 class PlanController {
 
-    private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int MAX_PAGE_SIZE = 100;
-
     private final ListPlans listPlans;
     private final GetPlan getPlan;
     private final CreatePlan createPlan;
@@ -51,13 +48,9 @@ class PlanController {
 
     @GetMapping(PlansApiPaths.PLANS)
     PlanPageResponse list(@RequestParam(required = false) PlanStatus status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size) {
-        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
-            throw new InvalidSubscriptionsRequestException(
-                    "`page` must be >= 0 and `size` between 1 and %d.".formatted(MAX_PAGE_SIZE));
-        }
-        PageRequest pageRequest = new PageRequest(page, size);
+            @RequestParam(defaultValue = PageParameters.FIRST_PAGE) int page,
+            @RequestParam(defaultValue = PageParameters.DEFAULT_SIZE) int size) {
+        PageRequest pageRequest = PageParameters.of(page, size);
         return PlanPageResponse.of(listPlans.list(Optional.ofNullable(status), pageRequest), pageRequest);
     }
 

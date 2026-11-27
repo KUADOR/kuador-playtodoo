@@ -14,10 +14,22 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import com.kuador.platodo.api.tenancy.application.RequestHosts;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantDirectory;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
+import com.kuador.platodo.api.tenancy.application.port.in.TenantProfileLock;
 import com.kuador.platodo.api.tenancy.domain.TenantStatus;
 
-/** Reads a complex and its current subdomain from {@code global.tenant} and {@code global.tenant_domain}. */
-public final class JdbcTenantDirectory implements TenantDirectory {
+/**
+ * Reads a complex and its current subdomain from {@code global.tenant} and {@code global.tenant_domain}, and locks its
+ * {@code global.tenant} row for the global transaction of the caller (the shared pool is the data source of the global
+ * transaction manager, so the lock joins that transaction).
+ */
+public final class JdbcTenantDirectory implements TenantDirectory, TenantProfileLock {
+
+    private static final String PROFILE = """
+            SELECT t.id::text AS id, t.display_name, t.status, d.subdomain, t.owner_email, t.created_at,
+                   t.suspended_at, t.archived_at, t.retention_days, t.purge_due_at, t.purged_at, t.version
+            FROM global.tenant t
+            LEFT JOIN global.tenant_domain d ON d.tenant_id = t.id AND d.is_current
+            """;
 
     private final JdbcClient global;
     private final RequestHosts hosts;
@@ -54,16 +66,22 @@ public final class JdbcTenantDirectory implements TenantDirectory {
         if (ids.isEmpty()) {
             return List.of();
         }
-        return global.sql("""
-                        SELECT t.id::text AS id, t.display_name, t.status, d.subdomain, t.owner_email, t.created_at,
-                               t.suspended_at, t.archived_at, t.retention_days, t.purge_due_at, t.purged_at, t.version
-                        FROM global.tenant t
-                        LEFT JOIN global.tenant_domain d ON d.tenant_id = t.id AND d.is_current
-                        WHERE t.id IN (:ids)
-                        """)
+        return global.sql(PROFILE + "WHERE t.id IN (:ids)")
                 .param("ids", ids)
                 .query((row, number) -> profileOf(row))
                 .list();
+    }
+
+    @Override
+    public Optional<TenantProfile> lock(TenantId tenant) {
+        Optional<UUID> id = uuidOf(tenant);
+        if (id.isEmpty()) {
+            return Optional.empty();
+        }
+        return global.sql(PROFILE + "WHERE t.id = :id FOR UPDATE OF t")
+                .param("id", id.get())
+                .query((row, number) -> profileOf(row))
+                .optional();
     }
 
     private static TenantProfile profileOf(ResultSet row) throws SQLException {
