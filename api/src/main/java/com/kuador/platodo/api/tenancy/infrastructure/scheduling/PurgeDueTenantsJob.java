@@ -8,7 +8,8 @@ import com.kuador.platodo.api.tenancy.application.PurgeDueTenants;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 
 /**
- * Daily permanent deletion of the complexes whose archive expired (ADR-013), at {@code tenancy.purge.cron} in UTC.
+ * Daily permanent deletion of the suspended and archived complexes whose retention ended (ADR-013, ADR-015), at
+ * {@code tenancy.purge.cron} in UTC.
  * Safe on several api instances at once: see {@link PurgeDueTenants}.
  */
 public class PurgeDueTenantsJob {
@@ -24,7 +25,7 @@ public class PurgeDueTenantsJob {
     @Scheduled(cron = "${tenancy.purge.cron}", zone = "UTC")
     public void run() {
         int claimed = purge.claimDue();
-        log.info("Claimed {} archived complexes for their permanent deletion", claimed);
+        log.info("Claimed {} complexes for their permanent deletion", claimed);
         purge.pending().forEach(this::purgeOne);
     }
 

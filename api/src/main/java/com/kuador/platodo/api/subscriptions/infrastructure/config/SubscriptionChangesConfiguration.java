@@ -1,9 +1,11 @@
 package com.kuador.platodo.api.subscriptions.infrastructure.config;
 
 import java.time.Clock;
+import java.time.Duration;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +20,7 @@ import com.kuador.platodo.api.subscriptions.application.ChangeComplexRetention;
 import com.kuador.platodo.api.subscriptions.application.ChangeSubscriptionStatus;
 import com.kuador.platodo.api.subscriptions.application.ComplexDetails;
 import com.kuador.platodo.api.subscriptions.application.ComplexLocks;
+import com.kuador.platodo.api.subscriptions.application.DeleteExpiredSubscriptionHistory;
 import com.kuador.platodo.api.subscriptions.application.ListComplexHistory;
 import com.kuador.platodo.api.subscriptions.application.ListComplexPayments;
 import com.kuador.platodo.api.subscriptions.application.RecordComplexPayment;
@@ -27,6 +30,7 @@ import com.kuador.platodo.api.subscriptions.application.port.out.SubscriptionHis
 import com.kuador.platodo.api.subscriptions.application.port.out.SubscriptionPayments;
 import com.kuador.platodo.api.subscriptions.application.port.out.Subscriptions;
 import com.kuador.platodo.api.subscriptions.infrastructure.events.SpringSubscriptionEvents;
+import com.kuador.platodo.api.subscriptions.infrastructure.persistence.global.JpaExpiredSubscriptionHistory;
 import com.kuador.platodo.api.subscriptions.infrastructure.persistence.global.JpaSubscriptionHistory;
 import com.kuador.platodo.api.subscriptions.infrastructure.persistence.global.JpaSubscriptionPayments;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantProfileLock;
@@ -49,12 +53,16 @@ class SubscriptionChangesConfiguration {
     private final EntityManager global;
     private final TransactionTemplate globalTransaction;
     private final Clock clock;
+    private final Duration historyRetention;
 
+    /** @param historyRetentionDays how long the history is kept (ADR-016: 365 by decision of Kuador) */
     SubscriptionChangesConfiguration(@Qualifier(GLOBAL_ENTITY_MANAGER_FACTORY) EntityManagerFactory global,
-            @Qualifier(GLOBAL_TRANSACTIONS) PlatformTransactionManager globalTx, ObjectProvider<Clock> clock) {
+            @Qualifier(GLOBAL_TRANSACTIONS) PlatformTransactionManager globalTx, ObjectProvider<Clock> clock,
+            @Value("${playtodoo.history.retention-days}") int historyRetentionDays) {
         this.global = SharedEntityManagerCreator.createSharedEntityManager(global);
         this.globalTransaction = new TransactionTemplate(globalTx);
         this.clock = clock.getIfAvailable(Clock::systemUTC);
+        this.historyRetention = Duration.ofDays(historyRetentionDays);
     }
 
     @Bean
@@ -114,6 +122,12 @@ class SubscriptionChangesConfiguration {
     @Bean
     ListComplexHistory listComplexHistory(CapabilityGuard guard, ComplexDetails details,
             SubscriptionHistory history, PlatformUserNames userNames) {
-        return new ListComplexHistory(guard, details, history, userNames, clock);
+        return new ListComplexHistory(guard, details, history, userNames, clock, historyRetention);
+    }
+
+    @Bean
+    DeleteExpiredSubscriptionHistory deleteExpiredSubscriptionHistory() {
+        return new DeleteExpiredSubscriptionHistory(new JpaExpiredSubscriptionHistory(global), globalTransaction,
+                clock, historyRetention);
     }
 }

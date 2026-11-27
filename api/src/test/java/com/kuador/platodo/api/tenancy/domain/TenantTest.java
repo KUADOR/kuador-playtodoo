@@ -236,9 +236,23 @@ class TenantTest {
                 .isInstanceOf(InvalidTransitionException.class);
     }
 
+    /** PLATODO-27 CA10 (ADR-015): a suspended complex is purged as well once its purge date is reached. */
+    @Test
+    void aSuspendedComplexStartsItsPurgeFromThePurgeDateOn() {
+        Tenant suspended = active().suspend(T1, RETENTION);
+
+        Tenant purging = suspended.startPurge(suspended.purgeDueAt());
+
+        assertThat(purging.status()).isEqualTo(TenantStatus.PURGING);
+        assertThat(purging.suspendedAt()).isEqualTo(T1);
+        assertThat(purging.purgeDueAt()).isEqualTo(suspended.purgeDueAt());
+        assertThatThrownBy(() -> suspended.startPurge(suspended.purgeDueAt().minusMillis(1)))
+                .isInstanceOf(InvalidTransitionException.class);
+    }
+
     @ParameterizedTest
-    @EnumSource(value = TenantStatus.class, names = "ARCHIVED", mode = EnumSource.Mode.EXCLUDE)
-    void onlyArchivedComplexesStartAPurge(TenantStatus status) {
+    @EnumSource(value = TenantStatus.class, names = {"SUSPENDED", "ARCHIVED"}, mode = EnumSource.Mode.EXCLUDE)
+    void onlySuspendedAndArchivedComplexesStartAPurge(TenantStatus status) {
         assertInvalid(status, tenant -> tenant.startPurge(T1));
     }
 

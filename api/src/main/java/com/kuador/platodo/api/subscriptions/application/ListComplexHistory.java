@@ -19,29 +19,29 @@ import com.kuador.platodo.api.subscriptions.domain.SubscriptionHistoryEntry;
  */
 public final class ListComplexHistory {
 
-    /** History is kept for one year (PLATODO-27, decision of the Kuador team). */
-    static final Duration RETENTION = Duration.ofDays(365);
-
     private final CapabilityGuard guard;
     private final ComplexDetails details;
     private final SubscriptionHistory history;
     private final PlatformUserNames userNames;
     private final Clock clock;
+    private final Duration retention;
 
+    /** @param retention how long the history is kept (PLATODO-27: one year by decision of the Kuador team) */
     public ListComplexHistory(CapabilityGuard guard, ComplexDetails details, SubscriptionHistory history,
-            PlatformUserNames userNames, Clock clock) {
+            PlatformUserNames userNames, Clock clock, Duration retention) {
         this.guard = guard;
         this.details = details;
         this.history = history;
         this.userNames = userNames;
         this.clock = clock;
+        this.retention = retention;
     }
 
     /** @throws ComplexNotFoundException if no complex has this id */
     public HistoryItem.Page list(UUID complexId, PageRequest page) {
         guard.requirePlatformUser();
         details.requireExists(complexId);
-        HistoryPage found = history.page(complexId, clock.instant().minus(RETENTION), page);
+        HistoryPage found = history.page(complexId, clock.instant().minus(retention), page);
         Function<UUID, String> names = PlatformUserNamesInBatch.of(userNames,
                 found.items().stream().map(SubscriptionHistoryEntry::changedBy).toList());
         return new HistoryItem.Page(found.items().stream()

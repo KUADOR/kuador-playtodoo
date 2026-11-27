@@ -18,17 +18,20 @@ import com.kuador.platodo.api.tenancy.application.port.out.TenantSchemas;
 import com.kuador.platodo.api.tenancy.domain.Tenant;
 import com.kuador.platodo.api.tenancy.domain.TenantStatus;
 import com.kuador.platodo.api.tenancy.domain.event.TenantPurged;
+import com.kuador.platodo.api.tenancy.domain.event.TenantStatusChanged;
 
 /**
- * Permanent deletion of the archived complexes whose retention ended (ADR-013, D8), safe with several api instances.
+ * Permanent deletion of the suspended and archived complexes whose retention ended (ADR-013, D8; ADR-015), safe with
+ * several api instances.
  * <ol>
- *   <li>{@link #claimDue()} moves the due {@code ARCHIVED} complexes to {@code PURGING} in one transaction, skipping
- *       the rows another instance holds: from then on they cannot be reactivated and their host answers "not found".
- *   </li>
+ *   <li>{@link #claimDue()} moves the due {@code SUSPENDED} and {@code ARCHIVED} complexes to {@code PURGING} in one
+ *       transaction, skipping the rows another instance (or a reactivation) holds, and publishes
+ *       {@link TenantStatusChanged} for each, whose synchronous consumers invalidate their support sessions in that
+ *       same transaction: from then on they cannot be reactivated and their host answers "not found".</li>
  *   <li>{@link #purge(TenantId)} purges one {@code PURGING} complex in one transaction that holds its row: queues the
  *       e-mail to the owner, drops the schema, marks it {@code PURGED}, retires its subdomain, redacts the owner
- *       e-mail of the global registry (ADR-016) and publishes
- *       {@link TenantPurged}, whose consumers anonymize their own global data within the same transaction (D11).</li>
+ *       e-mail of the global registry (ADR-016) and publishes {@link TenantPurged}, whose consumers remove or
+ *       anonymize their own global data (the catalog row, the access reasons) within the same transaction (D11).</li>
  * </ol>
  * If anything fails, the whole purge of that complex rolls back (PostgreSQL drops schemas transactionally): it stays
  * {@code PURGING} with its schema, no e-mail is queued, and the next run retries it from the start. Each run thus
@@ -55,14 +58,23 @@ public final class PurgeDueTenants {
         this.clock = TenancyUseCases.atDatabasePrecision(clock);
     }
 
-    /** Moves every {@code ARCHIVED} complex whose purge date was reached to {@code PURGING}; returns how many. */
+    /**
+     * Moves every {@code SUSPENDED} or {@code ARCHIVED} complex whose purge date was reached to {@code PURGING};
+     * returns how many.
+     */
     public int claimDue() {
         Instant now = clock.instant();
         return ports.transaction().run(() -> {
-            List<RegisteredTenant> due = ports.registry().lockArchivedDueBy(now);
-            due.forEach(claimed -> ports.registry().save(claimed.tenant().startPurge(now)));
+            List<RegisteredTenant> due = ports.registry().lockInRetentionDueBy(now);
+            due.forEach(claimed -> startPurge(claimed.tenant(), now));
             return due.size();
         });
+    }
+
+    private void startPurge(Tenant due, Instant now) {
+        Tenant purging = due.startPurge(now);
+        ports.registry().save(purging);
+        ports.events().publish(new TenantStatusChanged(purging.id(), purging.status(), purging.purgeDueAt(), now));
     }
 
     /** The complexes whose purge is pending: claimed by this run or left by a failed one. */

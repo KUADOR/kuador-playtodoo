@@ -11,8 +11,9 @@ import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
  * A sports complex as Tenancy keeps it in {@code global.tenant}, with its lifecycle (ADR-013 as adjusted by ADR-014):
  * {@code PROVISIONING ⇄ PROVISIONING_FAILED}, {@code PROVISIONING → ACTIVE ⇄ SUSPENDED} (reactivation only before
  * {@code purgeDueAt}), {@code ACTIVE | SUSPENDED → ARCHIVED} (terminal: a cancelled subscription is never reactivated)
- * and, for the purge job, {@code ARCHIVED → PURGING → PURGED} from {@code purgeDueAt} on. Every transition returns a
- * new value; a transition the current state does not allow throws {@link InvalidTransitionException}.
+ * and, for the purge job, {@code SUSPENDED | ARCHIVED → PURGING → PURGED} from {@code purgeDueAt} on (ADR-015).
+ * Every transition returns a new value; a transition the current state does not allow throws
+ * {@link InvalidTransitionException}.
  *
  * <p>Suspending and archiving an active complex start its retention; archiving a suspended one keeps the retention
  * that was running. Entering {@code ACTIVE} clears the suspension, so the timestamps always describe the current
@@ -132,13 +133,15 @@ public record Tenant(
     }
 
     /**
-     * {@code ARCHIVED → PURGING} once {@code purgeDueAt} is reached: the complex can no longer be reactivated and its
-     * host answers "not found" while the purge job deletes its schema. The archive fields are kept.
+     * {@code SUSPENDED | ARCHIVED → PURGING} once {@code purgeDueAt} is reached (ADR-015): the complex can no longer be
+     * reactivated and its host answers "not found" while the purge job deletes its schema. The suspension and archive
+     * fields are kept.
      *
-     * @throws InvalidTransitionException if the complex is not archived or its purge date is still ahead
+     * @throws InvalidTransitionException if the complex is neither suspended nor archived or its purge date is still
+     *         ahead
      */
     public Tenant startPurge(Instant now) {
-        requireStatusIn(Set.of(TenantStatus.ARCHIVED));
+        requireStatusIn(IN_RETENTION);
         if (now.isBefore(purgeDueAt)) {
             throw new InvalidTransitionException();
         }

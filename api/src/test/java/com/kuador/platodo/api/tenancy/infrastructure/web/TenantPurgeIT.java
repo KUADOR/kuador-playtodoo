@@ -40,13 +40,16 @@ import com.kuador.platodo.api.tenancy.application.TenancyUseCases;
 import com.kuador.platodo.api.tenancy.application.TenantLifecycle;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 import com.kuador.platodo.api.tenancy.domain.InvalidTransitionException;
+import com.kuador.platodo.api.tenancy.domain.TenantStatus;
 import com.kuador.platodo.api.tenancy.domain.event.TenantPurged;
+import com.kuador.platodo.api.tenancy.domain.event.TenantStatusChanged;
 import com.kuador.platodo.api.tenancy.infrastructure.scheduling.PurgeDueTenantsJob;
 
 /**
- * Permanent deletion of an archived complex (ADR-013: D8, D10, D11) with the real wiring and PostgreSQL. Numbers refer
- * to the criteria of PLATODO-26. The database is shared with other test classes, so every assertion is about the
- * complexes this class registers, never about totals.
+ * Permanent deletion of a suspended or archived complex (ADR-013: D8, D10, D11; ADR-015; ADR-016) with the real wiring
+ * and PostgreSQL. Numbers refer to the criteria of PLATODO-26; CA10 to PLATODO-27. Only the test database is touched,
+ * and it is shared with other test classes, so every assertion is about the complexes this class registers, never
+ * about totals.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -57,6 +60,8 @@ class TenantPurgeIT {
     private static final String ACCESS_REASON = "Soporte: revisar reservas del cliente Ana";
     private static final String OUTBOX_TYPE = "TENANT_PERMANENTLY_DELETED";
     private static final Duration OVERDUE = Duration.ofDays(1);
+    /** Rounds of the reactivation race; each one may go either way, the invariant holds in all. */
+    private static final int RACE_ROUNDS = 5;
 
     @Autowired
     private MockMvc mvc;
@@ -109,7 +114,29 @@ class TenantPurgeIT {
         assertThat(sessionReasonsOf(purged)).containsExactly(REDACTED_REASON);
         assertThat(eventReasonsOf(purged)).containsExactlyInAnyOrder(REDACTED_REASON, null);
         assertThat(unredactedRowsOf(purged)).isZero();
+        assertThat(catalogRowExists(purged)).isFalse();
+        assertThat(openSessionsOf(purged)).isZero();
         assertThat(purgeEvents.countFor(purged)).isEqualTo(1);
+    }
+
+    /** PLATODO-27 CA10 (ADR-015): a suspended complex past its purge date is deleted like an archived one. */
+    @Test
+    void aSuspendedComplexPastItsPurgeDateIsPermanentlyDeleted() throws Exception {
+        String subdomain = TenancyRequests.uniqueSubdomain("purge-susp");
+        TenantId purged = registered(subdomain, TestAccounts.uniqueEmail("owner"));
+        auditedAccess(TestAccounts.platformOwner(TestAccounts.uniqueEmail("kuador")), purged);
+        lifecycle.suspend(purged, Instant.now());
+        forcePurgeDate(purged, Instant.now().minus(OVERDUE));
+
+        runJob();
+
+        assertThat(tenantRow(purged)).containsEntry("status", "PURGED");
+        assertThat(tenantRow(purged).get("owner_email")).isNull();
+        assertThat(schemaExists(purged)).isFalse();
+        assertThat(catalogRowExists(purged)).isFalse();
+        assertThat(sessionReasonsOf(purged)).containsExactly(REDACTED_REASON);
+        assertThat(outboxFor(purged)).hasSize(1);
+        api.tenantState(subdomain).andExpect(status().isNotFound());
     }
 
     /** AGENTS.md isolation: purging one complex leaves every other complex and its audit untouched. */
@@ -132,6 +159,8 @@ class TenantPurgeIT {
         assertThat(sessionReasonsOf(kept)).containsExactly(ACCESS_REASON);
         assertThat(eventReasonsOf(kept)).containsExactlyInAnyOrder(ACCESS_REASON, null);
         assertThat(outboxFor(kept)).isEmpty();
+        assertThat(catalogRowExists(kept)).isTrue();
+        assertThat(openSessionsOf(kept)).isEqualTo(1);
         assertThat(purgeEvents.countFor(kept)).isZero();
     }
 
@@ -146,14 +175,13 @@ class TenantPurgeIT {
         assertNotPurged(archived, "ARCHIVED");
     }
 
-    /** Criterion 13: never outside ARCHIVED, even with a purge date in the past. */
+    /** Criterion 13 and ADR-015: never outside SUSPENDED or ARCHIVED, nor before the purge date of a suspension. */
     @Test
-    void onlyArchivedComplexesArePurged() throws Exception {
+    void onlySuspendedAndArchivedComplexesPastTheirPurgeDateArePurged() throws Exception {
         TenantId active = registered(TenancyRequests.uniqueSubdomain("active"), TestAccounts.uniqueEmail("o"));
         TenantId suspended = registered(TenancyRequests.uniqueSubdomain("susp"), TestAccounts.uniqueEmail("o"));
         lifecycle.suspend(suspended, Instant.now());
         forcePurgeDate(active, Instant.now().minus(OVERDUE));
-        forcePurgeDate(suspended, Instant.now().minus(OVERDUE));
 
         runJob();
 
@@ -177,6 +205,8 @@ class TenantPurgeIT {
         assertThat(domainRow(subdomain)).containsEntry("is_current", true);
         assertThat(outboxFor(tenant)).isEmpty();
         assertThat(sessionReasonsOf(tenant)).containsExactly(ACCESS_REASON);
+        assertThat(openSessionsOf(tenant)).isZero();
+        assertThat(catalogRowExists(tenant)).isTrue();
         api.tenantState(subdomain).andExpect(status().isNotFound());
         assertThatThrownBy(() -> lifecycle.reactivate(tenant, Instant.now()))
                 .isInstanceOf(InvalidTransitionException.class);
@@ -189,6 +219,55 @@ class TenantPurgeIT {
         assertThat(schemaExists(tenant)).isFalse();
         assertThat(outboxFor(tenant)).hasSize(1);
         assertThat(sessionReasonsOf(tenant)).containsExactly(REDACTED_REASON);
+        assertThat(catalogRowExists(tenant)).isFalse();
+    }
+
+    /** ADR-015: claiming the purge ends the open support sessions in the same transaction, or in none. */
+    @Test
+    void claimingThePurgeEndsTheOpenSupportSessionsAtomically() throws Exception {
+        TenantId tenant = registered(TenancyRequests.uniqueSubdomain("sessions"), TestAccounts.uniqueEmail("o"));
+        auditedAccess(TestAccounts.platformOwner(TestAccounts.uniqueEmail("kuador")), tenant);
+        archiveOverdue(tenant);
+        purgeEvents.failClaimFor(tenant);
+
+        assertThatThrownBy(purge::claimDue).isInstanceOf(IllegalStateException.class);
+
+        assertThat(tenantRow(tenant)).containsEntry("status", "ARCHIVED");
+        assertThat(openSessionsOf(tenant)).isEqualTo(1);
+
+        purgeEvents.stopFailing();
+        purge.claimDue();
+
+        assertThat(tenantRow(tenant)).containsEntry("status", "PURGING");
+        assertThat(openSessionsOf(tenant)).isZero();
+    }
+
+    /**
+     * ADR-015 and AGENTS.md concurrency: a reactivation racing the claim of the purge either wins entirely (the complex
+     * is active with its schema) or is rejected (the complex is purged); never both, never half of each.
+     */
+    @Test
+    void aReactivationRacingThePurgeEitherWinsOrIsRejected() throws Exception {
+        for (int round = 0; round < RACE_ROUNDS; round++) {
+            String subdomain = TenancyRequests.uniqueSubdomain("race");
+            TenantId tenant = registered(subdomain, TestAccounts.uniqueEmail("owner"));
+            lifecycle.suspend(tenant, Instant.now());
+            Instant purgeDueAt = Instant.now().minus(OVERDUE);
+            forcePurgeDate(tenant, purgeDueAt);
+
+            boolean reactivated = raceReactivationAgainstClaim(tenant, purgeDueAt.minusSeconds(1));
+            runJob();
+
+            if (reactivated) {
+                assertNotPurged(tenant, "ACTIVE");
+                assertThat(catalogRowExists(tenant)).isTrue();
+                api.tenantState(subdomain).andExpect(status().isOk());
+            } else {
+                assertThat(tenantRow(tenant)).containsEntry("status", "PURGED");
+                assertThat(schemaExists(tenant)).isFalse();
+                assertThat(outboxFor(tenant)).hasSize(1);
+            }
+        }
     }
 
     /** D8: two api instances running the job at once purge the complex once. */
@@ -261,6 +340,28 @@ class TenantPurgeIT {
     private void archiveOverdue(TenantId tenant) throws Exception {
         lifecycle.cancel(tenant, Instant.now());
         forcePurgeDate(tenant, Instant.now().minus(OVERDUE));
+    }
+
+    /** Starts both at once; true when the reactivation won, false when it found the complex already purging. */
+    private boolean raceReactivationAgainstClaim(TenantId tenant, Instant reactivatedAt) throws Exception {
+        CyclicBarrier start = new CyclicBarrier(2);
+        try (ExecutorService callers = Executors.newFixedThreadPool(2)) {
+            Future<Boolean> reactivation = callers.submit(() -> {
+                start.await();
+                try {
+                    lifecycle.reactivate(tenant, reactivatedAt);
+                    return true;
+                } catch (InvalidTransitionException alreadyPurging) {
+                    return false;
+                }
+            });
+            Future<Integer> claim = callers.submit(() -> {
+                start.await();
+                return purge.claimDue();
+            });
+            claim.get();
+            return reactivation.get();
+        }
     }
 
     private void runJob() {
@@ -363,6 +464,22 @@ class TenantPurgeIT {
                 .query((row, number) -> row.getString("reason")).list();
     }
 
+    private static boolean catalogRowExists(TenantId tenant) {
+        return TenantDatabase.admin().sql(
+                        "SELECT EXISTS (SELECT 1 FROM global.complex_catalog WHERE tenant_id = :id::uuid)")
+                .param("id", tenant.value())
+                .query(Boolean.class).single();
+    }
+
+    private static long openSessionsOf(TenantId tenant) {
+        return TenantDatabase.admin().sql("""
+                        SELECT count(*) FROM global.access_session
+                        WHERE tenant_id = :id::uuid AND closed_at IS NULL AND expires_at > now()
+                        """)
+                .param("id", tenant.value())
+                .query(Long.class).single();
+    }
+
     /** Rows with a reason whose redaction was not recorded. */
     private static long unredactedRowsOf(TenantId tenant) {
         return TenantDatabase.admin().sql("""
@@ -375,11 +492,22 @@ class TenantPurgeIT {
                 .query(Long.class).single();
     }
 
-    /** Counts the {@link TenantPurged} events per complex and can make their consumers fail for one complex. */
+    /**
+     * Counts the {@link TenantPurged} events per complex and can make their consumers fail for one complex, or the
+     * consumers of its claim ({@link TenantStatusChanged} to {@code PURGING}).
+     */
     static final class PurgeEvents {
 
         private final Map<TenantId, AtomicInteger> published = new ConcurrentHashMap<>();
         private final Set<TenantId> failing = ConcurrentHashMap.newKeySet();
+        private final Set<TenantId> failingClaims = ConcurrentHashMap.newKeySet();
+
+        @EventListener
+        void on(TenantStatusChanged event) {
+            if (event.status() == TenantStatus.PURGING && failingClaims.contains(event.tenantId())) {
+                throw new IllegalStateException("Claim consumer failure injected by the test");
+            }
+        }
 
         @EventListener
         void on(TenantPurged event) {
@@ -393,8 +521,13 @@ class TenantPurgeIT {
             failing.add(tenant);
         }
 
+        void failClaimFor(TenantId tenant) {
+            failingClaims.add(tenant);
+        }
+
         void stopFailing() {
             failing.clear();
+            failingClaims.clear();
         }
 
         int countFor(TenantId tenant) {

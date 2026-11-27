@@ -42,6 +42,12 @@ public final class JpaComplexCatalog implements ComplexCatalog {
         global.flush();
     }
 
+    @Override
+    public void remove(UUID tenantId) {
+        rowOf(tenantId).ifPresent(global::remove);
+        global.flush();
+    }
+
     private Optional<ComplexCatalogEntity> rowOf(UUID tenantId) {
         return Optional.ofNullable(global.find(ComplexCatalogEntity.class, tenantId));
     }

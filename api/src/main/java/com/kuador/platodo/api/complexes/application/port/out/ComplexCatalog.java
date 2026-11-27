@@ -19,4 +19,7 @@ public interface ComplexCatalog {
 
     /** Moves a listed complex to its new subdomain; a complex without a row stays without one. */
     void changeSubdomain(UUID tenantId, String subdomain, Instant at);
+
+    /** Deletes the row of a purged complex (ADR-016); a complex without a row stays without one. */
+    void remove(UUID tenantId);
 }
