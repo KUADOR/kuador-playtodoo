@@ -136,3 +136,17 @@ Nota para el release: `docs/deployment/changes/PLATODO-96.md`.
 - GitHub App de Dokploy y auto-despliegue filtrado por `Watch Paths` (fila 13, criterio 3).
 - Subred real de `dokploy-network` en `SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES`.
 - Anexo A (comodín): sin ensayar.
+
+### Validación en el VPS · pendiente
+
+Decisión del equipo (2026-11-27): una persona sigue el manual en el VPS y deja los resultados en la tarjeta
+PLATODO-96; el agente DevOps los registra aquí. El manual a seguir es el de la rama
+`feature/PLATODO-96-validar-el-manual-en-el-vps-y-registrar` (PR #44), que ya trae las correcciones del ensayo.
+
+Datos que hay que dejar en la tarjeta, **sin valores de secretos, IP ni capturas con contraseñas**:
+
+- Fecha, commit de `develop` desplegado, versión de Dokploy y valor del campo `Railpack Version`.
+- Resultado de cada fila de la sección 10 del manual (1 a 14): correcto o falla, y en las fallas el mensaje.
+- Fila 13: qué piezas desplegaron tras fusionar un PR que toca solo `app/`.
+- Cada paso del manual que no coincidió con Dokploy (campo con otro nombre, paso que faltó o sobró).
+- Los puntos marcados **[POR VALIDAR]** en el manual: cómo resultaron.
