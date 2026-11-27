@@ -24,6 +24,7 @@ public final class ComplexDetails {
     /** Tenant states in which the subscription can change: provisioned and not being purged. */
     private static final Set<TenantStatus> OPEN_TO_COMMERCIAL_CHANGES =
             EnumSet.of(TenantStatus.ACTIVE, TenantStatus.SUSPENDED, TenantStatus.ARCHIVED);
+    private static final Set<TenantStatus> PURGE_STARTED = EnumSet.of(TenantStatus.PURGING, TenantStatus.PURGED);
 
     private final Subscriptions subscriptions;
     private final TenantDirectory directory;
@@ -64,7 +65,18 @@ public final class ComplexDetails {
      * purged, and its retention, if any, has not expired.
      */
     static boolean acceptsCommercialChanges(TenantProfile tenant, Instant now) {
-        boolean retentionExpired = tenant.purgeDueAt() != null && !now.isBefore(tenant.purgeDueAt());
-        return OPEN_TO_COMMERCIAL_CHANGES.contains(tenant.status()) && !retentionExpired;
+        return OPEN_TO_COMMERCIAL_CHANGES.contains(tenant.status()) && !purgeDateReached(tenant, now);
+    }
+
+    /**
+     * Whether the retention of the complex is over at {@code now}: its purge date was reached, or it is being or was
+     * purged. A suspended subscription can then no longer be reactivated.
+     */
+    static boolean retentionOver(TenantProfile tenant, Instant now) {
+        return purgeDateReached(tenant, now) || PURGE_STARTED.contains(tenant.status());
+    }
+
+    private static boolean purgeDateReached(TenantProfile tenant, Instant now) {
+        return tenant.purgeDueAt() != null && !now.isBefore(tenant.purgeDueAt());
     }
 }

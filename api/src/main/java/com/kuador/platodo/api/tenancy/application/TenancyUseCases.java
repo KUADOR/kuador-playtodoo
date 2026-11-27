@@ -42,7 +42,8 @@ public record TenancyUseCases(
     /**
      * @param clock                any clock; the use cases read it at the precision of the database, so the times
      *                             they answer are exactly the stored ones
-     * @param defaultRetentionDays retention of a new archive ({@code tenancy.archive.default-retention-days})
+     * @param defaultRetentionDays retention of a new suspension or archive
+     *                             ({@code tenancy.archive.default-retention-days})
      */
     public static TenancyUseCases create(Ports ports, SubdomainRules rules, Clock clock, int defaultRetentionDays) {
         return build(ports, rules, atDatabasePrecision(clock), defaultRetentionDays);
@@ -53,10 +54,10 @@ public record TenancyUseCases(
     }
 
     private static TenancyUseCases build(Ports ports, SubdomainRules rules, Clock clock, int defaultRetentionDays) {
-        TenantTransitions transitions = new TenantTransitions(ports.registry(), ports.transaction(), ports.events());
+        TenantTransitions transitions = new TenantTransitions(ports.registry(), ports.transaction(), ports.events(),
+                clock);
         TenantProvisioning provisioning = new TenantProvisioning(ports.schemas(), ports.owners());
-        TenantLifecycle lifecycle = new TenantLifecycle(
-                ports.callers(), ports.registry(), transitions, provisioning, clock, defaultRetentionDays);
+        TenantLifecycle lifecycle = new TenantLifecycle(transitions, clock, defaultRetentionDays);
         return new TenancyUseCases(
                 new RegisterTenant(ports.callers(), rules, ports.registry(), ports.transaction(), provisioning,
                         lifecycle, clock),

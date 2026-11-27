@@ -14,6 +14,7 @@ import com.kuador.platodo.api.tenancy.application.PurgeDueTenants;
 import com.kuador.platodo.api.tenancy.application.RequestHosts;
 import com.kuador.platodo.api.tenancy.application.TenancyUseCases;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantOnboarding;
+import com.kuador.platodo.api.tenancy.application.port.in.TenantRetention;
 import com.kuador.platodo.api.tenancy.application.port.out.GlobalTransaction;
 import com.kuador.platodo.api.tenancy.application.port.out.SubdomainUsage;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantOwnerAccounts;
@@ -22,9 +23,10 @@ import com.kuador.platodo.api.tenancy.application.port.out.TenantRegistry;
 import com.kuador.platodo.api.tenancy.application.port.out.TenantSchemas;
 import com.kuador.platodo.api.tenancy.domain.SubdomainRules;
 import com.kuador.platodo.api.tenancy.infrastructure.events.SpringTenantEventPublisher;
+import com.kuador.platodo.api.tenancy.infrastructure.events.SubscriptionStatusEffects;
 import com.kuador.platodo.api.tenancy.infrastructure.identity.PrincipalCallers;
 
-/** Tenant lifecycle, purge and subdomain use cases (ADR-012, ADR-013). */
+/** Tenant lifecycle, purge and subdomain use cases (ADR-012, ADR-013, ADR-014). */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(TenancyProperties.class)
 class TenancyLifecycleConfiguration {
@@ -54,6 +56,18 @@ class TenancyLifecycleConfiguration {
     @Bean
     TenantOnboarding tenantOnboarding(TenancyUseCases useCases) {
         return useCases.onboarding();
+    }
+
+    /** Retention changes of a suspended or archived complex for Plans and subscriptions (ADR-014). */
+    @Bean
+    TenantRetention tenantRetention(TenancyUseCases useCases) {
+        return useCases.lifecycle();
+    }
+
+    /** Effect of a subscription status change on the tenant, inside the transaction of the change (ADR-014). */
+    @Bean
+    SubscriptionStatusEffects subscriptionStatusEffects(TenancyUseCases useCases) {
+        return new SubscriptionStatusEffects(useCases.lifecycle());
     }
 
     @Bean

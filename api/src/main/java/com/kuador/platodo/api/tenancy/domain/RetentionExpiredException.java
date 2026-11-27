@@ -1,6 +1,6 @@
 package com.kuador.platodo.api.tenancy.domain;
 
-/** The purge date of an archived complex has been reached: it can no longer be reactivated. */
+/** The purge date of a suspended complex has been reached: it can no longer be reactivated. */
 public class RetentionExpiredException extends RuntimeException {
 
     public RetentionExpiredException() {

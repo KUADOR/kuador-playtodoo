@@ -14,6 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.kuador.platodo.api.identity.application.port.in.CapabilityGuard;
 import com.kuador.platodo.api.identity.application.port.in.PlatformUserNames;
 import com.kuador.platodo.api.subscriptions.application.ChangeComplexPlan;
+import com.kuador.platodo.api.subscriptions.application.ChangeComplexRetention;
 import com.kuador.platodo.api.subscriptions.application.ChangeSubscriptionStatus;
 import com.kuador.platodo.api.subscriptions.application.ComplexDetails;
 import com.kuador.platodo.api.subscriptions.application.ComplexLocks;
@@ -29,13 +30,15 @@ import com.kuador.platodo.api.subscriptions.infrastructure.events.SpringSubscrip
 import com.kuador.platodo.api.subscriptions.infrastructure.persistence.global.JpaSubscriptionHistory;
 import com.kuador.platodo.api.subscriptions.infrastructure.persistence.global.JpaSubscriptionPayments;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantProfileLock;
+import com.kuador.platodo.api.tenancy.application.port.in.TenantRetention;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 
 /**
- * Plan changes, manual status changes, payments and history of a complex (ADR-014, ADR-018), in the global schema.
- * The tenant row is locked through the public port {@link TenantProfileLock} of Tenancy.
+ * Plan changes, manual status changes, retention, payments and history of a complex (ADR-014, ADR-018), in the global
+ * schema. The tenant row is locked through the public port {@link TenantProfileLock} of Tenancy and its retention
+ * changed through {@link TenantRetention}.
  */
 @Configuration(proxyBeanMethods = false)
 class SubscriptionChangesConfiguration {
@@ -88,6 +91,12 @@ class SubscriptionChangesConfiguration {
             ComplexDetails details) {
         return new ChangeSubscriptionStatus(guard, locks, subscriptions, history, events, details, globalTransaction,
                 clock);
+    }
+
+    @Bean
+    ChangeComplexRetention changeComplexRetention(CapabilityGuard guard, ComplexLocks locks, TenantRetention retention,
+            ComplexDetails details) {
+        return new ChangeComplexRetention(guard, locks, retention, details, globalTransaction);
     }
 
     @Bean

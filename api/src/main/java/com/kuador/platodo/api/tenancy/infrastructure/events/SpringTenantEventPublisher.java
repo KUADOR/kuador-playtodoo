@@ -7,8 +7,9 @@ import com.kuador.platodo.api.tenancy.domain.event.TenantEvent;
 
 /**
  * Publishes lifecycle events as Spring application events (ADR-007), in-process, same thread and transaction.
- * Consumers listen with {@code @TransactionalEventListener(phase = AFTER_COMMIT)}, except for {@code TenantPurged},
- * whose consumers listen with a plain {@code @EventListener} to run inside the purge transaction (ADR-013, D11).
+ * Consumers listen with {@code @TransactionalEventListener(phase = AFTER_COMMIT)}, except for {@code TenantPurged} and
+ * {@code TenantStatusChanged}, whose consumers listen with a plain {@code @EventListener} to run inside the transaction
+ * of the change (ADR-013 D11, ADR-014).
  */
 public final class SpringTenantEventPublisher implements TenantEventPublisher {
 

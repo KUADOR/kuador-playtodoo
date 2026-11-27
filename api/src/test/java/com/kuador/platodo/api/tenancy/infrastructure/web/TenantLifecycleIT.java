@@ -8,12 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.sql.Timestamp;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
@@ -37,15 +34,14 @@ import com.kuador.platodo.api.support.TestAccounts;
 import com.kuador.platodo.api.support.TestTenants;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 import com.kuador.platodo.api.tenancy.domain.event.TenantActivated;
-import com.kuador.platodo.api.tenancy.domain.event.TenantArchived;
-import com.kuador.platodo.api.tenancy.domain.event.TenantSuspended;
 import com.kuador.platodo.api.tenancy.infrastructure.persistence.TenantMigrations;
 
 import tools.jackson.databind.JsonNode;
 
 /**
- * Registration and lifecycle of a complex by Kuador (ADR-013), over HTTP with the real wiring and PostgreSQL. Numbers
- * refer to the criteria of PLATODO-26.
+ * Registration of a complex by Kuador (ADR-013), over HTTP with the real wiring and PostgreSQL. Numbers refer to the
+ * criteria of PLATODO-26. The lifecycle changes through the subscription (ADR-014): see
+ * {@code SubscriptionLifecycleEffectsIT}.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,7 +50,6 @@ import tools.jackson.databind.JsonNode;
 class TenantLifecycleIT {
 
     private static final String PROBLEM_JSON = MediaType.APPLICATION_PROBLEM_JSON_VALUE;
-    private static final int DEFAULT_RETENTION_DAYS = 45;
 
     @Autowired
     private MockMvc mvc;
@@ -183,138 +178,6 @@ class TenantLifecycleIT {
         assertThat(currentOwnersOf(subdomain)).isOne();
     }
 
-    @Test
-    void aSuspendedComplexIsUnavailableUntilItIsActivated() throws Exception {
-        String subdomain = uniqueSubdomain("susp");
-        TenantId id = api.registered(ownerToken, subdomain);
-
-        JsonNode suspended = json(api.lifecycle(ownerToken, id, "suspend")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUSPENDED"))
-                .andExpect(jsonPath("$.suspendedAt").isNotEmpty()));
-        expectProblem(api.tenantState(subdomain), 403, "TENANT_UNAVAILABLE");
-
-        api.lifecycle(ownerToken, id, "activate")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.suspendedAt").isEmpty());
-        api.tenantState(subdomain).andExpect(status().isOk());
-        assertThat(events.stream(TenantSuspended.class))
-                .containsExactly(new TenantSuspended(id, Instant.parse(suspended.get("suspendedAt").asString())));
-        assertThat(events.stream(TenantActivated.class)).hasSize(2);
-    }
-
-    /** Invalid transitions answer 409 INVALID_TRANSITION and change nothing. */
-    @Test
-    void transitionsTheStateDoesNotAllowAreConflicts() throws Exception {
-        TenantId id = api.registered(ownerToken, uniqueSubdomain("inv"));
-
-        expectProblem(api.lifecycle(ownerToken, id, "activate"), 409, "INVALID_TRANSITION");
-        expectProblem(api.lifecycle(ownerToken, id, "reactivate"), 409, "INVALID_TRANSITION");
-        expectProblem(api.changeRetention(ownerToken, id, "{\"days\": 60}"), 409, "INVALID_TRANSITION");
-        api.lifecycle(ownerToken, id, "suspend").andExpect(status().isOk());
-        expectProblem(api.lifecycle(ownerToken, id, "suspend"), 409, "INVALID_TRANSITION");
-        api.lifecycle(ownerToken, id, "archive").andExpect(status().isOk());
-        expectProblem(api.lifecycle(ownerToken, id, "archive"), 409, "INVALID_TRANSITION");
-        expectProblem(api.lifecycle(ownerToken, id, "suspend"), 409, "INVALID_TRANSITION");
-        expectProblem(api.lifecycle(ownerToken, id, "activate"), 409, "INVALID_TRANSITION");
-
-        assertThat(statusOf(id)).isEqualTo("ARCHIVED");
-    }
-
-    /** Criterion 12: an archived complex is not accessible; reactivated in time, it recovers all its data. */
-    @Test
-    void anArchivedComplexReactivatedInTimeRecoversItsData() throws Exception {
-        String subdomain = uniqueSubdomain("arch");
-        TenantId id = api.registered(ownerToken, subdomain);
-        String staffEmail = TestAccounts.uniqueEmail("staff");
-        TestAccounts.staff(id, staffEmail, "ADMIN");
-
-        JsonNode archived = json(api.lifecycle(ownerToken, id, "archive")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ARCHIVED"))
-                .andExpect(jsonPath("$.retentionDays").value(DEFAULT_RETENTION_DAYS)));
-        Instant archivedAt = Instant.parse(archived.get("archivedAt").asString());
-        Instant purgeDueAt = Instant.parse(archived.get("purgeDueAt").asString());
-        assertThat(purgeDueAt).isEqualTo(archivedAt.plus(Duration.ofDays(DEFAULT_RETENTION_DAYS)));
-        expectProblem(api.tenantState(subdomain), 403, "TENANT_UNAVAILABLE");
-        expectProblem(api.staffLogin(subdomain, staffEmail), 403, "TENANT_UNAVAILABLE");
-
-        api.lifecycle(ownerToken, id, "reactivate")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.archivedAt").isEmpty())
-                .andExpect(jsonPath("$.retentionDays").isEmpty())
-                .andExpect(jsonPath("$.purgeDueAt").isEmpty());
-
-        api.staffLogin(subdomain, staffEmail).andExpect(status().isOk());
-        assertThat(staffIn(id)).contains(staffEmail);
-        assertThat(events.stream(TenantArchived.class))
-                .containsExactly(new TenantArchived(id, purgeDueAt, archivedAt));
-    }
-
-    @Test
-    void aComplexPastItsPurgeDateCannotBeReactivated() throws Exception {
-        TenantId id = api.registered(ownerToken, uniqueSubdomain("late"));
-        api.lifecycle(ownerToken, id, "archive").andExpect(status().isOk());
-        movePurgeDate(id, Instant.now().minusSeconds(1));
-
-        expectProblem(api.lifecycle(ownerToken, id, "reactivate"), 409, "RETENTION_EXPIRED");
-
-        assertThat(statusOf(id)).isEqualTo("ARCHIVED");
-    }
-
-    @Test
-    void kuadorChangesTheRetentionOfAnArchivedComplex() throws Exception {
-        TenantId id = api.registered(ownerToken, uniqueSubdomain("ret"));
-        Instant archivedAt = Instant.parse(json(api.lifecycle(ownerToken, id, "archive")).get("archivedAt").asString());
-
-        api.changeRetention(ownerToken, id, "{\"days\": 60}")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.retentionDays").value(60))
-                .andExpect(jsonPath("$.purgeDueAt").value(archivedAt.plus(Duration.ofDays(60)).toString()));
-        expectProblem(api.changeRetention(ownerToken, id, "{\"days\": 0}"), 400, "INVALID_REQUEST");
-        expectProblem(api.changeRetention(ownerToken, id, "{}"), 400, "INVALID_REQUEST");
-
-        moveArchiveDate(id, Instant.now().minus(Duration.ofDays(30)));
-        expectProblem(api.changeRetention(ownerToken, id, "{\"days\": 10}"), 422, "RETENTION_INVALID");
-        assertThat(retentionOf(id)).isEqualTo(60);
-    }
-
-    @Test
-    void anUnknownTenantIdIsNotFound() throws Exception {
-        expectProblem(api.lifecycle(ownerToken, new TenantId(UUID.randomUUID().toString()), "suspend"), 404,
-                "TENANT_NOT_FOUND");
-        expectProblem(api.lifecycle(ownerToken, new TenantId("not-a-uuid"), "suspend"), 404, "TENANT_NOT_FOUND");
-    }
-
-    @Test
-    void lifecycleOperationsNeedThePlatformOwner() throws Exception {
-        TenantId id = api.registered(ownerToken, uniqueSubdomain("perm"));
-
-        expectProblem(api.lifecycle(null, id, "suspend"), 401, "UNAUTHENTICATED");
-        expectProblem(api.lifecycle(api.playerToken(), id, "archive"), 403, "FORBIDDEN");
-
-        assertThat(statusOf(id)).isEqualTo("ACTIVE");
-    }
-
-    /** A failed provisioning stays PROVISIONING; activate retries it once the owner account exists. */
-    @Test
-    void activatingRetriesAFailedProvisioning() throws Exception {
-        TenantId id = new TenantId(UUID.randomUUID().toString());
-        TestTenants.register(id, "PROVISIONING");
-
-        expectProblem(api.lifecycle(ownerToken, id, "activate"), 409, "INVALID_TRANSITION");
-        assertThat(schemaExists(id)).isTrue();
-        assertThat(statusOf(id)).isEqualTo("PROVISIONING");
-
-        TestAccounts.staff(id, TestAccounts.uniqueEmail("owner"), "OWNER");
-        api.lifecycle(ownerToken, id, "activate")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ACTIVE"));
-        api.tenantState(TestTenants.subdomainOf(id)).andExpect(status().isOk());
-    }
-
     private static List<Integer> runTogether(Callable<Integer> first, Callable<Integer> second) throws Exception {
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
             List<Future<Integer>> results = new ArrayList<>();
@@ -350,13 +213,6 @@ class TenantLifecycleIT {
                 .list();
     }
 
-    private static List<String> staffIn(TenantId tenant) {
-        return TenantDatabase.admin()
-                .sql("SELECT email FROM \"%s\".staff_user".formatted(TestTenants.schemaOf(tenant)))
-                .query(String.class)
-                .list();
-    }
-
     private static long tenantsNamed(String displayName) {
         return TenantDatabase.admin().sql("SELECT count(*) FROM global.tenant WHERE display_name = :name")
                 .param("name", displayName)
@@ -370,33 +226,5 @@ class TenantLifecycleIT {
                 .param("subdomain", subdomain)
                 .query(Long.class)
                 .single();
-    }
-
-    private static String statusOf(TenantId tenant) {
-        return TenantDatabase.admin().sql("SELECT status FROM global.tenant WHERE id = :id::uuid")
-                .param("id", tenant.value())
-                .query(String.class)
-                .single();
-    }
-
-    private static Integer retentionOf(TenantId tenant) {
-        return TenantDatabase.admin().sql("SELECT retention_days FROM global.tenant WHERE id = :id::uuid")
-                .param("id", tenant.value())
-                .query(Integer.class)
-                .single();
-    }
-
-    private static void movePurgeDate(TenantId tenant, Instant purgeDueAt) {
-        TenantDatabase.admin().sql("UPDATE global.tenant SET purge_due_at = :at WHERE id = :id::uuid")
-                .param("at", Timestamp.from(purgeDueAt))
-                .param("id", tenant.value())
-                .update();
-    }
-
-    private static void moveArchiveDate(TenantId tenant, Instant archivedAt) {
-        TenantDatabase.admin().sql("UPDATE global.tenant SET archived_at = :at WHERE id = :id::uuid")
-                .param("at", Timestamp.from(archivedAt))
-                .param("id", tenant.value())
-                .update();
     }
 }

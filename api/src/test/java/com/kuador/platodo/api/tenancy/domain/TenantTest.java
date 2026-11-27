@@ -14,7 +14,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 
-/** Lifecycle of ADR-013. Invalid transitions are the 409 INVALID_TRANSITION of the contract. */
+/** Lifecycle of ADR-013 as adjusted by ADR-014. */
 class TenantTest {
 
     private static final TenantId ID = new TenantId("5f1c2a3b-4d5e-4f6a-8b7c-9d0e1f2a3b4c");
@@ -63,91 +63,135 @@ class TenantTest {
         assertInvalid(status, Tenant::retryProvisioning);
     }
 
+    /** ADR-014: suspending starts the retention from the suspension. */
     @Test
-    void anActiveComplexIsSuspendedAndActivatedAgain() {
-        Tenant suspended = active().suspend(T1);
-        Tenant activeAgain = suspended.activate(T1.plusSeconds(1));
+    void suspendingSetsTheRetentionFromTheSuspension() {
+        Tenant suspended = active().suspend(T1, RETENTION);
 
         assertThat(suspended.status()).isEqualTo(TenantStatus.SUSPENDED);
         assertThat(suspended.suspendedAt()).isEqualTo(T1);
-        assertThat(activeAgain.status()).isEqualTo(TenantStatus.ACTIVE);
-        assertThat(activeAgain.suspendedAt()).isNull();
+        assertThat(suspended.retentionDays()).isEqualTo(RETENTION);
+        assertThat(suspended.purgeDueAt()).isEqualTo(T1.plus(Duration.ofDays(RETENTION)));
+        assertThat(suspended.archivedAt()).isNull();
     }
 
+    /** ADR-014: a suspended complex reactivated before its purge date is active again, without retention. */
     @Test
-    void archivingSetsTheRetentionAndThePurgeDate() {
-        Tenant archived = active().archive(T1, RETENTION);
+    void reactivatingASuspendedComplexBeforeThePurgeDateClearsTheRetention() {
+        Tenant suspended = active().suspend(T1, RETENTION);
 
-        assertThat(archived.status()).isEqualTo(TenantStatus.ARCHIVED);
-        assertThat(archived.archivedAt()).isEqualTo(T1);
-        assertThat(archived.retentionDays()).isEqualTo(RETENTION);
-        assertThat(archived.purgeDueAt()).isEqualTo(T1.plus(Duration.ofDays(RETENTION)));
-    }
-
-    @Test
-    void aSuspendedComplexCanBeArchived() {
-        assertThat(active().suspend(T1).archive(T1, RETENTION).status()).isEqualTo(TenantStatus.ARCHIVED);
-    }
-
-    @Test
-    void reactivatingBeforeThePurgeDateClearsTheArchive() {
-        Tenant archived = active().suspend(T1).archive(T1, RETENTION);
-
-        Tenant reactivated = archived.reactivate(archived.purgeDueAt().minusMillis(1));
+        Tenant reactivated = suspended.reactivate(suspended.purgeDueAt().minusMillis(1));
 
         assertThat(reactivated.status()).isEqualTo(TenantStatus.ACTIVE);
-        assertThat(reactivated.archivedAt()).isNull();
+        assertThat(reactivated.suspendedAt()).isNull();
         assertThat(reactivated.retentionDays()).isNull();
         assertThat(reactivated.purgeDueAt()).isNull();
-        assertThat(reactivated.suspendedAt()).isNull();
     }
 
     @Test
     void reactivatingFromThePurgeDateOnIsRefused() {
-        Tenant archived = active().archive(T1, RETENTION);
+        Tenant suspended = active().suspend(T1, RETENTION);
 
-        assertThatThrownBy(() -> archived.reactivate(archived.purgeDueAt()))
+        assertThatThrownBy(() -> suspended.reactivate(suspended.purgeDueAt()))
                 .isInstanceOf(RetentionExpiredException.class);
     }
 
+    /** ADR-014: cancelling an active complex archives it with the retention from the cancellation. */
     @Test
-    void theRetentionIsRecomputedFromTheArchiveDate() {
+    void archivingAnActiveComplexSetsTheRetentionFromTheArchive() {
+        Tenant archived = active().archive(T1, RETENTION);
+
+        assertThat(archived.status()).isEqualTo(TenantStatus.ARCHIVED);
+        assertThat(archived.archivedAt()).isEqualTo(T1);
+        assertThat(archived.suspendedAt()).isNull();
+        assertThat(archived.retentionDays()).isEqualTo(RETENTION);
+        assertThat(archived.purgeDueAt()).isEqualTo(T1.plus(Duration.ofDays(RETENTION)));
+    }
+
+    /** ADR-014: cancelling a suspended complex keeps the purge date that was running. */
+    @Test
+    void archivingASuspendedComplexKeepsItsRetention() {
+        Tenant suspended = active().suspend(T1, 30);
+        Instant tenDaysLater = T1.plus(Duration.ofDays(10));
+
+        Tenant archived = suspended.archive(tenDaysLater, RETENTION);
+
+        assertThat(archived.status()).isEqualTo(TenantStatus.ARCHIVED);
+        assertThat(archived.archivedAt()).isEqualTo(tenDaysLater);
+        assertThat(archived.suspendedAt()).isEqualTo(T1);
+        assertThat(archived.retentionDays()).isEqualTo(30);
+        assertThat(archived.purgeDueAt()).isEqualTo(suspended.purgeDueAt());
+    }
+
+    /** ADR-014: a cancelled subscription is terminal, so an archived complex is never reactivated. */
+    @Test
+    void anArchivedComplexIsNeverReactivated() {
+        Tenant archived = active().archive(T1, RETENTION);
+
+        assertThatThrownBy(() -> archived.reactivate(T1)).isInstanceOf(InvalidTransitionException.class);
+    }
+
+    @Test
+    void theRetentionOfASuspendedComplexIsRecomputedFromTheSuspension() {
+        Tenant suspended = active().suspend(T1, RETENTION);
+
+        Tenant extended = suspended.changeRetention(60, T1.plus(Duration.ofDays(10)));
+
+        assertThat(extended.status()).isEqualTo(TenantStatus.SUSPENDED);
+        assertThat(extended.retentionDays()).isEqualTo(60);
+        assertThat(extended.purgeDueAt()).isEqualTo(T1.plus(Duration.ofDays(60)));
+    }
+
+    @Test
+    void theRetentionOfAComplexCancelledWhileActiveIsRecomputedFromTheArchive() {
         Tenant archived = active().archive(T1, RETENTION);
 
         Tenant extended = archived.changeRetention(60, T1.plus(Duration.ofDays(10)));
 
+        assertThat(extended.status()).isEqualTo(TenantStatus.ARCHIVED);
         assertThat(extended.retentionDays()).isEqualTo(60);
         assertThat(extended.purgeDueAt()).isEqualTo(T1.plus(Duration.ofDays(60)));
         assertThat(extended.archivedAt()).isEqualTo(T1);
     }
 
     @Test
+    void theRetentionOfAComplexCancelledWhileSuspendedIsRecomputedFromTheSuspension() {
+        Tenant archived = active().suspend(T1, RETENTION).archive(T1.plus(Duration.ofDays(5)), RETENTION);
+
+        Tenant extended = archived.changeRetention(60, T1.plus(Duration.ofDays(10)));
+
+        assertThat(extended.purgeDueAt()).isEqualTo(T1.plus(Duration.ofDays(60)));
+        assertThat(extended.archivedAt()).isEqualTo(T1.plus(Duration.ofDays(5)));
+    }
+
+    @Test
     void aRetentionThatPutsThePurgeDateInThePastIsRefused() {
-        Tenant archived = active().archive(T1, RETENTION);
+        Tenant suspended = active().suspend(T1, RETENTION);
         Instant tenDaysLater = T1.plus(Duration.ofDays(10));
 
-        assertThatThrownBy(() -> archived.changeRetention(10, tenDaysLater))
+        assertThatThrownBy(() -> suspended.changeRetention(10, tenDaysLater))
                 .isInstanceOf(RetentionInvalidException.class);
-        assertThatThrownBy(() -> archived.changeRetention(5, tenDaysLater))
+        assertThatThrownBy(() -> suspended.changeRetention(5, tenDaysLater))
                 .isInstanceOf(RetentionInvalidException.class);
     }
 
     @Test
     void aRetentionBelowOneDayIsRefused() {
         assertThatIllegalArgumentException().isThrownBy(() -> active().archive(T1, 0));
+        assertThatIllegalArgumentException().isThrownBy(() -> active().suspend(T1, 0));
         assertThatIllegalArgumentException().isThrownBy(() -> active().archive(T1, RETENTION).changeRetention(0, T1));
     }
 
     @ParameterizedTest
-    @EnumSource(value = TenantStatus.class, names = {"PROVISIONING_FAILED", "ACTIVE", "ARCHIVED", "PURGING", "PURGED"})
-    void onlyProvisioningAndSuspendedComplexesCanBeActivated(TenantStatus status) {
+    @EnumSource(value = TenantStatus.class, names = "PROVISIONING", mode = EnumSource.Mode.EXCLUDE)
+    void onlyProvisioningComplexesCanBeActivated(TenantStatus status) {
         assertInvalid(status, tenant -> tenant.activate(T1));
     }
 
     @ParameterizedTest
     @EnumSource(value = TenantStatus.class, names = "ACTIVE", mode = EnumSource.Mode.EXCLUDE)
     void onlyActiveComplexesCanBeSuspended(TenantStatus status) {
-        assertInvalid(status, tenant -> tenant.suspend(T1));
+        assertInvalid(status, tenant -> tenant.suspend(T1, RETENTION));
     }
 
     @ParameterizedTest
@@ -158,10 +202,17 @@ class TenantTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = TenantStatus.class, names = "ARCHIVED", mode = EnumSource.Mode.EXCLUDE)
-    void onlyArchivedComplexesCanBeReactivatedOrChangeTheirRetention(TenantStatus status) {
+    @EnumSource(value = TenantStatus.class, names = "SUSPENDED", mode = EnumSource.Mode.EXCLUDE)
+    void onlySuspendedComplexesCanBeReactivated(TenantStatus status) {
         assertInvalid(status, tenant -> tenant.reactivate(T1));
-        assertInvalid(status, tenant -> tenant.changeRetention(RETENTION, T1));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TenantStatus.class, names = {"SUSPENDED", "ARCHIVED"}, mode = EnumSource.Mode.EXCLUDE)
+    void onlySuspendedAndArchivedComplexesChangeTheirRetention(TenantStatus status) {
+        Tenant tenant = new Tenant(ID, "Canchas El Sol", status, T0, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> tenant.changeRetention(RETENTION, T1)).isInstanceOf(NotInRetentionException.class);
     }
 
     /** Criterion 13: the purge starts once the purge date is reached and keeps the archive fields. */
