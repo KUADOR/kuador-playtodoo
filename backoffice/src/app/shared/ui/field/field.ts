@@ -4,10 +4,10 @@ import { LucideCircleAlert } from '@lucide/angular';
 export type FieldKind = 'text' | 'select';
 
 /** `type` of the native input when `kind` is `text`. */
-export type TextInputType = 'text' | 'email' | 'password';
+export type TextInputType = 'text' | 'email' | 'password' | 'date';
 
-/** Native `inputmode`: which on-screen keyboard a phone shows for a text input. */
-export type TextInputMode = 'text' | 'decimal' | 'numeric' | 'email';
+/** Native `inputmode`: which on-screen keyboard a phone shows. */
+export type InputMode = 'text' | 'decimal' | 'numeric' | 'email';
 
 export interface FieldOption {
   readonly value: string;
@@ -33,7 +33,6 @@ export class Field {
   readonly label = input.required<string>();
   readonly kind = input<FieldKind>('text');
   readonly inputType = input<TextInputType>('text');
-  readonly inputMode = input<TextInputMode>();
   /** Native `autocomplete` hint, for example `username` or `current-password`. */
   readonly autocomplete = input<string>();
   readonly required = input(false);
@@ -41,6 +40,12 @@ export class Field {
   readonly error = input<string>();
   readonly disabled = input(false);
   readonly placeholder = input<string>();
+  readonly inputMode = input<InputMode>();
+  readonly maxLength = input<number>();
+  /** Native `max`, for example the latest date allowed. */
+  readonly max = input<string>();
+  /** Fixed text shown right after the control, for example `.playtodoo.com`. */
+  readonly suffix = input<string>();
   readonly options = input<readonly FieldOption[]>([]);
   readonly value = model('');
 
@@ -49,10 +54,15 @@ export class Field {
   readonly controlId = `app-field-${nextFieldId++}`;
   protected readonly helpId = `${this.controlId}-help`;
   protected readonly errorId = `${this.controlId}-error`;
+  protected readonly suffixId = `${this.controlId}-suffix`;
 
   protected readonly hasError = computed(() => Boolean(this.error()));
   protected readonly describedBy = computed(() => {
-    const ids = [this.help() ? this.helpId : null, this.hasError() ? this.errorId : null];
+    const ids = [
+      this.suffix() ? this.suffixId : null,
+      this.help() ? this.helpId : null,
+      this.hasError() ? this.errorId : null,
+    ];
     return ids.filter((id) => id !== null).join(' ') || null;
   });
 

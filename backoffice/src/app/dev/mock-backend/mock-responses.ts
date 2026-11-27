@@ -1,4 +1,4 @@
-import { Page } from '../../core/api/page';
+import { DEFAULT_PAGE_SIZE, Page } from '../../core/api/page';
 
 /** Request and response shapes shared by the in-memory mocks of the contract. */
 export interface MockRequest {
@@ -20,8 +20,6 @@ export interface MockFieldError {
   readonly code: string;
 }
 
-const DEFAULT_PAGE_SIZE = 20;
-
 export function ok(body: unknown): MockResponse {
   return { status: 200, body };
 }
@@ -30,7 +28,7 @@ export function created(body: unknown): MockResponse {
   return { status: 201, body };
 }
 
-/** Problem Details (RFC 9457) with the stable `code` of the contract. */
+/** Problem Details (RFC 9457) with the stable `code` of the contracts. */
 export function problem(
   status: number,
   code: string,

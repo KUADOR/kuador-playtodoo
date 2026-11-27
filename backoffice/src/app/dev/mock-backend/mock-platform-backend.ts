@@ -4,16 +4,18 @@ import {
   ChangeOperatorCapabilitiesRequest,
   OperatorCapabilities,
 } from '../../features/operator-permissions/operator-capabilities-api';
+import { MockComplexesBackend } from './mock-complexes-backend';
 import { MockPlansBackend } from './mock-plans-backend';
 import { MockRequest, MockResponse, ok, pageOf, problem } from './mock-responses';
 
 export type { MockRequest, MockResponse } from './mock-responses';
 
-/**
+/*
  * In-memory stand-in of the platform operations this backoffice uses, built from the examples of
  * contracts/platform-backoffice.openapi.yaml and contracts/tenancy.openapi.yaml. Development
  * builds only (see mock-backend.development.ts). Every password is accepted: there are no secrets.
  */
+
 /** Sign in with one of these e-mails (any password) to try each role. */
 export const MOCK_ACCOUNTS = {
   superAdmin: 'superadmin@kuador.test',
@@ -60,11 +62,16 @@ export class MockPlatformBackend {
   private readonly changes: CapabilityChange[] = [];
   private nextChangeId = 1;
   private readonly plans = new MockPlansBackend();
+  private readonly complexes = new MockComplexesBackend();
 
   handle(request: MockRequest): MockResponse {
     const route = `${request.method} ${request.path}`;
     if (route === 'POST /auth/platform/login') {
       return this.login(request.body);
+    }
+    const publicResponse = this.complexes.handlePublic(request);
+    if (publicResponse !== null) {
+      return publicResponse;
     }
     const user = this.userOf(request.bearerToken);
     if (user === null) {
@@ -82,8 +89,10 @@ export class MockPlatformBackend {
       case 'GET /platform/operator-capabilities/changes':
         return this.onlySuperAdmin(user, () => ok(pageOf(this.changes, request.query)));
       default:
+        // Plans first: it owns the full plan catalogue (P10–P12), published reads included.
         return (
-          this.plans.handle(request, user.role === 'SUPER_ADMIN') ?? { status: 404, body: null }
+          this.plans.handle(request, user.role === 'SUPER_ADMIN') ??
+          this.complexes.handle(request, this.currentUser(user)) ?? { status: 404, body: null }
         );
     }
   }

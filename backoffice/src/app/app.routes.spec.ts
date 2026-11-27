@@ -8,7 +8,6 @@ import {
   INITIAL_CAPABILITIES,
   ME_URL,
   OPERATOR_USER,
-  PLANS_URL,
   PLAN_FIELDS_URL,
   PLAN_OPTIONS,
   PLAN_OPTIONS_URL,
@@ -16,6 +15,7 @@ import {
   pageOf,
   storeAccessToken,
 } from '../testing/platform-fixtures';
+import { COMPLEXES_URL, EMPTY_PAGE, PLANS_URL } from '../testing/complex-fixtures';
 import { provideTestApi, settle } from '../testing/platform-testing';
 import { CurrentPlatformUser } from './core/auth/platform-user';
 import { routes } from './app.routes';
@@ -28,6 +28,8 @@ import './features/operator-permissions/operator-permissions-page';
 import './features/plans/plans-page/plans-page';
 import './features/plans/plan-editor-page/plan-editor-page';
 import './features/plans/plan-fields-page/plan-fields-page';
+import './features/complexes/list/complexes-page';
+import './features/complexes/register/register-complex-page';
 
 describe('App routes and guards', () => {
   let harness: RouterTestingHarness;
@@ -40,7 +42,13 @@ describe('App routes and guards', () => {
     harness = await RouterTestingHarness.create();
   });
 
-  afterEach(() => backend.verify());
+  afterEach(() => {
+    // «Complejos» (P2) loads its list on every navigation that lands there.
+    backend
+      .match((request) => request.url === COMPLEXES_URL)
+      .forEach((request) => request.flush(EMPTY_PAGE));
+    backend.verify();
+  });
 
   /** Navigates as `user` (answering the `GET /me` of the guards) and returns the final URL. */
   async function navigateAs(user: CurrentPlatformUser | null, url: string): Promise<string> {
@@ -125,6 +133,19 @@ describe('App routes and guards', () => {
     expect(
       harness.fixture.nativeElement.querySelector('[aria-current="page"]')?.textContent,
     ).toContain('Planes');
+  });
+
+  it('opens «Dar de alta complejo» only with COMPLEX_CREATE', async () => {
+    expect(await navigateAs(OPERATOR_USER, '/complexes/new')).toBe('/forbidden');
+  });
+
+  it('lets the super admin open «Dar de alta complejo»', async () => {
+    expect(await navigateAs(SUPER_ADMIN_USER, '/complexes/new')).toBe('/complexes/new');
+    backend.expectOne((request) => request.url === PLANS_URL).flush(EMPTY_PAGE);
+    await settle();
+
+    expect(heading()).toBe('Dar de alta complejo');
+    expect(document.title).toBe('Dar de alta complejo · Backoffice de Kuador');
   });
 
   it('sends unknown addresses home', async () => {

@@ -1,0 +1,56 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+h1 {
+  margin: 0;
+}
+
+.register {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  max-width: calc(var(--size-content-max) / 2);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.register__subdomain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.register__subdomain-status {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+.register__subdomain-status--available {
+  color: var(--color-success);
+  font-weight: var(--font-weight-semibold);
+}
+
+.register__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (max-width: 599px) {
+  .register {
+    padding: var(--space-4);
+  }
+
+  .register__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}

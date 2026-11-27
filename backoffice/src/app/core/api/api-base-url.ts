@@ -4,7 +4,7 @@ import { DOCUMENT } from '@angular/common';
 /** Same-origin prefix used when the backoffice is not served on `admin.{root domain}`. */
 export const SAME_ORIGIN_API_BASE_URL = '/api/v1';
 
-const BACKOFFICE_HOST_LABEL = 'admin';
+export const BACKOFFICE_HOST_LABEL = 'admin';
 const API_HOST_LABEL = 'api';
 
 export interface HostLocation {
