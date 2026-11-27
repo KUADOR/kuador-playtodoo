@@ -1,0 +1,117 @@
+@let current = state();
+<div class="plans__header">
+  <h1>Planes</h1>
+  <div class="plans__header-actions">
+    <app-link-button label="Campos de plan" variant="secondary" [url]="planFieldsUrl" />
+    <app-link-button label="Crear plan" [url]="newPlanUrl" />
+  </div>
+</div>
+
+@if (notice(); as message) {
+  <app-alert tone="success" [dismissible]="true" (dismiss)="notice.set(null)">{{
+    message
+  }}</app-alert>
+}
+
+<section aria-labelledby="plans-heading" [attr.aria-busy]="current.status === 'loading'">
+  <h2 id="plans-heading" class="visually-hidden">Catálogo de planes</h2>
+
+  @if (current.status === 'loading') {
+    <app-skeleton [rows]="skeletonRows" />
+  } @else if (current.status === 'error') {
+    <app-alert tone="error">
+      {{ current.message }}
+      <app-button alertActions label="Reintentar" variant="secondary" (press)="load(0)" />
+    </app-alert>
+  } @else if (current.page.totalItems === 0) {
+    <div class="plans__empty">
+      <p class="plans__empty-title">Todavía no hay planes.</p>
+      <p>Crea el primero para poder asignarlo a los complejos.</p>
+      <app-link-button label="Crear plan" [url]="newPlanUrl" />
+    </div>
+  } @else {
+    <table class="data-table">
+      <caption class="visually-hidden">
+        Planes
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Nombre</th>
+          <th scope="col" class="data-table__number">Precio</th>
+          <th scope="col">Periodicidad</th>
+          <th scope="col">Límites</th>
+          <th scope="col">Estado</th>
+          <th scope="col"><span class="visually-hidden">Acciones</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (plan of current.page.items; track plan.id) {
+          <tr>
+            <td data-label="Nombre">
+              <a class="plans__name-link" [routerLink]="planUrl(plan.id)">{{ plan.name }}</a>
+            </td>
+            <td data-label="Precio" class="data-table__number">{{ priceLabel(plan) }}</td>
+            <td data-label="Periodicidad">{{ periodicityLabel(plan.periodicity) }}</td>
+            <td data-label="Límites">{{ limitsLabel(plan) }}</td>
+            <td data-label="Estado"><app-status-badge [status]="statusBadges[plan.status]" /></td>
+            <td data-label="Acciones">
+              @if (plan.status === 'DRAFT') {
+                <app-button
+                  label="Publicar"
+                  variant="secondary"
+                  [accessibleLabel]="'Publicar plan ' + plan.name"
+                  (press)="askToPublish(plan)"
+                />
+              } @else {
+                <span aria-hidden="true">—</span>
+                <span class="visually-hidden">Sin acciones</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <app-pagination
+      label="Paginación de planes"
+      [page]="current.page.page"
+      [size]="current.page.size"
+      [totalItems]="current.page.totalItems"
+      (pageChange)="load($event)"
+    />
+  }
+</section>
+
+@if (publishTarget(); as target) {
+  <app-dialog
+    [heading]="publishDialogHeading(target.plan.name)"
+    [busy]="publishing()"
+    (closeRequest)="closePublish()"
+  >
+    <p>{{ publishTexts.confirmation }}</p>
+    @if (target.error; as message) {
+      <app-alert tone="error">
+        {{ message }}
+        @if (target.incomplete) {
+          <a alertActions class="plans__name-link" [routerLink]="planUrl(target.plan.id)"
+            >Editar plan</a
+          >
+        }
+      </app-alert>
+    }
+    <app-button
+      dialogActions
+      data-dialog-initial-focus
+      label="Cancelar"
+      variant="secondary"
+      [disabled]="publishing()"
+      (press)="closePublish()"
+    />
+    <app-button
+      dialogActions
+      label="Publicar"
+      [loading]="publishing()"
+      loadingLabel="Publicando…"
+      (press)="publish()"
+    />
+  </app-dialog>
+}

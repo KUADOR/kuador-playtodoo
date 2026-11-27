@@ -4,8 +4,8 @@ import {
   ChangeOperatorCapabilitiesRequest,
   OperatorCapabilities,
 } from '../../features/operator-permissions/operator-capabilities-api';
-
 import { MockComplexesBackend } from './mock-complexes-backend';
+import { MockPlansBackend } from './mock-plans-backend';
 import { MockRequest, MockResponse, ok, pageOf, problem } from './mock-responses';
 
 export type { MockRequest, MockResponse } from './mock-responses';
@@ -61,6 +61,7 @@ export class MockPlatformBackend {
   );
   private readonly changes: CapabilityChange[] = [];
   private nextChangeId = 1;
+  private readonly plans = new MockPlansBackend();
   private readonly complexes = new MockComplexesBackend();
 
   handle(request: MockRequest): MockResponse {
@@ -88,7 +89,9 @@ export class MockPlatformBackend {
       case 'GET /platform/operator-capabilities/changes':
         return this.onlySuperAdmin(user, () => ok(pageOf(this.changes, request.query)));
       default:
+        // Plans first: it owns the full plan catalogue (P10–P12), published reads included.
         return (
+          this.plans.handle(request, user.role === 'SUPER_ADMIN') ??
           this.complexes.handle(request, this.currentUser(user)) ?? { status: 404, body: null }
         );
     }
