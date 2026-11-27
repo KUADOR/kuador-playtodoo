@@ -39,11 +39,11 @@ public final class JdbcTenantRegistry implements TenantRegistry {
     private static final String LOCK_TENANT_ROW = " FOR UPDATE OF t";
     private static final String LOCK_TENANT_ROW_UNLESS_HELD = " FOR UPDATE OF t SKIP LOCKED";
 
-    private static final String ARCHIVED_DUE = """
+    private static final String IN_RETENTION_DUE = """
             SELECT %s
             FROM global.tenant t
             LEFT JOIN global.tenant_domain d ON d.tenant_id = t.id AND d.is_current
-            WHERE t.status = 'ARCHIVED' AND t.purge_due_at <= :now
+            WHERE t.status IN ('SUSPENDED', 'ARCHIVED') AND t.purge_due_at <= :now
             ORDER BY t.purge_due_at, t.id
             """.formatted(TENANT_COLUMNS);
 
@@ -101,8 +101,8 @@ public final class JdbcTenantRegistry implements TenantRegistry {
     }
 
     @Override
-    public List<RegisteredTenant> lockArchivedDueBy(Instant now) {
-        return global.sql(ARCHIVED_DUE + LOCK_TENANT_ROW_UNLESS_HELD)
+    public List<RegisteredTenant> lockInRetentionDueBy(Instant now) {
+        return global.sql(IN_RETENTION_DUE + LOCK_TENANT_ROW_UNLESS_HELD)
                 .param("now", toTimestamp(now))
                 .query((row, number) -> registeredTenant(row))
                 .list();

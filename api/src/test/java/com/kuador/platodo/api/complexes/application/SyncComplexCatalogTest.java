@@ -51,6 +51,14 @@ class SyncComplexCatalogTest {
         assertThat(catalog.calls).containsExactly("subdomain " + ID + " el-sol");
     }
 
+    /** ADR-016: «borrar todo» includes the catalog row of the purged complex. */
+    @Test
+    void aPurgedComplexLeavesTheCatalog() {
+        sync.purged(TENANT);
+
+        assertThat(catalog.calls).containsExactly("remove " + ID);
+    }
+
     private static final class RecordingCatalog implements ComplexCatalog {
 
         private final List<String> calls = new ArrayList<>();
@@ -68,6 +76,11 @@ class SyncComplexCatalogTest {
         @Override
         public void changeSubdomain(UUID tenantId, String subdomain, Instant at) {
             calls.add("subdomain " + tenantId + " " + subdomain);
+        }
+
+        @Override
+        public void remove(UUID tenantId) {
+            calls.add("remove " + tenantId);
         }
     }
 
