@@ -35,7 +35,9 @@ import com.kuador.platodo.api.identity.domain.AccountType;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 import com.kuador.platodo.api.tenancy.domain.TenantStatus;
 
-/** Opening a support session (ADR-020; PLATODO-27 CA11 to CA13): who, on which status, and only with a reason. */
+/**
+ * Opening a support session (ADR-020; PLATODO-27 CA11, CA12 and CA15): who, on which status, and only with a reason.
+ */
 class OpenSupportSessionTest {
 
     private static final TenantId COMPLEX = new TenantId("0a0a0a0a-0000-4000-8000-00000000000a");
@@ -124,7 +126,7 @@ class OpenSupportSessionTest {
         assertRefused(superAdmin(SUPER_ADMIN_ID), REASON, DenialCode.TENANT_NOT_ACCESSIBLE);
     }
 
-    /** CA11: without a reason no session is opened, so there is no access to any data. */
+    /** CA12: without a reason no session is opened, so there is no access to any data. */
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", "   "})
@@ -170,7 +172,7 @@ class OpenSupportSessionTest {
                         refusal -> assertThat(refusal.code()).isEqualTo(expected));
 
         assertThat(auditLog.events()).singleElement().satisfies(event -> assertDenied(event, caller, expected));
-        assertThat(sessions.closeOpenOf(COMPLEX, NOW)).isZero();
+        assertThat(sessions.count()).isZero();
     }
 
     private static void assertDenied(AccessAuditEvent event, AuthenticatedPrincipal caller, DenialCode expected) {

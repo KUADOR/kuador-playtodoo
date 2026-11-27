@@ -23,13 +23,11 @@ import com.kuador.platodo.api.audit.support.RecordingAuditLog;
 import com.kuador.platodo.api.audit.support.SupportCallers;
 import com.kuador.platodo.api.bookings.support.MutableClock;
 import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
-import com.kuador.platodo.api.tenancy.domain.event.TenantPurged;
 
-/** Closing support sessions: by whoever opened them, and all of them when the complex is purged (ADR-020). */
+/** Closing support sessions: only by whoever opened them, audited (ADR-020). */
 class CloseSupportSessionTest {
 
     private static final TenantId A = new TenantId("0a0a0a0a-0000-4000-8000-00000000000a");
-    private static final TenantId B = new TenantId("0b0b0b0b-0000-4000-8000-00000000000b");
     private static final Instant NOW = Instant.parse("2030-01-01T10:00:00Z");
     private static final Duration TTL = Duration.ofMinutes(30);
     private static final UUID OPERATOR_ID = UUID.randomUUID();
@@ -80,19 +78,6 @@ class CloseSupportSessionTest {
         })).isInstanceOf(SupportSessionNotFoundException.class);
         assertThat(sessions.find(session.id()).orElseThrow().isOpenAt(NOW)).isTrue();
         assertThat(auditLog.events()).isEmpty();
-    }
-
-    @Test
-    void thePurgeOfAComplexClosesItsOpenSessionsOnly() {
-        AccessSession onA = sessionOf(OPERATOR_ID, A);
-        AccessSession onB = sessionOf(OPERATOR_ID, B);
-        Instant purgedAt = NOW.plusSeconds(60);
-
-        int closed = new CloseSupportSessionsOfPurgedTenant(sessions).close(new TenantPurged(A, purgedAt));
-
-        assertThat(closed).isOne();
-        assertThat(sessions.find(onA.id()).orElseThrow().isOpenAt(purgedAt)).isFalse();
-        assertThat(sessions.find(onB.id()).orElseThrow().isOpenAt(purgedAt)).isTrue();
     }
 
     private AccessSession sessionOf(UUID platformUserId, TenantId tenant) {

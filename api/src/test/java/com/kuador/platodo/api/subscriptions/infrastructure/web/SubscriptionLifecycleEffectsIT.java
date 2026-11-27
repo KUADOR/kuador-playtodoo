@@ -556,5 +556,10 @@ class SubscriptionLifecycleEffectsIT {
         public void changeSubdomain(UUID tenantId, String subdomain, Instant at) {
             delegate.changeSubdomain(tenantId, subdomain, at);
         }
+
+        @Override
+        public void remove(UUID tenantId) {
+            delegate.remove(tenantId);
+        }
     }
 }

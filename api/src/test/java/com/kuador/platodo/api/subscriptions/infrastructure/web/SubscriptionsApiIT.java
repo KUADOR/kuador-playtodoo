@@ -40,6 +40,7 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import com.kuador.platodo.api.subscriptions.application.DeleteExpiredSubscriptionHistory;
 import com.kuador.platodo.api.subscriptions.domain.SubscriptionStatus;
 import com.kuador.platodo.api.subscriptions.domain.event.SubscriptionPlanChanged;
 import com.kuador.platodo.api.subscriptions.domain.event.SubscriptionStatusChanged;
@@ -71,6 +72,8 @@ class SubscriptionsApiIT {
     private MockMvc mvc;
     @Autowired
     private ApplicationEvents events;
+    @Autowired
+    private DeleteExpiredSubscriptionHistory deleteExpiredHistory;
 
     private ComplexRequests api;
     private String superAdminToken;
@@ -372,6 +375,21 @@ class SubscriptionsApiIT {
         assertThat(historyOf(complexId)).contains("STATUS:ACTIVE->EXPIRING").doesNotContain("PLAN:Old plan->Older plan");
     }
 
+    /** CA5 and ADR-016: the retention job deletes the history past one year and keeps the rest and the payments. */
+    @Test
+    void theRetentionJobDeletesOnlyTheHistoryOlderThanOneYear() throws Exception {
+        String complexId = registeredComplex("history-purge");
+        insertHistoryEntry(complexId, "PLAN", "Old plan", "Older plan", "366 days");
+        insertHistoryEntry(complexId, "STATUS", "ACTIVE", "EXPIRING", "364 days");
+        api.recordPayment(superAdminToken, complexId, "10", "2026-11-01", "TRANSFER").andExpect(status().isCreated());
+
+        deleteExpiredHistory.run();
+
+        assertThat(historyRowsOf(complexId)).isEqualTo(3);
+        assertThat(historyOf(complexId)).contains("STATUS:ACTIVE->EXPIRING");
+        assertThat(json(api.payments(superAdminToken, complexId)).get("totalItems").asLong()).isEqualTo(1);
+    }
+
     /**
      * Isolation: changing the plan, status and payments of one complex leaves another complex untouched, and the
      * payments and history of each complex show only its own.
@@ -441,6 +459,13 @@ class SubscriptionsApiIT {
 
     private static ResultActions expectProblem(ResultActions result, int status, String code) throws Exception {
         return result.andExpect(status().is(status)).andExpect(jsonPath("$.code").value(code));
+    }
+
+    private static long historyRowsOf(String complexId) {
+        return TenantDatabase.admin()
+                .sql("SELECT count(*) FROM global.subscription_history WHERE tenant_id = CAST(:id AS uuid)")
+                .param("id", complexId)
+                .query(Long.class).single();
     }
 
     private static void insertHistoryEntry(String complexId, String kind, String before, String after, String age) {

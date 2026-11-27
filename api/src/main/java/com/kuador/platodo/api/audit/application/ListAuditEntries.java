@@ -27,22 +27,22 @@ public final class ListAuditEntries {
 
     public static final int MAX_PAGE_SIZE = 100;
 
-    /** The audit is kept for one year (PLATODO-27, decision of the Kuador team; ADR-011 as adjusted). */
-    static final Duration RETENTION = Duration.ofDays(365);
-
     private final CapabilityGuard guard;
     private final TenantDirectory tenants;
     private final AccessAuditLog auditLog;
     private final PlatformUserNames userNames;
     private final Clock clock;
+    private final Duration retention;
 
+    /** @param retention how long the audit is kept (ADR-016: one year by decision of the Kuador team) */
     public ListAuditEntries(CapabilityGuard guard, TenantDirectory tenants, AccessAuditLog auditLog,
-            PlatformUserNames userNames, Clock clock) {
+            PlatformUserNames userNames, Clock clock, Duration retention) {
         this.guard = guard;
         this.tenants = tenants;
         this.auditLog = auditLog;
         this.userNames = userNames;
         this.clock = clock;
+        this.retention = retention;
     }
 
     /**
@@ -59,7 +59,7 @@ public final class ListAuditEntries {
         if (tenants.find(tenant).isEmpty()) {
             throw new SupportComplexNotFoundException();
         }
-        AuditPage found = auditLog.pageOf(tenant, clock.instant().minus(RETENTION), new PageRequest(page, size));
+        AuditPage found = auditLog.pageOf(tenant, clock.instant().minus(retention), new PageRequest(page, size));
         Map<UUID, String> names =
                 userNames.displayNamesOf(found.items().stream().map(AccessAuditEvent::platformUserId).toList());
         return new AuditEntries(found.items().stream()

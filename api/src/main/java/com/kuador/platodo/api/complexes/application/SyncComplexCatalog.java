@@ -13,8 +13,9 @@ import com.kuador.platodo.api.tenancy.domain.TenantStatus;
 
 /**
  * Keeps the global catalog aligned with the lifecycle of each complex (ADR-014): only an {@code ACTIVE} complex is
- * visible, so a suspended or cancelled one disappears for players in the same commit that blocks it. Runs inside the
- * transaction of the lifecycle change; reads only the global directory, never a tenant schema.
+ * visible, so a suspended or cancelled one disappears for players in the same commit that blocks it, and a purged one
+ * loses its row. Runs inside the transaction of the lifecycle change; reads only the global directory, never a tenant
+ * schema.
  */
 public final class SyncComplexCatalog {
 
@@ -41,5 +42,10 @@ public final class SyncComplexCatalog {
 
     public void subdomainChanged(TenantId tenant, String subdomain, Instant at) {
         catalog.changeSubdomain(UUID.fromString(tenant.value()), subdomain, at);
+    }
+
+    /** A purged complex leaves the catalog for good: «borrar todo» includes its row (ADR-016). */
+    public void purged(TenantId tenant) {
+        catalog.remove(UUID.fromString(tenant.value()));
     }
 }

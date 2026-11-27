@@ -1,6 +1,6 @@
 # Cambios a documentos compartidos · PLATODO-88
 
-Acceso de soporte con motivo, edición y auditoría en la `api` (ADR-017, ADR-020; PLATODO-27 CA11 a CA14 y CA17).
+Acceso de soporte con motivo, edición y auditoría en la `api` (ADR-017, ADR-020). Criterios de PLATODO-27: CA11 (suspendido: SUPER_ADMIN con motivo), CA12 (sin motivo no hay datos), CA13 (auditoría 1 año), CA14 (aislamiento), CA15 (OPERATOR solo lo habilitado) y CA17 (concurrencia sin duplicados).
 
 ## docs/architecture.md
 
@@ -15,8 +15,9 @@ com.kuador.platodo.api.audit/
                                  TENANT_DATA_ACCESS; SUSPENDED y ARCHIVED solo SUPER_ADMIN; otros estados nadie
   application/                   OpenSupportSession (audita la apertura, permitida o rechazada), CloseSupportSession
                                  (audita el cierre), ListAuditEntries (solo SUPER_ADMIN, últimos 365 días, nombres en
-                                 una consulta), AuthorizeSupportAccess (implementa SupportAccessAuthorization de
-                                 Tenancy), CloseSupportSessionsOfPurgedTenant, CurrentSupportCaller (CapabilityGuard)
+                                 una consulta; retención playtodoo.audit.retention-days), AuthorizeSupportAccess
+                                 (implementa SupportAccessAuthorization de Tenancy), CurrentSupportCaller
+                                 (CapabilityGuard)
   infrastructure/web/            SupportAccessController: POST /platform/complexes/{complexId}/support-sessions,
                                  DELETE /platform/support-sessions/{sessionId},
                                  GET /platform/complexes/{complexId}/audit-entries
@@ -42,6 +43,6 @@ En «Decisiones», ADR-011: la cabecera es `X-Support-Session` y el error `SUPPO
 
 Punto 7 («Reemplazo»): queda hecho en PLATODO-88. Las operaciones `access-sessions`, `access-audit` y la cabecera `X-Platform-Access-Session` se retiraron de la `api` y de `contracts/tenancy.openapi.yaml`.
 
-Punto 5 («Purga»): desde `PURGING` el host del complejo responde «no encontrado» y ninguna solicitud llega; las sesiones abiertas se cierran en la transacción de la purga (`TenantPurged`), porque `claimDue` no publica un evento al pasar a `PURGING`.
+Punto 5 («Purga»): lo implementó PLATODO-87 (`InvalidateAccessSessionsOfPurgingTenant`, al pasar a `PURGING`); PLATODO-88 lo reutiliza. Además, la autorización de cada solicitud lee el estado con la fila del complejo bloqueada, así que una purga en curso se espera y decide.
 
 Punto 6 (canchas y horarios): sigue igual; crear reservas o bloqueos desde soporte responde `404 COURT_NOT_FOUND` hasta que exista el módulo de canchas.

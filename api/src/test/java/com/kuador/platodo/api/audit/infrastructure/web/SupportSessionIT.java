@@ -52,7 +52,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Support sessions with a reason, edition and audit (ADR-017, ADR-020; PLATODO-27 CA11 to CA14 and CA17), over HTTP
+ * Support sessions with a reason, edition and audit (ADR-017, ADR-020; PLATODO-27 CA11 to CA15), over HTTP
  * with the real tenant resolution, token filter, support access guard, staff booking operations and PostgreSQL. A
  * probe endpoint of the tenant host reports the schema its connection uses and counts its own runs, so a denial is
  * shown to touch no tenant schema.
@@ -103,7 +103,7 @@ class SupportSessionIT {
         tenantDataAccessForOperators(false);
     }
 
-    /** CA11: with a reason the SUPER_ADMIN reaches complex A, audited first and only inside the schema of A. */
+    /** CA13 and CA14: with a reason the SUPER_ADMIN reaches complex A, audited first and only in its schema. */
     @Test
     void withAReasonTheSuperAdminReachesTheComplexAuditedAndOnlyInItsSchema() throws Exception {
         String opened = openSession(A, superAdminToken, REASON)
@@ -140,7 +140,7 @@ class SupportSessionIT {
         assertThat(opening.get("sessionId").asString()).isEqualTo(sessionId);
     }
 
-    /** CA11 and CA17: support reuses the staff operations, audited with their contract operationId. */
+    /** CA13: support reuses the staff operations, audited with their contract operationId. */
     @Test
     void supportUsesTheStaffOperationsAndTheAuditNamesTheOperation() throws Exception {
         String sessionId = sessionIdOf(openSession(A, superAdminToken, REASON));
@@ -154,7 +154,7 @@ class SupportSessionIT {
         assertThat(entry.get("pathTemplate").asString()).isEqualTo(STAFF_BOOKINGS);
     }
 
-    /** CA11: without a reason no session is opened and no data is reached; the refusal is audited. */
+    /** CA12: without a reason no session is opened and no data is reached; the refusal is audited. */
     @Test
     void withoutAReasonNoSessionIsOpenedAndThereIsNoData() throws Exception {
         long sessionsBefore = sessionsOf(superAdminId);
@@ -186,7 +186,7 @@ class SupportSessionIT {
         assertThat(refusal.get("sessionId").isNull()).isTrue();
     }
 
-    /** Isolation: a session of A used on the host of B is denied without touching the schema of B, audited on B. */
+    /** CA14: a session of A used on the host of B is denied without touching the schema of B, audited on B. */
     @Test
     void theSessionOfAUsedOnTheHostOfBIsDeniedWithoutTouchingB() throws Exception {
         String sessionId = sessionIdOf(openSession(A, superAdminToken, REASON));
@@ -211,7 +211,7 @@ class SupportSessionIT {
         assertThat(auditRowsOutsideTenant(A, sessionId)).isZero();
     }
 
-    /** CA12 and ADR-017: the operator needs TENANT_DATA_ACCESS, and losing it stops the next request. */
+    /** CA15 and ADR-017: the operator needs TENANT_DATA_ACCESS, and losing it stops the next request. */
     @Test
     void anOperatorNeedsTheCapabilityAndLosesAccessOnTheNextRequestWhenItIsDisabled() throws Exception {
         openSession(A, operatorToken, REASON)
@@ -228,7 +228,7 @@ class SupportSessionIT {
                 .andExpect(jsonPath("$.code").value("SUPPORT_SESSION_INVALID"));
     }
 
-    /** CA13: on a suspended complex only the SUPER_ADMIN works, reading and editing; the operator is refused. */
+    /** CA11: on a suspended complex only the SUPER_ADMIN works, reading and editing; the operator is refused. */
     @Test
     void onASuspendedComplexOnlyTheSuperAdminWorks() throws Exception {
         tenantDataAccessForOperators(true);
@@ -358,7 +358,7 @@ class SupportSessionIT {
         probeOn(A, superAdminToken, sessionId).andExpect(status().isOk());
     }
 
-    /** CA14: only the SUPER_ADMIN reads the audit, newest first and only for that complex. */
+    /** CA13: only the SUPER_ADMIN reads the audit, newest first and only for that complex. */
     @Test
     void onlyTheSuperAdminReadsTheAuditPagedNewestFirst() throws Exception {
         String sessionId = sessionIdOf(openSession(A, superAdminToken, REASON));

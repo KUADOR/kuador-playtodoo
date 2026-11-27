@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import com.kuador.platodo.api.audit.application.port.out.AccessSessions;
 import com.kuador.platodo.api.audit.domain.AccessSession;
-import com.kuador.platodo.api.tenancy.application.port.in.TenantId;
 
 import jakarta.persistence.EntityManager;
 
@@ -35,16 +34,5 @@ public final class JpaAccessSessions implements AccessSessions {
     public void close(UUID sessionId, Instant closedAt) {
         Optional.ofNullable(global.find(AccessSessionEntity.class, sessionId))
                 .ifPresent(session -> session.closeAt(closedAt));
-    }
-
-    @Override
-    public int closeOpenOf(TenantId tenant, Instant closedAt) {
-        return global.createQuery("""
-                        UPDATE AccessSessionEntity s SET s.closedAt = :closedAt
-                        WHERE s.tenantId = :tenant AND s.closedAt IS NULL AND s.expiresAt > :closedAt
-                        """)
-                .setParameter("closedAt", closedAt)
-                .setParameter("tenant", UUID.fromString(tenant.value()))
-                .executeUpdate();
     }
 }

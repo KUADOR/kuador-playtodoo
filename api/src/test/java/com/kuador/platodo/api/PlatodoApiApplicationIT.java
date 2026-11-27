@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.ContextConfiguration;
 
+import com.kuador.platodo.api.audit.infrastructure.scheduling.AccessAuditRetentionJob;
 import com.kuador.platodo.api.bookings.application.CreatePendingBooking;
 import com.kuador.platodo.api.support.TenantDatabase;
 
@@ -26,5 +27,11 @@ class PlatodoApiApplicationIT {
     @Test
     void thePlayerBookingApiIsOffByDefault() {
         assertThat(context.getBeanNamesForType(CreatePendingBooking.class)).isEmpty();
+    }
+
+    /** Tests turn the retention jobs off (src/test/resources/config/application.properties). */
+    @Test
+    void theRetentionJobsAreOffInTests() {
+        assertThat(context.getBeanNamesForType(AccessAuditRetentionJob.class)).isEmpty();
     }
 }

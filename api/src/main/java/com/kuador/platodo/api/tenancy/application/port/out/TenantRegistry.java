@@ -41,11 +41,11 @@ public interface TenantRegistry {
     Optional<RegisteredTenant> tryLock(TenantId id);
 
     /**
-     * The {@code ARCHIVED} complexes whose purge date is {@code now} or earlier, locked until the surrounding
-     * {@link GlobalTransaction} ends. The ones another transaction holds are skipped, so several instances of the purge
-     * job never claim the same complex.
+     * The {@code SUSPENDED} and {@code ARCHIVED} complexes whose purge date is {@code now} or earlier, locked until the
+     * surrounding {@link GlobalTransaction} ends. The ones another transaction holds are skipped, so several instances
+     * of the purge job never claim the same complex, and a reactivation in progress keeps its complex.
      */
-    List<RegisteredTenant> lockArchivedDueBy(Instant now);
+    List<RegisteredTenant> lockInRetentionDueBy(Instant now);
 
     /** The complexes left in {@code PURGING}, whose purge still has to be done or retried. */
     List<TenantId> purging();

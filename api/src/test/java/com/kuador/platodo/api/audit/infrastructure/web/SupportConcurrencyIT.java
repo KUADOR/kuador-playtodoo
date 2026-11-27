@@ -50,10 +50,10 @@ import com.kuador.platodo.api.tenancy.infrastructure.scheduling.PurgeDueTenantsJ
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Concurrency of Kuador support (AGENTS.md, ADR-006, ADR-020): support and a player booking the same slot of an
- * active complex, two support sessions blocking the same slot of a suspended complex, and support requests racing the
- * purge of an archived complex. Real HTTP stack and PostgreSQL; only the court rules are a test double, because the
- * Courts module does not exist yet.
+ * Concurrency of Kuador support (PLATODO-27 CA17; AGENTS.md, ADR-006, ADR-020): support and a player booking the
+ * same slot of an active complex, two support sessions blocking the same slot of a suspended complex, and support
+ * requests racing the purge of an archived complex. Real HTTP stack and PostgreSQL; only the court rules are a test
+ * double, because the Courts module does not exist yet.
  */
 @SpringBootTest(properties = {
         ConditionalOnStaffApiEnabled.PROPERTY + "=true",
@@ -135,7 +135,7 @@ class SupportConcurrencyIT {
         assertThat(activeEntriesOn(ACTIVE, court)).isOne();
     }
 
-    /** CA13: two SUPER_ADMIN sessions block the same slot of a suspended complex at once; one inactive block stays. */
+    /** CA11, CA17: two SUPER_ADMIN sessions block one slot of a suspended complex at once; one inactive block stays. */
     @Test
     void twoSupportSessionsOnASuspendedComplexNeverBothBlockTheSameSlot() throws Exception {
         String first = superAdminToken();

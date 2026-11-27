@@ -40,6 +40,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kuador.platodo.api.identity.application.DeleteExpiredCapabilityChanges;
 import com.kuador.platodo.api.identity.application.port.in.AuthenticatedPrincipal;
 import com.kuador.platodo.api.identity.application.port.in.CapabilityGuard;
 import com.kuador.platodo.api.identity.application.port.out.AccessTokens;
@@ -80,6 +81,8 @@ class PlatformRolesAndCapabilitiesIT {
     private MockMvc mvc;
     @Autowired
     private AccessTokens accessTokens;
+    @Autowired
+    private DeleteExpiredCapabilityChanges deleteExpiredChanges;
 
     private UUID superAdminId;
     private String superAdminToken;
@@ -164,6 +167,17 @@ class PlatformRolesAndCapabilitiesIT {
         assertThat(newest.get("changedBy").get("id").asString()).isEqualTo(superAdminId.toString());
         assertThat(newest.get("changedBy").get("displayName").asString()).isEqualTo(TestAccounts.PLATFORM_USER_NAME);
         assertThat(page.get("totalItems").asLong()).isGreaterThanOrEqualTo(2);
+    }
+
+    /** ADR-016: the retention job deletes the capability changes past one year and keeps the newer ones. */
+    @Test
+    void theRetentionJobDeletesOnlyTheChangesOlderThanOneYear() {
+        UUID expired = insertChange("366 days");
+        UUID kept = insertChange("364 days");
+
+        deleteExpiredChanges.run();
+
+        assertThat(changeIdsOf(superAdminId)).containsExactly(kept).doesNotContain(expired);
     }
 
     @Test
@@ -278,6 +292,22 @@ class PlatformRolesAndCapabilitiesIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         assertThat(currentVersion()).isEqualTo(version);
+    }
+
+    private UUID insertChange(String age) {
+        UUID id = UUID.randomUUID();
+        TenantDatabase.admin().sql("""
+                        INSERT INTO global.capability_change (id, capability_key, enabled, changed_by, changed_at)
+                        VALUES (:id, :key, true, :user, now() - CAST(:age AS interval))
+                        """)
+                .param("id", id).param("key", PAYMENTS).param("user", superAdminId).param("age", age)
+                .update();
+        return id;
+    }
+
+    private static List<UUID> changeIdsOf(UUID changedBy) {
+        return TenantDatabase.admin().sql("SELECT id FROM global.capability_change WHERE changed_by = :user")
+                .param("user", changedBy).query(UUID.class).list();
     }
 
     private long currentVersion() throws Exception {

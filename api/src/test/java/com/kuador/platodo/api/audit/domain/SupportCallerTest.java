@@ -10,7 +10,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import com.kuador.platodo.api.tenancy.domain.TenantStatus;
 
-/** Who may work on a complex in each status (ADR-020, PLATODO-27 CA11 to CA13). */
+/** Who may work on a complex in each status (ADR-020, PLATODO-27 CA11 and CA15). */
 class SupportCallerTest {
 
     private static final SupportCaller SUPER_ADMIN = new SupportCaller(UUID.randomUUID(), true, true);

@@ -3,6 +3,7 @@ package com.kuador.platodo.api.complexes.infrastructure.events;
 import org.springframework.context.event.EventListener;
 
 import com.kuador.platodo.api.complexes.application.SyncComplexCatalog;
+import com.kuador.platodo.api.tenancy.domain.event.TenantPurged;
 import com.kuador.platodo.api.tenancy.domain.event.TenantStatusChanged;
 import com.kuador.platodo.api.tenancy.domain.event.TenantSubdomainChanged;
 
@@ -26,5 +27,11 @@ public final class TenantCatalogListener {
     @EventListener
     public void on(TenantSubdomainChanged changed) {
         sync.subdomainChanged(changed.tenantId(), changed.subdomain(), changed.occurredAt());
+    }
+
+    /** Inside the purge transaction (ADR-016): if the row cannot be deleted, the complex stays {@code PURGING}. */
+    @EventListener
+    public void on(TenantPurged purged) {
+        sync.purged(purged.tenantId());
     }
 }
